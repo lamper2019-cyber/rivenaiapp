@@ -21,7 +21,10 @@ const hasRealClerkKeys =
   !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
   !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes("katydid");
 
-const noopMiddleware = (_req: NextRequest) => NextResponse.next();
+const noopMiddleware = (_req: NextRequest) => {
+  void _req;
+  return NextResponse.next();
+};
 
 const middleware = hasRealClerkKeys
   ? clerkMiddleware((auth, req) => {

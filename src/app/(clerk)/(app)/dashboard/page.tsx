@@ -71,7 +71,6 @@ export default async function DashboardPage() {
             label="Calories"
             value={todayTotals.calories}
             target={profile.cutCalories}
-            remaining={calorieRemaining}
             unit=""
             remainingLabel={
               calorieRemaining > 0
@@ -83,7 +82,6 @@ export default async function DashboardPage() {
             label="Protein"
             value={todayTotals.protein}
             target={profile.proteinFloor}
-            remaining={proteinRemaining}
             unit="g"
             remainingLabel={
               proteinRemaining > 0
@@ -96,7 +94,6 @@ export default async function DashboardPage() {
             label="Steps"
             value={todayTotals.steps}
             target={STEP_GOAL}
-            remaining={stepRemaining}
             unit=""
             remainingLabel={
               stepRemaining > 0
@@ -190,7 +187,6 @@ function ProgressCard({
   label,
   value,
   target,
-  remaining,
   unit,
   remainingLabel,
   requireToHit,
@@ -198,7 +194,6 @@ function ProgressCard({
   label: string;
   value: number;
   target: number;
-  remaining: number;
   unit: string;
   remainingLabel: string;
   requireToHit?: boolean;

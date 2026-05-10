@@ -66,7 +66,7 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
   }
 
   // Load profile (for targets) and today's totals.
-  let user, profile, todayTotals;
+  let user;
   try {
     user = await prisma.user.findUnique({
       where: { clerkId: userId },
@@ -85,10 +85,10 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
       error: "Complete onboarding before logging meals.",
     };
   }
-  profile = user.profile;
+  const profile = user.profile;
 
   const today = startOfDay(new Date());
-  todayTotals = await prisma.dailyTotals.findUnique({
+  const todayTotals = await prisma.dailyTotals.findUnique({
     where: { userId_date: { userId: user.id, date: today } },
   });
 
