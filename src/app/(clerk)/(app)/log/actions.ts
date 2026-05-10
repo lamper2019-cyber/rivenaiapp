@@ -189,6 +189,98 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
   return { ok: true, analysis, totals: newTotals, mealLogId: mealLog.id };
 }
 
+export type UndoLastMealResult =
+  | {
+      ok: true;
+      undone: { id: string; description: string; calories: number; protein: number };
+      totals: { calories: number; protein: number; fat: number; carbs: number };
+    }
+  | { ok: false; error: string };
+
+/**
+ * Delete the most recent meal log for the signed-in user and decrement
+ * today's totals by exactly that meal's macros. Only undoes meals logged on
+ * the current calendar day — yesterday's accidental meal won't accidentally
+ * un-rewind today's scoreboard.
+ */
+export async function undoLastMeal(): Promise<UndoLastMealResult> {
+  const { userId } = auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: isClerkConfigured ? "Not signed in." : "Add Clerk keys to .env.local.",
+    };
+  }
+
+  let user;
+  try {
+    user = await prisma.user.findUnique({ where: { clerkId: userId } });
+  } catch {
+    return { ok: false, error: "Database not connected." };
+  }
+  if (!user) return { ok: false, error: "Complete onboarding first." };
+
+  const today = startOfDay(new Date());
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const lastMeal = await prisma.mealLog.findFirst({
+    where: {
+      userId: user.id,
+      createdAt: { gte: today, lt: tomorrow },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      description: true,
+      calories: true,
+      protein: true,
+      fat: true,
+      carbs: true,
+    },
+  });
+
+  if (!lastMeal) {
+    return {
+      ok: false,
+      error: "No meal logged today to undo.",
+    };
+  }
+
+  // Decrement totals + delete meal in one transaction.
+  const [, updatedTotals] = await prisma.$transaction([
+    prisma.mealLog.delete({ where: { id: lastMeal.id } }),
+    prisma.dailyTotals.update({
+      where: { userId_date: { userId: user.id, date: today } },
+      data: {
+        totalCalories: { decrement: lastMeal.calories },
+        totalProtein: { decrement: lastMeal.protein },
+        totalFat: { decrement: lastMeal.fat },
+        totalCarbs: { decrement: lastMeal.carbs },
+      },
+    }),
+  ]);
+
+  revalidatePath("/log");
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    undone: {
+      id: lastMeal.id,
+      description: lastMeal.description,
+      calories: lastMeal.calories,
+      protein: lastMeal.protein,
+    },
+    totals: {
+      calories: Math.max(0, updatedTotals.totalCalories),
+      protein: Math.max(0, updatedTotals.totalProtein),
+      fat: Math.max(0, updatedTotals.totalFat),
+      carbs: Math.max(0, updatedTotals.totalCarbs),
+    },
+  };
+}
+
 export async function getRecentMeals(limit = 8) {
   const { userId } = auth();
   if (!userId) return [];

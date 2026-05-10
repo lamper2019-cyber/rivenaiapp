@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { logMeal, type LogMealResult } from "./actions";
+import { logMeal, undoLastMeal, type LogMealResult } from "./actions";
 
 type RecentMeal = {
   id: string;
@@ -29,6 +29,8 @@ export function LogForm({
   const [result, setResult] = useState<LogMealResult | null>(null);
   const [totals, setTotals] = useState<Totals>(initialTotals);
   const [pending, startTransition] = useTransition();
+  const [undoPending, startUndo] = useTransition();
+  const [undoMessage, setUndoMessage] = useState<string | null>(null);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,6 +38,7 @@ export function LogForm({
 
     const fd = new FormData();
     fd.set("description", description);
+    setUndoMessage(null);
 
     startTransition(async () => {
       const res = await logMeal(fd);
@@ -49,6 +52,30 @@ export function LogForm({
             proteinToday: totals.proteinToday + res.analysis.protein,
           });
         }
+      }
+    });
+  }
+
+  function handleUndo() {
+    if (undoPending || pending) return;
+    setUndoMessage(null);
+    startUndo(async () => {
+      const res = await undoLastMeal();
+      if (res.ok) {
+        // Wipe the result card and roll the totals back to what the server returned.
+        setResult(null);
+        setUndoMessage(
+          `Undid: ${res.undone.description.slice(0, 60)}${res.undone.description.length > 60 ? "…" : ""}`
+        );
+        if (totals) {
+          setTotals({
+            ...totals,
+            caloriesToday: res.totals.calories,
+            proteinToday: res.totals.protein,
+          });
+        }
+      } else {
+        setUndoMessage(res.error);
       }
     });
   }
@@ -109,13 +136,37 @@ export function LogForm({
         </div>
       )}
 
-      {result && result.ok && <ResultCard analysis={result.analysis} />}
+      {result && result.ok && (
+        <ResultCard
+          analysis={result.analysis}
+          onUndo={handleUndo}
+          undoPending={undoPending}
+        />
+      )}
+
+      {undoMessage && (
+        <div className="rounded-md border border-outline-variant/60 bg-surface-container-lowest px-gutter py-3">
+          <p className="font-body text-body-md text-on-surface-variant">{undoMessage}</p>
+        </div>
+      )}
 
       {recentMeals.length > 0 && (
         <section className="space-y-3">
-          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-            Recent meals
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+              Recent meals
+            </h2>
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={undoPending || pending}
+              className="inline-flex items-center gap-1 font-body text-label-sm tracking-wide text-on-surface-variant hover:text-charcoal disabled:opacity-50 transition-colors"
+              title="Undo today's most recent meal log"
+            >
+              <span className="material-symbols-outlined text-[14px]">undo</span>
+              {undoPending ? "Undoing…" : "Undo last"}
+            </button>
+          </div>
           <div className="flex flex-wrap gap-2">
             {recentMeals.map((m) => (
               <button
@@ -178,8 +229,12 @@ function TotalCard({
 
 function ResultCard({
   analysis,
+  onUndo,
+  undoPending,
 }: {
   analysis: { calories: number; protein: number; fat: number; carbs: number; coaching: string };
+  onUndo: () => void;
+  undoPending: boolean;
 }) {
   return (
     <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter md:p-6 shadow-elevation-2 space-y-4">
@@ -191,6 +246,17 @@ function ResultCard({
         <Macro label="Protein" value={analysis.protein} unit="g" />
         <Macro label="Fat" value={analysis.fat} unit="g" />
         <Macro label="Carbs" value={analysis.carbs} unit="g" />
+      </div>
+      <div className="flex justify-end pt-1">
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={undoPending}
+          className="inline-flex items-center gap-1.5 font-body text-label-md tracking-widest uppercase text-on-surface-variant hover:text-charcoal disabled:opacity-60 transition-colors"
+        >
+          <span className="material-symbols-outlined text-[16px]">undo</span>
+          {undoPending ? "Undoing…" : "Undo"}
+        </button>
       </div>
     </div>
   );
