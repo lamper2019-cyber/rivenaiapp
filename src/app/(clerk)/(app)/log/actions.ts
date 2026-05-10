@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -127,7 +128,9 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
         },
       ],
       messages: [{ role: "user", content: userMessage }],
-      output_format: MealAnalysisSchema,
+      // Anthropic deprecated the top-level `output_format` parameter — must use
+      // `output_config.format` with the Zod helper now.
+      output_config: { format: zodOutputFormat(MealAnalysisSchema) },
     });
     if (!response.parsed_output) {
       return {
