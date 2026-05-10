@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { startOfIsoWeek, formatWeekRange } from "@/lib/week";
-import { getPromptForClientWeek, getClientWeekNumber, CONTENT_PROMPTS } from "@/lib/content-prompts";
+import { getPromptForClientWeek, getClientWeekNumber } from "@/lib/content-prompts";
 import { ContentForm } from "./content-form";
 
 export default async function ContentPage() {
@@ -66,9 +66,6 @@ export default async function ContentPage() {
         </p>
         <p className="font-body text-label-sm text-on-surface-variant/80 max-w-md">
           {prompt.hint}
-        </p>
-        <p className="font-body text-label-sm text-on-surface-variant/60">
-          Prompt {prompt.id} of {CONTENT_PROMPTS.length}
         </p>
       </header>
 

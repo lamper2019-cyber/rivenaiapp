@@ -24,12 +24,19 @@ export function ContentForm({ onboarded }: { onboarded: boolean }) {
 
     startUpload(async () => {
       try {
+        // Some browsers don't fill file.type for videos — fall back to
+        // a sensible default so the sign endpoint doesn't reject the request
+        // before it gets to look at the file extension.
+        const inferredType =
+          file.type ||
+          (isVideo ? "video/mp4" : isImage ? "image/jpeg" : "application/octet-stream");
+
         const sign = await fetch("/api/r2/sign", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             fileName: file.name,
-            contentType: file.type,
+            contentType: inferredType,
             contentLength: file.size,
             scope: "content",
           }),
@@ -37,7 +44,7 @@ export function ContentForm({ onboarded }: { onboarded: boolean }) {
 
         if (!sign.ok) {
           const data = await sign.json().catch(() => ({}));
-          throw new Error(data.error ?? `Sign failed: ${sign.status}`);
+          throw new Error(data.error ?? `Sign failed (${sign.status}). Try a smaller file or different format.`);
         }
 
         const { uploadUrl, publicUrl } = (await sign.json()) as {
@@ -48,9 +55,14 @@ export function ContentForm({ onboarded }: { onboarded: boolean }) {
         const put = await fetch(uploadUrl, {
           method: "PUT",
           body: file,
-          headers: { "Content-Type": file.type },
+          headers: { "Content-Type": inferredType },
         });
-        if (!put.ok) throw new Error(`Upload failed: ${put.status}`);
+        if (!put.ok) {
+          const body = await put.text().catch(() => "");
+          throw new Error(
+            `Upload to R2 failed (${put.status}). ${body.slice(0, 200) || "Check your bucket CORS policy in the Cloudflare dashboard."}`
+          );
+        }
 
         if (isVideo) {
           setVideoUrl(publicUrl);
@@ -60,7 +72,10 @@ export function ContentForm({ onboarded }: { onboarded: boolean }) {
           setVideoUrl("");
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Upload failed";
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Upload failed — check your network and try again.";
         setUploadError(msg);
       }
     });

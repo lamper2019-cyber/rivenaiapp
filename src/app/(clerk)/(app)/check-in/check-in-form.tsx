@@ -252,12 +252,14 @@ function PhotoUpload({
     setError(null);
     startUpload(async () => {
       try {
+        const contentType = file.type || "image/jpeg";
+
         const signResp = await fetch("/api/r2/sign", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             fileName: file.name,
-            contentType: file.type || "image/jpeg",
+            contentType,
             contentLength: file.size,
             scope,
           }),
@@ -265,7 +267,7 @@ function PhotoUpload({
 
         if (!signResp.ok) {
           const data = await signResp.json().catch(() => ({}));
-          throw new Error(data.error ?? `Sign failed: ${signResp.status}`);
+          throw new Error(data.error ?? `Sign failed (${signResp.status}). Try a smaller file.`);
         }
 
         const { uploadUrl, publicUrl: pUrl } = (await signResp.json()) as {
@@ -276,16 +278,22 @@ function PhotoUpload({
         const putResp = await fetch(uploadUrl, {
           method: "PUT",
           body: file,
-          headers: { "Content-Type": file.type || "image/jpeg" },
+          headers: { "Content-Type": contentType },
         });
 
         if (!putResp.ok) {
-          throw new Error(`Upload failed: ${putResp.status}`);
+          const body = await putResp.text().catch(() => "");
+          throw new Error(
+            `Upload failed (${putResp.status}). ${body.slice(0, 200) || "Check the R2 bucket CORS policy in Cloudflare."}`
+          );
         }
 
         onChange(pUrl);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Upload failed";
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Upload failed — check your network and try again.";
         setError(msg);
       }
     });

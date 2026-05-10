@@ -5,20 +5,32 @@ import { isR2Configured, presignUpload, buildR2Key } from "@/lib/r2";
 
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
+  "image/jpg",
   "image/png",
   "image/webp",
   "image/heic",
   "image/heif",
 ]);
 
+// Browsers report video MIME types inconsistently:
+//   - iOS Safari camera roll: video/quicktime (.mov)
+//   - iOS recorded inline: video/mp4 or video/quicktime
+//   - Android Chrome: video/mp4, sometimes video/3gpp
+//   - Some PWAs leave it blank
 const ALLOWED_VIDEO_TYPES = new Set([
   "video/mp4",
   "video/quicktime",
   "video/webm",
+  "video/x-m4v",
+  "video/mpeg",
+  "video/3gpp",
+  "video/3gpp2",
+  "video/ogg",
+  "application/octet-stream", // some browsers leave videos as binary stream
 ]);
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15 MB
-const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
+const MAX_VIDEO_BYTES = 500 * 1024 * 1024; // 500 MB — iPhone 4K @ 1 min ≈ 150-200 MB
 
 const BodySchema = z.object({
   fileName: z.string().min(1).max(200),
@@ -67,13 +79,25 @@ export async function POST(req: Request) {
 
   const { fileName, contentType, contentLength, scope } = parsed.data;
 
-  const isImage = ALLOWED_IMAGE_TYPES.has(contentType);
-  const isVideo = ALLOWED_VIDEO_TYPES.has(contentType);
+  // Some browsers report video/quicktime as application/octet-stream or send an
+  // empty contentType for recorded video. Fall back to the file extension to
+  // figure out what kind of asset this actually is.
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  const VIDEO_EXTS = new Set(["mp4", "mov", "m4v", "webm", "mpg", "mpeg", "3gp", "ogv"]);
+  const IMAGE_EXTS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "gif"]);
+
+  let isImage = ALLOWED_IMAGE_TYPES.has(contentType) || IMAGE_EXTS.has(ext);
+  let isVideo = ALLOWED_VIDEO_TYPES.has(contentType) || VIDEO_EXTS.has(ext);
+  // If both somehow match (shouldn't), let the extension win.
+  if (isImage && isVideo) {
+    isImage = IMAGE_EXTS.has(ext);
+    isVideo = VIDEO_EXTS.has(ext);
+  }
 
   if (!isImage && !isVideo) {
     return NextResponse.json(
       {
-        error: `Unsupported content type: ${contentType}. Use JPEG, PNG, WebP, HEIC for images or MP4, MOV, WebM for video.`,
+        error: `Unsupported file: contentType="${contentType}" extension=".${ext}". Use JPEG/PNG/WebP/HEIC for images or MP4/MOV/WebM for video.`,
       },
       { status: 415 }
     );
