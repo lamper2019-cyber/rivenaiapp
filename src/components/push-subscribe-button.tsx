@@ -68,9 +68,15 @@ export function PushSubscribeButton({
       }
 
       const reg = await navigator.serviceWorker.ready;
+      // TS 5.7+ narrowed BufferSource to require Uint8Array<ArrayBuffer>;
+      // the helper's underlying buffer is always a plain ArrayBuffer so the
+      // cast is sound.
+      const applicationServerKey = urlBase64ToUint8Array(
+        vapidPublicKey!
+      ) as Uint8Array<ArrayBuffer>;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey!),
+        applicationServerKey,
       });
 
       const subJson = sub.toJSON();
@@ -156,13 +162,15 @@ function DisabledNote({ children }: { children: React.ReactNode }) {
 
 /**
  * VAPID public keys are URL-safe base64 strings; the Push API needs them as
- * a Uint8Array.
+ * a Uint8Array. Returning the narrower Uint8Array<ArrayBuffer> so call sites
+ * can pass directly into BufferSource-typed APIs without a cast.
  */
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(base64);
-  const out = new Uint8Array(raw.length);
+  const buffer = new ArrayBuffer(raw.length);
+  const out = new Uint8Array(buffer);
   for (let i = 0; i < raw.length; ++i) out[i] = raw.charCodeAt(i);
   return out;
 }
