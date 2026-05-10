@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { startOfIsoWeek } from "@/lib/week";
-import { getPromptForWeek } from "@/lib/content-prompts";
+import { getPromptForClientWeek, getClientWeekNumber } from "@/lib/content-prompts";
 
 export async function loadDashboardData(clerkId: string) {
   const user = await prisma.user.findUnique({
@@ -27,8 +27,13 @@ export async function loadDashboardData(clerkId: string) {
     }),
   ]);
 
-  const prompt = getPromptForWeek(weekStart);
-  const dayName = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  // Per-client week numbering — week 1 starts the day she finishes onboarding.
+  const clientWeek = getClientWeekNumber(user.profile.onboardedAt);
+  const prompt = getPromptForClientWeek(clientWeek);
+  const dayName = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    timeZone: "America/Chicago",
+  });
   const isCheckInDay = ["Sunday", "Monday"].includes(dayName);
 
   return {
@@ -44,6 +49,7 @@ export async function loadDashboardData(clerkId: string) {
     weekContent,
     weekStart,
     prompt,
+    clientWeek,
     isCheckInDay,
     dayName,
   };

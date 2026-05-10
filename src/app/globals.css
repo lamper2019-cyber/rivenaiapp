@@ -41,3 +41,43 @@ body {
     padding-bottom: max(env(safe-area-inset-bottom), 1rem);
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Premium animations — slow, ambient, never strobing.
+   All respect prefers-reduced-motion.
+   ───────────────────────────────────────────────────────────────── */
+
+/* Soft pulse for the Sunday check-in card on non-Sunday days. */
+@keyframes riven-pulse-soft {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.005); opacity: 0.94; }
+}
+.riven-pulse-soft {
+  animation: riven-pulse-soft 3.6s ease-in-out infinite;
+}
+
+/* Stronger pulse — used on Saturday (one day before check-in opens). */
+@keyframes riven-pulse-strong {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(201, 169, 97, 0.0); }
+  50% { transform: scale(1.012); box-shadow: 0 0 28px 4px rgba(201, 169, 97, 0.22); }
+}
+.riven-pulse-strong {
+  animation: riven-pulse-strong 2.4s ease-in-out infinite;
+}
+
+/* Soft gold aura around the Ask RIVEN icon. */
+@keyframes riven-glow {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.12); }
+}
+.riven-glow {
+  animation: riven-glow 2.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .riven-pulse-soft,
+  .riven-pulse-strong,
+  .riven-glow {
+    animation: none;
+  }
+}

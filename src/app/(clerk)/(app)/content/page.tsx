@@ -2,15 +2,15 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { startOfIsoWeek, formatWeekRange } from "@/lib/week";
-import { getPromptForWeek } from "@/lib/content-prompts";
+import { getPromptForClientWeek, getClientWeekNumber, CONTENT_PROMPTS } from "@/lib/content-prompts";
 import { ContentForm } from "./content-form";
 
 export default async function ContentPage() {
   const { userId } = auth();
   const weekStart = startOfIsoWeek(new Date());
-  const prompt = getPromptForWeek(weekStart);
 
   let onboarded = true;
+  let clientWeek = 1;
   let existing: {
     id: string;
     videoUrl: string | null;
@@ -23,9 +23,12 @@ export default async function ContentPage() {
     try {
       const user = await prisma.user.findUnique({
         where: { clerkId: userId },
-        include: { profile: { select: { id: true } } },
+        include: { profile: { select: { id: true, onboardedAt: true } } },
       });
       onboarded = !!user?.profile;
+      if (user?.profile) {
+        clientWeek = getClientWeekNumber(user.profile.onboardedAt);
+      }
 
       if (user) {
         existing = await prisma.contentSubmission.findFirst({
@@ -47,11 +50,13 @@ export default async function ContentPage() {
     }
   }
 
+  const prompt = getPromptForClientWeek(clientWeek);
+
   return (
     <main className="relative min-h-screen px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-12">
       <header className="mb-section-gap space-y-3">
         <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-          Content prompt · Week of {formatWeekRange(weekStart)}
+          Week {clientWeek} of your journey · {formatWeekRange(weekStart)}
         </p>
         <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal text-balance">
           {prompt.title}
@@ -61,6 +66,9 @@ export default async function ContentPage() {
         </p>
         <p className="font-body text-label-sm text-on-surface-variant/80 max-w-md">
           {prompt.hint}
+        </p>
+        <p className="font-body text-label-sm text-on-surface-variant/60">
+          Prompt {prompt.id} of {CONTENT_PROMPTS.length}
         </p>
       </header>
 

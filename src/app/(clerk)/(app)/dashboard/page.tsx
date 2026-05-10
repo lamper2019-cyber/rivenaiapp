@@ -5,6 +5,7 @@ import { loadDashboardData } from "@/lib/dashboard";
 import { pickQuoteForDate } from "@/lib/daily-quotes";
 import { ASK_RIVEN_PROMPTS } from "@/lib/ask-riven-prompts";
 import { RotatingText } from "@/components/rotating-text";
+import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import { LogStepsForm } from "./log-steps-form";
 
 const STEP_GOAL = 10000;
@@ -68,6 +69,9 @@ export default async function DashboardPage() {
         </p>
       </header>
 
+      {/* Self-hides if already installed as PWA or dismissed. */}
+      <PwaInstallBanner />
+
       {/* Today's targets — three progress cards */}
       <section className="space-y-3">
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
@@ -116,33 +120,43 @@ export default async function DashboardPage() {
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
           Quick actions
         </h2>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Link
-            href="/log"
-            className="rounded-md bg-charcoal text-cream px-gutter py-4 hover:opacity-90 transition-opacity shadow-elevation-1 flex items-center justify-between"
-          >
-            <span className="font-body text-body-md tracking-wide">Log a meal</span>
-            <span className="material-symbols-outlined">edit_note</span>
-          </Link>
-          <Link
-            href="/chat"
-            className="group rounded-md bg-gradient-to-br from-secondary-container/60 via-surface-container-lowest to-surface-container-lowest border border-gold/40 text-charcoal px-gutter py-4 hover:border-gold hover:shadow-elevation-2 transition-all shadow-elevation-1 flex items-center justify-between gap-3 overflow-hidden"
-          >
-            <div className="flex flex-col min-w-0">
-              <span className="font-body text-label-sm tracking-widest uppercase text-on-secondary-container/80">
+        {/* Ask RIVEN — hero quick action, bigger and visually distinct */}
+        <Link
+          href="/chat"
+          className="group relative block rounded-md bg-gradient-to-br from-secondary-container/70 via-cream to-tertiary-container/30 border border-gold/50 text-charcoal px-gutter py-6 hover:shadow-elevation-2 hover:border-gold transition-all shadow-elevation-1 overflow-hidden"
+        >
+          <div className="flex items-center gap-4">
+            {/* Animated icon with soft pulsing aura */}
+            <div className="relative shrink-0 flex items-center justify-center w-14 h-14">
+              <span className="absolute inset-0 rounded-full bg-gold/30 riven-glow" aria-hidden />
+              <span className="absolute inset-1 rounded-full bg-cream shadow-elevation-1" aria-hidden />
+              <span className="material-symbols-outlined relative text-gold text-[32px] filled">
+                auto_awesome
+              </span>
+            </div>
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="font-body text-label-md tracking-widest uppercase text-on-secondary-container">
                 Ask RIVEN
               </span>
               <RotatingText
                 lines={ASK_RIVEN_PROMPTS}
-                intervalMs={3200}
-                className="font-display text-body-lg text-charcoal whitespace-nowrap"
+                intervalMs={4200}
+                className="font-display text-headline-md text-charcoal mt-1"
               />
             </div>
-            <span className="material-symbols-outlined text-gold shrink-0 group-hover:scale-110 transition-transform">
-              auto_awesome
+            <span className="material-symbols-outlined text-charcoal/60 shrink-0 group-hover:translate-x-1 transition-transform">
+              arrow_forward
             </span>
-          </Link>
-        </div>
+          </div>
+        </Link>
+
+        <Link
+          href="/log"
+          className="block rounded-md bg-charcoal text-cream px-gutter py-4 hover:opacity-90 transition-opacity shadow-elevation-1 flex items-center justify-between"
+        >
+          <span className="font-body text-body-md tracking-wide">Log a meal</span>
+          <span className="material-symbols-outlined">edit_note</span>
+        </Link>
         <LogStepsForm initial={todayTotals.steps} />
       </section>
 
@@ -317,32 +331,70 @@ function SundayLockedCard({ dayName }: { dayName: string }) {
     Saturday: 1,
   };
   const days = daysUntilSunday[dayName] ?? 0;
-  const dayLabel = days === 1 ? "1 day" : `${days} days`;
+  const dayLabel = days === 1 ? "Tomorrow" : `In ${days} days`;
+
+  // Urgency ramps over the week:
+  //   Saturday  → gold border + strong pulse + glow
+  //   Friday    → gold-tinted border + soft pulse
+  //   Mon–Thu   → neutral, very subtle pulse
+  const isSaturday = days === 1;
+  const isFriday = days === 2;
+
+  const tone = isSaturday
+    ? "border-gold/70 bg-secondary-container/40 riven-pulse-strong"
+    : isFriday
+    ? "border-gold/40 bg-secondary-container/20 riven-pulse-soft"
+    : "border-outline-variant/60 bg-surface-container/40 riven-pulse-soft";
+
+  const eyebrowColor = isSaturday
+    ? "text-on-secondary-container"
+    : isFriday
+    ? "text-on-secondary-container/80"
+    : "text-on-surface-variant";
+
+  const counterColor = isSaturday
+    ? "text-gold font-semibold"
+    : "text-on-surface-variant/70";
+
+  const titleByDays = isSaturday
+    ? "Sunday check-in opens tomorrow."
+    : isFriday
+    ? "Two days out. Start thinking about your week."
+    : "Sunday check-in is on the calendar.";
 
   return (
     <div
-      className="relative rounded-md border border-outline-variant/60 bg-surface-container/40 px-gutter py-5 opacity-75"
+      className={`relative rounded-md border ${tone} px-gutter py-5`}
       aria-disabled
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[16px]">lock</span>
+          <p
+            className={`font-body text-label-md tracking-widest uppercase flex items-center gap-1.5 ${eyebrowColor}`}
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {isSaturday ? "schedule" : "lock"}
+            </span>
             Sunday check-in
           </p>
           <h3 className="font-display text-headline-md text-charcoal mt-2">
-            Opens Sunday morning.
+            {titleByDays}
           </h3>
           <p className="font-body text-body-md text-on-surface-variant mt-2">
             Weight, waist, photos, and how the week actually went. Sean reads every
             answer.
           </p>
-          <p className="font-body text-label-sm text-on-surface-variant/70 mt-3">
-            {days === 0 ? "Available now" : `Available in ${dayLabel}`}
+          <p className={`font-body text-label-sm mt-3 ${counterColor}`}>
+            {dayLabel}
+            {isSaturday && " · ~9:00 AM CT reminder will ping your phone"}
           </p>
         </div>
-        <span className="material-symbols-outlined text-on-surface-variant/60 mt-1">
-          calendar_month
+        <span
+          className={`material-symbols-outlined mt-1 ${
+            isSaturday ? "text-gold" : "text-on-surface-variant/60"
+          }`}
+        >
+          {isSaturday ? "notifications_active" : "calendar_month"}
         </span>
       </div>
     </div>

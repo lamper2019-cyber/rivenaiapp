@@ -6,7 +6,7 @@ import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { startOfIsoWeek } from "@/lib/week";
-import { getPromptForWeek } from "@/lib/content-prompts";
+import { getPromptForClientWeek, getClientWeekNumber } from "@/lib/content-prompts";
 
 const SubmitSchema = z.object({
   videoUrl: z
@@ -56,14 +56,19 @@ export async function submitContent(
 
   let user;
   try {
-    user = await prisma.user.findUnique({ where: { clerkId: userId } });
+    user = await prisma.user.findUnique({
+      where: { clerkId: userId },
+      include: { profile: { select: { onboardedAt: true } } },
+    });
   } catch {
     return { ok: false, error: "Database not connected." };
   }
   if (!user) return { ok: false, error: "Complete onboarding first." };
+  if (!user.profile) return { ok: false, error: "Complete onboarding first." };
 
   const weekStart = startOfIsoWeek(new Date());
-  const prompt = getPromptForWeek(weekStart);
+  const clientWeek = getClientWeekNumber(user.profile.onboardedAt);
+  const prompt = getPromptForClientWeek(clientWeek);
 
   await prisma.contentSubmission.create({
     data: {
