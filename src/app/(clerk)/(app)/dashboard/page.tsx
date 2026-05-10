@@ -123,25 +123,25 @@ export default async function DashboardPage() {
         {/* Ask RIVEN — hero quick action, bigger and visually distinct */}
         <Link
           href="/chat"
-          className="group relative block rounded-md bg-gradient-to-br from-secondary-container/70 via-cream to-tertiary-container/30 border border-gold/50 text-charcoal px-gutter py-6 hover:shadow-elevation-2 hover:border-gold transition-all shadow-elevation-1 overflow-hidden"
+          className="group relative block rounded-md bg-gradient-to-br from-secondary-container/70 via-cream to-tertiary-container/30 border border-gold/50 text-charcoal px-4 py-5 sm:px-gutter sm:py-6 hover:shadow-elevation-2 hover:border-gold transition-all shadow-elevation-1 overflow-hidden"
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             {/* Animated icon with soft pulsing aura */}
-            <div className="relative shrink-0 flex items-center justify-center w-14 h-14">
+            <div className="relative shrink-0 flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14">
               <span className="absolute inset-0 rounded-full bg-gold/30 riven-glow" aria-hidden />
               <span className="absolute inset-1 rounded-full bg-cream shadow-elevation-1" aria-hidden />
-              <span className="material-symbols-outlined relative text-gold text-[32px] filled">
+              <span className="material-symbols-outlined relative text-gold text-[28px] sm:text-[32px] filled">
                 auto_awesome
               </span>
             </div>
             <div className="flex flex-col min-w-0 flex-1">
-              <span className="font-body text-label-md tracking-widest uppercase text-on-secondary-container">
+              <span className="font-body text-label-sm sm:text-label-md tracking-widest uppercase text-on-secondary-container">
                 Ask RIVEN
               </span>
               <RotatingText
                 lines={ASK_RIVEN_PROMPTS}
                 intervalMs={4200}
-                className="font-display text-headline-md text-charcoal mt-1"
+                className="font-display text-body-lg sm:text-headline-md text-charcoal mt-0.5 sm:mt-1"
               />
             </div>
             <span className="material-symbols-outlined text-charcoal/60 shrink-0 group-hover:translate-x-1 transition-transform">

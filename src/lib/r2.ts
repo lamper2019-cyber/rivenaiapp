@@ -29,6 +29,11 @@ function getR2Client(): S3Client {
       accessKeyId: process.env.R2_ACCESS_KEY_ID!,
       secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
     },
+    // R2 doesn't reliably sign virtual-hosted-style URLs for browser PUT
+    // requests — the host doesn't match the signed bucket subdomain and the
+    // request fails with SignatureDoesNotMatch. Path-style sidesteps this:
+    //   https://<account>.r2.cloudflarestorage.com/<bucket>/<key>?...
+    forcePathStyle: true,
   });
   return cachedClient;
 }

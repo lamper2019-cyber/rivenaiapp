@@ -85,7 +85,7 @@ export function RotatingText({
     >
       {/* Outgoing line — starts at y=0, slides to y=+100% */}
       <span
-        className={`absolute inset-x-0 ${className}`}
+        className={`absolute inset-x-0 whitespace-nowrap overflow-hidden text-ellipsis ${className}`}
         style={{
           top: 0,
           transform: phase === "rest" ? "translateY(0)" : "translateY(100%)",
@@ -99,7 +99,7 @@ export function RotatingText({
 
       {/* Incoming line — starts at y=-100%, slides to y=0 */}
       <span
-        className={`absolute inset-x-0 ${className}`}
+        className={`absolute inset-x-0 whitespace-nowrap overflow-hidden text-ellipsis ${className}`}
         style={{
           top: 0,
           transform: phase === "rest" ? "translateY(-100%)" : "translateY(0)",

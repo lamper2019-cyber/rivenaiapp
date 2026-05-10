@@ -324,7 +324,7 @@ export function ChatUI({
 
   return (
     <>
-      <div className="flex-1 px-container-mobile md:px-container-desktop max-w-3xl mx-auto w-full">
+      <div className="flex-1 flex flex-col px-container-mobile md:px-container-desktop max-w-3xl mx-auto w-full">
         {!onboarded && (
           <div className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-3 mb-6">
             <p className="font-body text-body-md text-charcoal">
@@ -596,12 +596,12 @@ function EmptyState({
   disabled: boolean;
 }) {
   return (
-    <div className="py-8 space-y-4">
-      <p className="font-body text-body-md text-on-surface-variant">
+    <div className="flex-1 flex flex-col justify-center py-6 space-y-5">
+      <p className="font-body text-body-md text-on-surface-variant text-center max-w-md mx-auto">
         Ask anything about your wellness journey, meal plans, or progress
         tracking. Tap the photo icon to send a meal pic.
       </p>
-      <div className="grid sm:grid-cols-2 gap-3 pt-4">
+      <div className="grid sm:grid-cols-2 gap-3">
         {SUGGESTED_PROMPTS.map((prompt) => (
           <button
             key={prompt}

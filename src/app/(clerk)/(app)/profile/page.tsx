@@ -10,6 +10,7 @@ import {
 } from "@/lib/progress";
 import { Sparkline } from "@/components/sparkline";
 import { PushSubscribeButton } from "@/components/push-subscribe-button";
+import { DeleteAccountButton } from "./delete-account-button";
 
 const PHASE_LABEL: Record<string, string> = {
   PHASE_1: "Phase 1 · Active",
@@ -176,13 +177,19 @@ export default async function ProfilePage() {
         />
       </section>
 
-      <div className="pt-4">
-        <SignOutButton>
-          <button className="font-body text-label-md tracking-widest uppercase text-charcoal underline underline-offset-4">
-            Sign out
-          </button>
-        </SignOutButton>
-      </div>
+      <section className="space-y-3">
+        <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+          Account
+        </h2>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <SignOutButton>
+            <button className="font-body text-label-md tracking-widest uppercase text-charcoal underline underline-offset-4">
+              Sign out
+            </button>
+          </SignOutButton>
+          <DeleteAccountButton />
+        </div>
+      </section>
 
       <div className="fixed bottom-[20%] left-[-15%] w-[40%] h-[30%] bg-sage/5 blur-[120px] rounded-full pointer-events-none -z-10" />
     </main>
