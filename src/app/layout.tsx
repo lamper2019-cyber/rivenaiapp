@@ -22,6 +22,21 @@ export const metadata: Metadata = {
   description: "Your transformation starts today.",
   manifest: "/manifest.json",
   applicationName: "RIVEN",
+  // Without these explicit icon links, iOS PWA installs fall back to a
+  // black splash screen for ~2s on launch because iOS can't find an app
+  // icon and doesn't fully respect manifest.background_color in that case.
+  // /apple-touch-icon.png + /icons/icon-{192,512}.png are generated cream
+  // squares with the RIVEN "R" wordmark; the manifest already references
+  // the 192/512 pair. Together they give iOS what it needs to render a
+  // proper cream splash on launch.
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+    shortcut: "/favicon.ico",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
