@@ -8,6 +8,7 @@ import { RotatingText } from "@/components/rotating-text";
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import { NotificationOptIn } from "@/components/notification-opt-in";
 import { CoachMessageBadge } from "@/components/coach-message-badge";
+import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
 import { LogStepsForm } from "./log-steps-form";
 
 const STEP_GOAL = 10000;
@@ -38,6 +39,13 @@ export default async function DashboardPage() {
 
   if (!data) {
     redirect("/onboarding");
+  }
+
+  // Profile exists but the post-profile walkthrough hasn't been completed —
+  // run it before showing the dashboard. tutorialStep persists per-user so
+  // closing the app mid-tutorial picks up on the same slide.
+  if (data.profile.tutorialStep < TUTORIAL_DONE_STEP) {
+    redirect("/tutorial");
   }
 
   const {
@@ -201,7 +209,7 @@ export default async function DashboardPage() {
       {/* Content prompt card */}
       {!weekContent ? (
         <PromptCard
-          eyebrow={`This week's prompt · #${prompt.id}`}
+          eyebrow="This week's prompt"
           title={prompt.title}
           body={prompt.prompt}
           subBody={prompt.hint}

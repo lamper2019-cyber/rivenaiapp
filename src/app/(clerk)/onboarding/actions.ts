@@ -105,9 +105,13 @@ export async function createProfile(
       activityLevel: data.activityLevel,
       cycleStatus: data.cycleStatus,
       phase: "PHASE_1",
+      // New users land on slide 0 of the post-profile tutorial. Existing
+      // profiles keep the schema default (5 = already complete) so we never
+      // run the walkthrough against people already mid-program.
+      tutorialStep: 0,
       ...targets,
     },
   });
 
-  redirect("/dashboard");
+  redirect("/tutorial");
 }

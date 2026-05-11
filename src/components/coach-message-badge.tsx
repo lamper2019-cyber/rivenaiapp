@@ -31,7 +31,7 @@ export function CoachMessageBadge({ latestMessageId }: { latestMessageId: string
     <Link
       href="/chat"
       aria-label="View message from Sean"
-      className="fixed top-[calc(env(safe-area-inset-top)+12px)] right-3 z-50 inline-flex items-center gap-2 rounded-full bg-cream/95 backdrop-blur-md border border-gold/60 text-charcoal pl-2 pr-3 py-1.5 shadow-elevation-1 riven-float-pulse active:scale-95 transition-transform"
+      className="fixed top-[calc(env(safe-area-inset-top)_+_12px)] right-3 z-50 inline-flex items-center gap-2 rounded-full bg-cream/95 backdrop-blur-md border border-gold/60 text-charcoal pl-2 pr-3 py-1.5 shadow-elevation-1 riven-float-pulse active:scale-95 transition-transform"
     >
       <span className="relative flex items-center justify-center w-6 h-6">
         <span className="absolute inset-0 rounded-full bg-gold/30" aria-hidden />

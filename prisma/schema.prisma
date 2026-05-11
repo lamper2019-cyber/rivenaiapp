@@ -99,6 +99,12 @@ model Profile {
 
   onboardedAt         DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
+
+  // Post-profile tutorial walkthrough. 0–4 = currently on that slide,
+  // 5+ = completed (or skipped). Default 5 so existing rows from before
+  // this column existed don't get marched through the tutorial; new
+  // profile rows from onboarding/actions.ts explicitly set tutorialStep: 0.
+  tutorialStep        Int           @default(5)
 }
 
 model MealLog {
