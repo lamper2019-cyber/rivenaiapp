@@ -1,8 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
 
-const HERO_IMAGE =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDVySudo5N655CccxJkSI1W4KLMS2kIe1GfxHIYxWXZPfbzHpEFqlhS89ZU08nbqYzK-PpeC6SeXHbAIaxEGQA4dI-HJnvB87tmjoVgvMbAC2-9xCvcL0wWxaocNZBskTUMjONsn-nQHaYUaVAmVVurnNfk5SjCA57HcR_8upLve1nheLl-kopgWMX5Aela6MIYu6F5p2Wmcbve2fcjYYTlK4tGPcj9pc73z6SeTzMM9KQYlv_0nzwlom_n3I0rku7klzMTOV_ASS1d";
+// Self-hosted welcome hero. Previously sourced from lh3.googleusercontent.com,
+// which forced Railway's image optimizer to fetch upstream → re-encode →
+// serve. Local hosting eliminates the upstream roundtrip; Next still emits
+// AVIF/WebP variants and the responsive srcset.
+const HERO_IMAGE = "/welcome-hero.png";
 
 export default function WelcomePage() {
   return (
