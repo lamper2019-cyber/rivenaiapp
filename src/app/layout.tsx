@@ -44,12 +44,44 @@ export const viewport: Viewport = {
 const MATERIAL_SYMBOLS_HREF =
   "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0&display=swap";
 
+/**
+ * Critical above-the-fold CSS inlined in <head>. The browser can paint the
+ * welcome page before the Tailwind bundle arrives — meaningful FCP win on
+ * slow mobile networks. Each rule is a duplicate of what Tailwind emits for
+ * the same class, so when the bundle DOES load, values match exactly — no
+ * flash, no re-layout. Keep this lean (under ~1KB inline).
+ */
+const CRITICAL_CSS = `
+  *,::before,::after{box-sizing:border-box;border:0 solid #D4CFC6}
+  html,body{margin:0;padding:0}
+  body{
+    background:#FAF7F2;
+    color:#1A1A1A;
+    min-height:100vh;
+    font-family:var(--font-plus-jakarta),'Plus Jakarta Sans',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+  }
+  .font-display{font-family:var(--font-dm-serif),'DM Serif Display',serif}
+  .font-body{font-family:var(--font-plus-jakarta),'Plus Jakarta Sans',system-ui,sans-serif}
+  .bg-cream{background-color:#FAF7F2}
+  .bg-charcoal{background-color:#1A1A1A}
+  .text-charcoal{color:#1A1A1A}
+  .text-cream{color:#FAF7F2}
+  .bg-surface-container{background-color:#F2EDE5}
+  .text-on-primary-container{color:#5A5752}
+`.trim();
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${dmSerif.variable} ${plusJakarta.variable}`}>
       <head>
+        {/* Inline critical CSS — duplicates a few Tailwind values so the
+            page can paint before /_next/static/css/app/layout.css arrives. */}
+        <style dangerouslySetInnerHTML={{ __html: CRITICAL_CSS }} />
+
         {/* Material Symbols Outlined is loaded asynchronously so it never
             render-blocks first paint. Lighthouse confirmed this was the
             single biggest mobile bottleneck (~3.7s on slow networks).

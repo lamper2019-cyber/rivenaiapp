@@ -63,9 +63,6 @@ export default function WelcomePage() {
         </p>
       </div>
 
-      {/* Decorative ambient glows (DESIGN.md: subtle warm halos) */}
-      <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-gold/5 blur-[120px] rounded-full pointer-events-none" />
-      <div className="fixed bottom-[-5%] right-[-5%] w-[30%] h-[30%] bg-sage/5 blur-[100px] rounded-full pointer-events-none" />
     </main>
   );
 }
