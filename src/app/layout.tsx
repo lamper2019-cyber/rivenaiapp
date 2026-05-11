@@ -49,6 +49,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#FAF7F2",
+  // Pin the site to a light color scheme. Without this, iOS Safari users in
+  // dark mode see a black flash during navigation transitions before our CSS
+  // can declare the cream background. RIVEN is a single-theme brand — light.
+  colorScheme: "light",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -67,7 +71,9 @@ const MATERIAL_SYMBOLS_HREF =
  * flash, no re-layout. Keep this lean (under ~1KB inline).
  */
 const CRITICAL_CSS = `
+  :root{color-scheme:light;background:#FAF7F2}
   *,::before,::after{box-sizing:border-box;border:0 solid #D4CFC6}
+  html{background:#FAF7F2;-webkit-text-size-adjust:100%}
   html,body{margin:0;padding:0}
   body{
     background:#FAF7F2;
