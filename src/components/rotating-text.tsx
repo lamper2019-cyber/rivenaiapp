@@ -29,7 +29,7 @@ type RotatingTextProps = {
 export function RotatingText({
   lines,
   intervalMs = 5600,
-  transitionMs = 1000,
+  transitionMs = 700,
   className = "",
   maxLines = 1,
 }: RotatingTextProps) {
@@ -120,16 +120,20 @@ export function RotatingText({
         {lines[currentIdx] ?? ""}
       </span>
 
-      {/* Incoming line — starts at y=-100%, slides to y=0 */}
+      {/* Incoming line — sits at y=0 and fades in. Earlier versions slid
+          from y=-100%, but that created a "down then up" perception when the
+          outgoing line was simultaneously sliding down. Pure fade-in here
+          means the eye reads: outgoing slides down out, new prompt appears
+          in place. Slight transitionDelay so the fade-in lags the slide-out. */}
       <span
         className={`absolute inset-x-0 ${layerWrapClasses} ${className}`}
         style={{
           ...layerClampStyle,
           top: 0,
-          transform: phase === "rest" ? "translateY(-100%)" : "translateY(0)",
           opacity: phase === "rest" ? 0 : 1,
-          transition: `transform ${duration}ms ${easing}, opacity ${duration}ms ease-in`,
-          willChange: "transform, opacity",
+          transition: `opacity ${duration}ms ease-out`,
+          transitionDelay: phase === "rest" ? "0ms" : `${Math.round(duration * 0.35)}ms`,
+          willChange: "opacity",
         }}
       >
         {lines[nextIdx] ?? ""}

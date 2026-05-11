@@ -35,6 +35,10 @@ export function ChatUI({
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Drives the staggered exit animation on the empty-state cards. Stays
+  // true through the animation window so EmptyState keeps mounting; the
+  // wrapper around send() flips it on, waits, then calls actual send.
+  const [emptyExiting, setEmptyExiting] = useState(false);
 
   // Clear the home-screen "Message from Sean" badge as soon as the client
   // opens chat — finding the most recent COACH message in history is enough.
@@ -152,6 +156,12 @@ export function ChatUI({
     });
   }
 
+  // Length of the exit-animation window before send() actually fires when
+  // the chat is empty. Lines up with EmptyState's 250ms per-card + 60ms
+  // stagger across 4 cards + intro paragraph delay. Past this point all
+  // empty-state elements have visually finished leaving.
+  const EMPTY_EXIT_MS = 380;
+
   async function send(text: string) {
     const trimmed = text.trim();
     const uploadedImages = attachments
@@ -160,6 +170,14 @@ export function ChatUI({
 
     if (!trimmed && uploadedImages.length === 0) return;
     if (streaming) return;
+
+    // First message in this thread — animate the suggested prompts out
+    // before the user's message lands. Keeps EmptyState mounted through
+    // the animation by reading `emptyExiting`, see render below.
+    if (messages.length === 0 && !emptyExiting) {
+      setEmptyExiting(true);
+      await new Promise((r) => setTimeout(r, EMPTY_EXIT_MS));
+    }
 
     setError(null);
     setInput("");
@@ -180,6 +198,9 @@ export function ChatUI({
     setMessages((prev) => [...prev, userMsg, placeholder]);
     setAttachments([]);
     setStreaming(true);
+    // Cards have already finished their exit animation by this point —
+    // unmount EmptyState so the messages list takes over.
+    setEmptyExiting(false);
 
     try {
       const response = await fetch("/api/chat/stream", {
@@ -347,8 +368,12 @@ export function ChatUI({
           </div>
         )}
 
-        {isEmpty && onboarded ? (
-          <EmptyState onPrompt={(p) => send(p)} disabled={streaming} />
+        {(isEmpty || emptyExiting) && onboarded ? (
+          <EmptyState
+            onPrompt={(p) => send(p)}
+            disabled={streaming}
+            exiting={emptyExiting}
+          />
         ) : (
           <ul className="space-y-6 py-4">
             {messages.map((m) => (
@@ -601,24 +626,42 @@ function Dot({ delay }: { delay: string }) {
 function EmptyState({
   onPrompt,
   disabled,
+  exiting,
 }: {
   onPrompt: (prompt: string) => void;
   disabled: boolean;
+  exiting: boolean;
 }) {
+  // Single clean exit per element: opacity + small downward drift, staggered
+  // across the cards so they leave one after another like a falling pulldown.
+  // Each item runs ~250ms; stagger = 60ms; transitions never overlap with
+  // remount because the parent keeps EmptyState alive for the full duration.
+  const introOpacity = exiting ? "opacity-0" : "opacity-100";
+  const introTransform = exiting ? "translate-y-3" : "translate-y-0";
   return (
-    <div className="flex-1 flex flex-col justify-center py-6 space-y-5">
-      <p className="font-body text-body-md text-on-surface-variant text-center max-w-md mx-auto">
+    <div
+      className={`flex-1 flex flex-col justify-center py-6 space-y-5 ${
+        exiting ? "pointer-events-none" : ""
+      }`}
+      aria-hidden={exiting}
+    >
+      <p
+        className={`font-body text-body-md text-on-surface-variant text-center max-w-md mx-auto transition-[opacity,transform] duration-[250ms] ease-out ${introOpacity} ${introTransform}`}
+      >
         Ask anything about your wellness journey, meal plans, or progress
         tracking. Tap the photo icon to send a meal pic.
       </p>
       <div className="grid sm:grid-cols-2 gap-3">
-        {SUGGESTED_PROMPTS.map((prompt) => (
+        {SUGGESTED_PROMPTS.map((prompt, idx) => (
           <button
             key={prompt}
             type="button"
-            disabled={disabled}
+            disabled={disabled || exiting}
             onClick={() => onPrompt(prompt)}
-            className="text-left rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-3 font-body text-body-md text-charcoal hover:border-gold hover:bg-cream transition-colors disabled:opacity-60 shadow-elevation-1"
+            style={{
+              transitionDelay: exiting ? `${60 + idx * 60}ms` : "0ms",
+            }}
+            className={`text-left rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-3 font-body text-body-md text-charcoal hover:border-gold hover:bg-cream disabled:opacity-60 shadow-elevation-1 transition-[opacity,transform,colors] duration-[250ms] ease-out ${introOpacity} ${introTransform}`}
           >
             {prompt}
           </button>
