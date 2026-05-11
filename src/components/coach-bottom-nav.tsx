@@ -17,7 +17,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: "groups",
     matches: (p) => p === "/coach" || p.startsWith("/coach/clients"),
   },
-  { href: "/profile", label: "Profile", icon: "person" },
+  { href: "/coach/profile", label: "Profile", icon: "person" },
 ];
 
 export function CoachBottomNav() {

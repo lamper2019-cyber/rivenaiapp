@@ -389,9 +389,10 @@ export default async function CoachClientDetailPage({
             {chatMessagesAsc.map((m) => {
               const isUser = m.role === "USER";
               const isCoachMessage = m.kind === "COACH" && !isUser;
-              // Coaches skip client onboarding, so Profile.name is usually
-              // empty. Skip the email-username fallback so we land on "Sean".
-              const senderName = m.sender?.profile?.name ?? "Sean";
+              // All COACH messages render as "Sean" — single-coach brand, and
+              // we never want a stale Profile.name (e.g. "Dean" from an old
+              // client test account on the coach's user) leaking into the UI.
+              const senderName = "Sean";
 
               if (isUser) {
                 return (

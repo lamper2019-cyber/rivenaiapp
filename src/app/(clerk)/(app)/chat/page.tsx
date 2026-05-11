@@ -43,9 +43,11 @@ export default async function ChatPage() {
           kind: m.kind,
           content: m.content,
           imageUrls: m.imageUrls,
-          // Coaches skip client onboarding so Profile.name is usually empty —
-          // omit the email-username fallback so the UI's "Sean" default kicks in.
-          senderName: m.sender?.profile?.name ?? undefined,
+          // All COACH messages display as "Sean" — single-coach brand, and
+          // never leak Profile.name (which may be stale from when Sean tested
+          // his own client account before role gating existed). senderName
+          // stays undefined; the UI hardcodes "Sean" for coach messages.
+          senderName: undefined,
         }));
       }
     } catch {
