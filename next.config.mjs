@@ -6,6 +6,15 @@ const nextConfig = {
     // (would need NEXT_PUBLIC_R2_PUBLIC_URL exposed and matched here).
     remotePatterns: [],
   },
+  experimental: {
+    // critters extracts above-the-fold CSS from the Tailwind bundle, inlines
+    // it in <head>, and rewrites the external stylesheet <link> to load
+    // non-blocking via media="print" + onload="this.media='all'". Result:
+    // Safari can paint the moment HTML arrives instead of waiting on the
+    // full layout.css to download — was the cause of the "black gap after
+    // loading bar finishes" on iOS. Requires the `critters` package.
+    optimizeCss: true,
+  },
   async headers() {
     return [
       // Hashed Next static assets (JS/CSS bundles) — already get immutable
