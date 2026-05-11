@@ -153,8 +153,10 @@ export default async function DashboardPage() {
               </span>
               <RotatingText
                 lines={ASK_RIVEN_PROMPTS}
-                intervalMs={4200}
-                className="font-display text-body-lg sm:text-headline-md text-charcoal mt-0.5 sm:mt-1"
+                intervalMs={5600}
+                transitionMs={1000}
+                maxLines={2}
+                className="font-display text-body-md sm:text-headline-md text-charcoal mt-0.5 sm:mt-1 leading-snug"
               />
             </div>
             <span className="material-symbols-outlined text-charcoal/60 shrink-0 group-hover:translate-x-1 transition-transform">
