@@ -41,8 +41,12 @@ export default async function CoachClientDetailPage({
       role: true,
       createdAt: true,
       profile: true,
+      // Trimmed to the most recent 12 check-ins for the sparkline + latest-
+      // checkin card. Over a year, this caps the payload at a fixed size.
+      // Re-reversed below to give the sparkline ascending order.
       weeklyCheckIns: {
-        orderBy: { weekStart: "asc" },
+        orderBy: { weekStart: "desc" },
+        take: 12,
         select: {
           id: true,
           userId: true,
@@ -61,7 +65,7 @@ export default async function CoachClientDetailPage({
       },
       mealLogs: {
         orderBy: { createdAt: "desc" },
-        take: 15,
+        take: 10,
         select: {
           id: true,
           description: true,
@@ -72,26 +76,22 @@ export default async function CoachClientDetailPage({
           createdAt: true,
         },
       },
+      // Sender join dropped — UI hardcodes "Sean" for COACH messages now,
+      // so we don't need to fetch the related User row.
       chatMessages: {
         orderBy: { createdAt: "desc" },
-        take: 12,
+        take: 8,
         select: {
           id: true,
           role: true,
           kind: true,
           content: true,
           createdAt: true,
-          sender: {
-            select: {
-              email: true,
-              profile: { select: { name: true } },
-            },
-          },
         },
       },
       contentSubmissions: {
         orderBy: { createdAt: "desc" },
-        take: 8,
+        take: 6,
         select: {
           id: true,
           week: true,
@@ -107,7 +107,9 @@ export default async function CoachClientDetailPage({
   if (!client || client.role !== "CLIENT") notFound();
 
   const profile = client.profile;
-  const checkIns = client.weeklyCheckIns;
+  // Query returns DESC (newest first) so we can pair `take: 12` with sparkline
+  // order. The sparkline + "latest" lookup below want ascending order.
+  const checkIns = [...client.weeklyCheckIns].reverse();
   const latestCheckIn = checkIns[checkIns.length - 1];
   const chatMessagesAsc = [...client.chatMessages].reverse();
 
@@ -234,6 +236,10 @@ export default async function CoachClientDetailPage({
                   <img
                     src={latestCheckIn.photoFrontUrl}
                     alt="Front check-in photo"
+                    width={160}
+                    height={160}
+                    loading="lazy"
+                    decoding="async"
                     className="w-32 h-32 sm:w-40 sm:h-40 rounded-md object-cover bg-charcoal/10"
                   />
                 )}
@@ -242,6 +248,10 @@ export default async function CoachClientDetailPage({
                   <img
                     src={latestCheckIn.photoSideUrl}
                     alt="Side check-in photo"
+                    width={160}
+                    height={160}
+                    loading="lazy"
+                    decoding="async"
                     className="w-32 h-32 sm:w-40 sm:h-40 rounded-md object-cover bg-charcoal/10"
                   />
                 )}
@@ -346,6 +356,10 @@ export default async function CoachClientDetailPage({
                         <img
                           src={s.photoUrl!}
                           alt={`Content submission from ${s.week.toLocaleDateString()}`}
+                          width={200}
+                          height={200}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                         />
                       </a>

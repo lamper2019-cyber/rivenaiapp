@@ -206,12 +206,12 @@ export default async function DashboardPage() {
         <SundayLockedCard dayName={dayName} />
       )}
 
-      {/* Content prompt card — short single-sentence prompt only; the full
-          prompt + hint live on the /content recording page. */}
+      {/* Content prompt card — single-sentence prompt only; the hint lives
+          alongside the full prompt on the /content recording page. */}
       {!weekContent ? (
         <PromptCard
           eyebrow="This week's prompt"
-          title={prompt.shortPrompt}
+          title={prompt.prompt}
           ctaLabel="Record my answer"
           ctaHref="/content"
           tone="gold"

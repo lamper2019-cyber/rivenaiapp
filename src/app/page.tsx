@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const HERO_IMAGE =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuDVySudo5N655CccxJkSI1W4KLMS2kIe1GfxHIYxWXZPfbzHpEFqlhS89ZU08nbqYzK-PpeC6SeXHbAIaxEGQA4dI-HJnvB87tmjoVgvMbAC2-9xCvcL0wWxaocNZBskTUMjONsn-nQHaYUaVAmVVurnNfk5SjCA57HcR_8upLve1nheLl-kopgWMX5Aela6MIYu6F5p2Wmcbve2fcjYYTlK4tGPcj9pc73z6SeTzMM9KQYlv_0nzwlom_n3I0rku7klzMTOV_ASS1d";
@@ -16,11 +17,13 @@ export default function WelcomePage() {
       {/* Hero */}
       <div className="flex-grow flex flex-col items-center justify-center text-center max-w-2xl space-y-8">
         <div className="relative w-full aspect-[4/5] md:aspect-video rounded-xl overflow-hidden shadow-elevation-1 mb-8 bg-surface-container">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={HERO_IMAGE}
             alt="A serene portrait of a mature Black woman in a minimalist wellness sanctuary, captured in soft golden-hour light."
-            className="w-full h-full object-cover"
+            fill
+            sizes="(max-width: 768px) 100vw, 672px"
+            priority
+            className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-cream/40 to-transparent" />
         </div>

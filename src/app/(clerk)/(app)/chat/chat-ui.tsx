@@ -543,6 +543,10 @@ function MessageBubble({
                   key={i}
                   src={url}
                   alt="Sent attachment"
+                  width={160}
+                  height={160}
+                  loading="lazy"
+                  decoding="async"
                   className="max-w-[160px] max-h-[160px] rounded-md object-cover bg-charcoal/40"
                 />
               ))}

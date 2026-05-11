@@ -304,6 +304,10 @@ function PhotoTimeline({
                 <img
                   src={c.photoFrontUrl}
                   alt={`Front photo from ${c.weekStart.toLocaleDateString()}`}
+                  width={96}
+                  height={128}
+                  loading="lazy"
+                  decoding="async"
                   className="w-24 aspect-[3/4] object-cover rounded-md bg-surface-container border border-outline-variant/60"
                 />
               )}
@@ -312,6 +316,10 @@ function PhotoTimeline({
                 <img
                   src={c.photoSideUrl}
                   alt={`Side photo from ${c.weekStart.toLocaleDateString()}`}
+                  width={96}
+                  height={128}
+                  loading="lazy"
+                  decoding="async"
                   className="w-24 aspect-[3/4] object-cover rounded-md bg-surface-container border border-outline-variant/60"
                 />
               )}
