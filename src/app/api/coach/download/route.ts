@@ -1,14 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { presignDownload } from "@/lib/r2";
 
 /**
  * Coach-only download endpoint for ContentSubmission media.
  *
- * Streams the file out of R2 with `Content-Disposition: attachment` so the
- * browser actually downloads (vs. opening inline). We never accept a raw URL
- * — caller passes a submissionId, we look up the URL server-side. This keeps
- * the endpoint from being a generic open proxy / SSRF vector.
+ * Generates a short-lived signed R2 URL (with Content-Disposition set so the
+ * browser downloads instead of opens inline) and 302-redirects there. The
+ * browser then talks straight to R2, bypassing Next.js entirely — no
+ * streaming through Railway, no Cloudflare 100s timeout to worry about, no
+ * memory pressure on multi-minute video downloads.
+ *
+ * We never accept a raw URL from the caller — only a submissionId we look
+ * up server-side. Keeps this endpoint from being a generic open proxy.
  */
 export async function GET(req: NextRequest) {
   const { userId } = auth();
@@ -55,14 +60,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No file for that kind" }, { status: 404 });
   }
 
-  const upstream = await fetch(sourceUrl);
-  if (!upstream.ok || !upstream.body) {
-    return NextResponse.json(
-      { error: `Upstream ${upstream.status}` },
-      { status: 502 }
-    );
-  }
-
   const clientName =
     submission.user.profile?.name?.replace(/[^a-zA-Z0-9]/g, "-") ??
     submission.user.email.split("@")[0];
@@ -70,18 +67,17 @@ export async function GET(req: NextRequest) {
   const ext = guessExtension(sourceUrl, kind);
   const filename = `riven-${clientName}-${dateLabel}.${ext}`;
 
-  // Re-stream from R2 with attachment headers.
-  return new Response(upstream.body, {
-    status: 200,
-    headers: {
-      "content-type":
-        upstream.headers.get("content-type") ??
-        (kind === "photo" ? "image/jpeg" : "video/mp4"),
-      "content-length": upstream.headers.get("content-length") ?? "",
-      "content-disposition": `attachment; filename="${filename}"`,
-      "cache-control": "private, max-age=0, no-store",
-    },
-  });
+  let signedUrl: string;
+  try {
+    signedUrl = await presignDownload({ publicUrl: sourceUrl, filename });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Signing failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  // 302 so the browser follows. R2 honors ResponseContentDisposition baked
+  // into the signed URL and serves with the attachment filename header.
+  return NextResponse.redirect(signedUrl, 302);
 }
 
 function guessExtension(url: string, kind: string): string {

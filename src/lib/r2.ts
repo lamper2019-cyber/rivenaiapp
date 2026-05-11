@@ -1,5 +1,5 @@
 import { S3Client } from "@aws-sdk/client-s3";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /**
@@ -94,4 +94,43 @@ function extractExtension(fileName: string): string {
   if (idx === -1 || idx === fileName.length - 1) return "";
   // Strip anything that isn't alphanumeric — defensive against weird filenames.
   return fileName.slice(idx + 1).replace(/[^a-zA-Z0-9]/g, "").toLowerCase().slice(0, 8);
+}
+
+/**
+ * Generate a presigned GET URL for a stored R2 object, forcing the browser
+ * to download it (rather than open inline) and using the desired filename.
+ *
+ * Used by the coach download endpoint to redirect straight to R2 instead of
+ * proxying multi-minute video streams through Next.js — that proxy approach
+ * is timeout-prone on Cloudflare's free 100s edge limit and memory-prone
+ * on Railway containers, both of which surface as 502 Bad Gateway.
+ *
+ * `publicUrl` is the URL we stored in ContentSubmission. We re-derive the
+ * object key by stripping the configured R2 public base.
+ */
+export async function presignDownload(args: {
+  publicUrl: string;
+  filename: string;
+}): Promise<string> {
+  const client = getR2Client();
+  const bucket = process.env.R2_BUCKET_NAME!;
+  const publicBase = process.env.R2_PUBLIC_URL!.replace(/\/$/, "");
+
+  if (!args.publicUrl.startsWith(publicBase + "/")) {
+    throw new Error(
+      "Stored public URL doesn't match the configured R2 public base; can't sign."
+    );
+  }
+  const key = args.publicUrl.slice(publicBase.length + 1);
+
+  // Quote filename only if it contains a quote/backslash — keeps the header
+  // simple for the common case and safe for the edge case.
+  const safeFilename = args.filename.replace(/["\\]/g, "");
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ResponseContentDisposition: `attachment; filename="${safeFilename}"`,
+  });
+
+  return getSignedUrl(client, command, { expiresIn: 300 });
 }
