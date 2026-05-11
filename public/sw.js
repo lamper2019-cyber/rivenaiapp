@@ -1,10 +1,24 @@
-// RIVEN service worker — minimal install/activate, plus Web Push handlers.
+// RIVEN service worker — minimal install/activate, navigation cache strategy,
+// plus Web Push handlers.
 
-const CACHE = "riven-v2";
+// Bumped from v2 → v3 so existing installs upgrade and pick up the new
+// fetch handler that serves the welcome page stale-while-revalidate.
+const CACHE = "riven-v3";
+const WELCOME_PATH = "/";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(["/", "/manifest.json"]))
+    (async () => {
+      const cache = await caches.open(CACHE);
+      // Prime the welcome page + manifest into cache so the very first
+      // navigation post-install is already cached. Don't fail install if
+      // the network fetch errors — SW still activates.
+      try {
+        await cache.addAll([WELCOME_PATH, "/manifest.json"]);
+      } catch {
+        /* ignore — install proceeds */
+      }
+    })()
   );
   self.skipWaiting();
 });
@@ -19,10 +33,51 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Network-first for navigation requests; fall back to cache when offline.
+  const url = new URL(event.request.url);
+
+  // Welcome page — stale-while-revalidate. The previous policy was
+  // network-first, which meant every navigation waited on TTFB. On slow
+  // networks (school wifi, weak cellular) that translated to ~5s of
+  // Safari painting its own dark-mode background before our HTML arrived.
+  // SWR serves the cached HTML immediately (instant cream paint), then
+  // fetches fresh in the background so the *next* visit is up to date.
+  if (
+    event.request.mode === "navigate" &&
+    url.origin === self.location.origin &&
+    url.pathname === WELCOME_PATH
+  ) {
+    event.respondWith(
+      (async () => {
+        const cache = await caches.open(CACHE);
+        const cached = await cache.match(WELCOME_PATH);
+
+        const networkPromise = fetch(event.request)
+          .then((response) => {
+            // Only cache full successful responses. Don't poison the cache
+            // with redirects or error pages.
+            if (response && response.status === 200 && response.type === "basic") {
+              cache.put(WELCOME_PATH, response.clone());
+            }
+            return response;
+          })
+          .catch(() => null);
+
+        // Cache HIT → return immediately, fire-and-forget the revalidate.
+        if (cached) return cached;
+        // Cache MISS (first ever visit, or post-evict) → wait on network.
+        const networkResponse = await networkPromise;
+        return networkResponse ?? new Response("Offline", { status: 503 });
+      })()
+    );
+    return;
+  }
+
+  // Other navigations: network-first with cache fallback for offline.
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match("/") || new Response("Offline", { status: 503 }))
+      fetch(event.request).catch(
+        () => caches.match(WELCOME_PATH) || new Response("Offline", { status: 503 })
+      )
     );
   }
 });
