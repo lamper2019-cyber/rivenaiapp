@@ -12,7 +12,7 @@ export async function loadDashboardData(clerkId: string) {
   const today = startOfDay(new Date());
   const weekStart = startOfIsoWeek(new Date());
 
-  const [todayTotals, weekCheckIn, weekContent] = await Promise.all([
+  const [todayTotals, weekCheckIn, weekContent, latestCoachMessage] = await Promise.all([
     prisma.dailyTotals.findUnique({
       where: { userId_date: { userId: user.id, date: today } },
     }),
@@ -24,6 +24,13 @@ export async function loadDashboardData(clerkId: string) {
       where: { userId: user.id, week: weekStart },
       orderBy: { createdAt: "desc" },
       select: { id: true, videoUrl: true, photoUrl: true, promptText: true, createdAt: true },
+    }),
+    // Most recent COACH message — drives the pulsing "Message from Sean" chip
+    // on the home screen. Client-side localStorage decides if it's already seen.
+    prisma.chatMessage.findFirst({
+      where: { userId: user.id, kind: "COACH" },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
     }),
   ]);
 
@@ -52,6 +59,7 @@ export async function loadDashboardData(clerkId: string) {
     clientWeek,
     isCheckInDay,
     dayName,
+    latestCoachMessage,
   };
 }
 

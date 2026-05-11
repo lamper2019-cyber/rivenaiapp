@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SUGGESTED_PROMPTS } from "@/lib/chat-prompt";
+import { markCoachMessageSeen } from "@/components/coach-message-badge";
 
 const MAX_IMAGES_PER_MESSAGE = 4;
 
@@ -34,6 +35,15 @@ export function ChatUI({
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Clear the home-screen "Message from Sean" badge as soon as the client
+  // opens chat — finding the most recent COACH message in history is enough.
+  useEffect(() => {
+    const latestCoach = [...initialMessages]
+      .reverse()
+      .find((m) => m.kind === "COACH");
+    if (latestCoach) markCoachMessageSeen(latestCoach.id);
+  }, [initialMessages]);
 
   // Voice recording state
   const [recording, setRecording] = useState(false);

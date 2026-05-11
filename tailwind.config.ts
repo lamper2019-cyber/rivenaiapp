@@ -100,6 +100,11 @@ const config: Config = {
         "section-gap": "48px",
         "container-padding-mobile": "20px",
         "container-padding-desktop": "40px",
+        // Aliases — call sites use `px-container-mobile`/`px-container-desktop`.
+        // Without these, those utilities silently render no padding (content
+        // flush to the viewport edge). Don't remove.
+        "container-mobile": "20px",
+        "container-desktop": "40px",
       },
       boxShadow: {
         // DESIGN.md elevation tokens

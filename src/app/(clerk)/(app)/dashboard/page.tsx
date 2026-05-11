@@ -6,6 +6,8 @@ import { pickQuoteForDate } from "@/lib/daily-quotes";
 import { ASK_RIVEN_PROMPTS } from "@/lib/ask-riven-prompts";
 import { RotatingText } from "@/components/rotating-text";
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
+import { NotificationOptIn } from "@/components/notification-opt-in";
+import { CoachMessageBadge } from "@/components/coach-message-badge";
 import { LogStepsForm } from "./log-steps-form";
 
 const STEP_GOAL = 10000;
@@ -45,6 +47,7 @@ export default async function DashboardPage() {
     weekContent,
     prompt,
     dayName,
+    latestCoachMessage,
   } = data;
 
   const calorieRemaining = profile.cutCalories - todayTotals.calories;
@@ -57,6 +60,10 @@ export default async function DashboardPage() {
 
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-3xl mx-auto py-12 space-y-section-gap">
+      {latestCoachMessage && (
+        <CoachMessageBadge latestMessageId={latestCoachMessage.id} />
+      )}
+
       <header className="space-y-2">
         <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
           {dayName}
@@ -71,6 +78,12 @@ export default async function DashboardPage() {
 
       {/* Self-hides if already installed as PWA or dismissed. */}
       <PwaInstallBanner />
+
+      {/* Self-hides if push is already on, blocked, or iOS-not-installed
+          (in which case the install banner is the right path). */}
+      <NotificationOptIn
+        vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
+      />
 
       {/* Today's targets — three progress cards */}
       <section className="space-y-3">

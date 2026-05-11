@@ -40,12 +40,36 @@ body {
   .pb-safe {
     padding-bottom: max(env(safe-area-inset-bottom), 1rem);
   }
+  /* Safe-area padding for iOS PWA status bar / dynamic island */
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top), 1rem);
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────
    Premium animations — slow, ambient, never strobing.
    All respect prefers-reduced-motion.
    ───────────────────────────────────────────────────────────────── */
+
+/* Floating "Message from Sean" badge — gentle bob + soft gold halo pulse. */
+@keyframes riven-float-pulse {
+  0%, 100% {
+    transform: translateY(0);
+    box-shadow: 0 4px 16px rgba(201, 169, 97, 0.18);
+  }
+  50% {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 22px rgba(201, 169, 97, 0.32);
+  }
+}
+.riven-float-pulse {
+  animation: riven-float-pulse 2.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .riven-float-pulse {
+    animation: none;
+  }
+}
 
 /* Soft pulse for the Sunday check-in card on non-Sunday days. */
 @keyframes riven-pulse-soft {

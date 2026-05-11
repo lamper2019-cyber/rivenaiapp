@@ -10,6 +10,11 @@ import {
 } from "@/lib/progress";
 import { Sparkline } from "@/components/sparkline";
 import { PushSubscribeButton } from "@/components/push-subscribe-button";
+import { startOfIsoWeek } from "@/lib/week";
+import {
+  getClientWeekNumber,
+  getPromptForClientWeek,
+} from "@/lib/content-prompts";
 import { DeleteAccountButton } from "./delete-account-button";
 
 const PHASE_LABEL: Record<string, string> = {
@@ -25,6 +30,19 @@ export default async function ProfilePage() {
   let profile = null;
   let checkIns: Awaited<ReturnType<typeof prisma.weeklyCheckIn.findMany>> = [];
   let wins: Win[] = [];
+  let weekCheckIn: {
+    id: string;
+    weight: number;
+    waist: number;
+  } | null = null;
+  let weekContent: {
+    id: string;
+    videoUrl: string | null;
+    photoUrl: string | null;
+    promptText: string;
+  } | null = null;
+
+  const weekStart = startOfIsoWeek(new Date());
 
   if (userId) {
     try {
@@ -35,11 +53,27 @@ export default async function ProfilePage() {
       profile = user?.profile ?? null;
 
       if (user) {
-        checkIns = await prisma.weeklyCheckIn.findMany({
-          where: { userId: user.id },
-          orderBy: { weekStart: "asc" },
-          take: 26, // last ~6 months of weekly check-ins
-        });
+        [checkIns, weekCheckIn, weekContent] = await Promise.all([
+          prisma.weeklyCheckIn.findMany({
+            where: { userId: user.id },
+            orderBy: { weekStart: "asc" },
+            take: 26, // last ~6 months of weekly check-ins
+          }),
+          prisma.weeklyCheckIn.findUnique({
+            where: { userId_weekStart: { userId: user.id, weekStart } },
+            select: { id: true, weight: true, waist: true },
+          }),
+          prisma.contentSubmission.findFirst({
+            where: { userId: user.id, week: weekStart },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              videoUrl: true,
+              photoUrl: true,
+              promptText: true,
+            },
+          }),
+        ]);
       }
 
       if (profile) {
@@ -49,6 +83,10 @@ export default async function ProfilePage() {
       /* DB not connected — render minimal page */
     }
   }
+
+  const prompt = profile
+    ? getPromptForClientWeek(getClientWeekNumber(profile.onboardedAt))
+    : null;
 
   const weightSeries = toWeightSeries(checkIns);
   const waistSeries = toWaistSeries(checkIns);
@@ -130,42 +168,70 @@ export default async function ProfilePage() {
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
           Weekly
         </h2>
-        <Link
-          href="/check-in"
-          className="block rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-4 hover:border-gold transition-colors shadow-elevation-1"
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-display text-headline-md text-charcoal">
-                Sunday check-in
-              </p>
-              <p className="font-body text-body-md text-on-surface-variant mt-1">
-                Weight, waist, photos, and how the week actually went.
-              </p>
-            </div>
-            <span className="material-symbols-outlined text-on-surface-variant">
-              arrow_forward
-            </span>
+
+        {weekCheckIn ? (
+          <div className="rounded-md bg-tertiary-container/40 border border-sage/40 px-gutter py-4 shadow-elevation-1">
+            <p className="font-body text-label-md tracking-widest uppercase text-sage">
+              Checked in this week
+            </p>
+            <p className="font-body text-body-md text-charcoal mt-2">
+              Weight {weekCheckIn.weight} lbs · Waist {weekCheckIn.waist}″
+            </p>
           </div>
-        </Link>
-        <Link
-          href="/content"
-          className="block rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-4 hover:border-gold transition-colors shadow-elevation-1"
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-display text-headline-md text-charcoal">
-                This week&apos;s prompt
-              </p>
-              <p className="font-body text-body-md text-on-surface-variant mt-1">
-                Record a 60-90 second answer.
-              </p>
+        ) : (
+          <Link
+            href="/check-in"
+            className="block rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-4 hover:border-gold transition-colors shadow-elevation-1"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-display text-headline-md text-charcoal">
+                  Sunday check-in
+                </p>
+                <p className="font-body text-body-md text-on-surface-variant mt-1">
+                  Weight, waist, photos, and how the week actually went.
+                </p>
+              </div>
+              <span className="material-symbols-outlined text-on-surface-variant">
+                arrow_forward
+              </span>
             </div>
-            <span className="material-symbols-outlined text-on-surface-variant">
-              videocam
-            </span>
+          </Link>
+        )}
+
+        {weekContent ? (
+          <div className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-4 shadow-elevation-1">
+            <p className="font-body text-label-md tracking-widest uppercase text-on-secondary-container">
+              Submitted this week
+              {prompt ? ` · ${prompt.title}` : ""}
+            </p>
+            <Link
+              href="/content"
+              className="font-body text-body-md text-charcoal underline underline-offset-4 mt-2 inline-block"
+            >
+              Re-record →
+            </Link>
           </div>
-        </Link>
+        ) : (
+          <Link
+            href="/content"
+            className="block rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-4 hover:border-gold transition-colors shadow-elevation-1"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-display text-headline-md text-charcoal">
+                  This week&apos;s prompt
+                </p>
+                <p className="font-body text-body-md text-on-surface-variant mt-1">
+                  {prompt ? prompt.title : "Record a 60-90 second answer."}
+                </p>
+              </div>
+              <span className="material-symbols-outlined text-on-surface-variant">
+                videocam
+              </span>
+            </div>
+          </Link>
+        )}
       </section>
 
       <section className="space-y-3">

@@ -1,25 +1,34 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureUserExists } from "@/lib/user-bootstrap";
 import { OnboardingForm } from "./onboarding-form";
 
 export default async function OnboardingPage() {
   const { userId } = auth();
 
-  // Already-onboarded clients skip straight to the dashboard.
-  // Wrapped in try/catch because Phase 1 can run without a live DB —
-  // a missing DATABASE_URL shouldn't block the form from rendering for design review.
-  if (userId) {
+  // Already-onboarded clients skip to the dashboard. Coaches never onboard —
+  // bootstrap them straight to /coach if their email matches COACH_EMAIL.
+  // The DB lookup is wrapped in try/catch (Phase 1 can run without a live DB)
+  // but redirects MUST sit outside or the catch swallows the NEXT_REDIRECT.
+  let shouldRedirectTo: string | null = null;
+  if (userId && isClerkConfigured) {
     try {
-      const existing = await prisma.user.findUnique({
-        where: { clerkId: userId },
-        include: { profile: { select: { id: true } } },
-      });
-      if (existing?.profile) redirect("/dashboard");
+      const bootstrapped = await ensureUserExists(userId);
+      if (bootstrapped?.role === "COACH") {
+        shouldRedirectTo = "/coach";
+      } else {
+        const existing = await prisma.user.findUnique({
+          where: { clerkId: userId },
+          include: { profile: { select: { id: true } } },
+        });
+        if (existing?.profile) shouldRedirectTo = "/dashboard";
+      }
     } catch {
       /* no DB yet — render the form anyway */
     }
   }
+  if (shouldRedirectTo) redirect(shouldRedirectTo);
 
   return (
     <main className="relative min-h-screen px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-12">

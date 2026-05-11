@@ -43,7 +43,9 @@ export default async function ChatPage() {
           kind: m.kind,
           content: m.content,
           imageUrls: m.imageUrls,
-          senderName: m.sender?.profile?.name ?? m.sender?.email?.split("@")[0],
+          // Coaches skip client onboarding so Profile.name is usually empty —
+          // omit the email-username fallback so the UI's "Sean" default kicks in.
+          senderName: m.sender?.profile?.name ?? undefined,
         }));
       }
     } catch {

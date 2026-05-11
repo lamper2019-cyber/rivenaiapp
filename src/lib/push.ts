@@ -7,6 +7,7 @@
  */
 
 import webpush, { type PushSubscription as WebPushSubscription, type SendResult } from "web-push";
+import { prisma } from "@/lib/prisma";
 
 export const isPushConfigured =
   !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY &&
@@ -61,4 +62,46 @@ export function isExpiredSubscriptionError(err: unknown): boolean {
   if (typeof err !== "object" || err === null) return false;
   const e = err as { statusCode?: number };
   return e.statusCode === 404 || e.statusCode === 410;
+}
+
+/**
+ * Fan out a push to every subscription a single user has, garbage-collecting
+ * any that come back 404/410 (uninstalled app, revoked permission, etc.).
+ *
+ * Best-effort: never throws. Push failures shouldn't break the upstream
+ * action (sending a chat message, updating targets, etc.). Returns counters
+ * for observability.
+ */
+export async function sendPushToUser(
+  userId: string,
+  payload: PushPayload
+): Promise<{ sent: number; failed: number; cleaned: number }> {
+  if (!isPushConfigured) return { sent: 0, failed: 0, cleaned: 0 };
+
+  const subs = await prisma.pushSubscription.findMany({
+    where: { userId },
+    select: { id: true, endpoint: true, p256dh: true, auth: true },
+  });
+
+  let sent = 0;
+  let failed = 0;
+  const expiredIds: string[] = [];
+
+  for (const sub of subs) {
+    try {
+      await sendPush(sub, payload);
+      sent++;
+    } catch (err) {
+      failed++;
+      if (isExpiredSubscriptionError(err)) expiredIds.push(sub.id);
+    }
+  }
+
+  if (expiredIds.length > 0) {
+    await prisma.pushSubscription.deleteMany({
+      where: { id: { in: expiredIds } },
+    });
+  }
+
+  return { sent, failed, cleaned: expiredIds.length };
 }
