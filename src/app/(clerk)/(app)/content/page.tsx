@@ -56,7 +56,7 @@ export default async function ContentPage() {
     <main className="relative min-h-screen px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-12">
       <header className="mb-section-gap space-y-3">
         <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-          Week {clientWeek} of your journey · {formatWeekRange(weekStart)}
+          This week&apos;s prompt · {formatWeekRange(weekStart)}
         </p>
         <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal text-balance">
           {prompt.title}

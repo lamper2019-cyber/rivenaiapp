@@ -19,8 +19,12 @@ export default async function ChatPage() {
       onboarded = !!user?.profile;
 
       if (user) {
+        // RIVEN Ai is strictly the user ↔ AI conversation. COACH messages
+        // live on /messages (separate feature, distinct UX). Filtering by
+        // kind here is the single source of truth — no coach content ever
+        // leaks into the AI thread.
         const messagesDesc = await prisma.chatMessage.findMany({
-          where: { userId: user.id },
+          where: { userId: user.id, kind: "AI" },
           orderBy: { createdAt: "desc" },
           take: HISTORY_LIMIT,
           select: {
@@ -29,12 +33,6 @@ export default async function ChatPage() {
             kind: true,
             content: true,
             imageUrls: true,
-            sender: {
-              select: {
-                profile: { select: { name: true } },
-                email: true,
-              },
-            },
           },
         });
         initialMessages = messagesDesc.reverse().map((m) => ({
@@ -43,10 +41,6 @@ export default async function ChatPage() {
           kind: m.kind,
           content: m.content,
           imageUrls: m.imageUrls,
-          // All COACH messages display as "Sean" — single-coach brand, and
-          // never leak Profile.name (which may be stale from when Sean tested
-          // his own client account before role gating existed). senderName
-          // stays undefined; the UI hardcodes "Sean" for coach messages.
           senderName: undefined,
         }));
       }

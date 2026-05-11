@@ -206,13 +206,12 @@ export default async function DashboardPage() {
         <SundayLockedCard dayName={dayName} />
       )}
 
-      {/* Content prompt card */}
+      {/* Content prompt card — short single-sentence prompt only; the full
+          prompt + hint live on the /content recording page. */}
       {!weekContent ? (
         <PromptCard
           eyebrow="This week's prompt"
-          title={prompt.title}
-          body={prompt.prompt}
-          subBody={prompt.hint}
+          title={prompt.shortPrompt}
           ctaLabel="Record my answer"
           ctaHref="/content"
           tone="gold"
@@ -304,7 +303,7 @@ function PromptCard({
 }: {
   eyebrow: string;
   title: string;
-  body: string;
+  body?: string;
   subBody?: string;
   ctaLabel: string;
   ctaHref: string;
@@ -326,9 +325,11 @@ function PromptCard({
       <h3 className="font-display text-headline-md text-charcoal mt-2">
         {title}
       </h3>
-      <p className="font-body text-body-md text-charcoal mt-3 leading-relaxed">
-        {body}
-      </p>
+      {body && (
+        <p className="font-body text-body-md text-charcoal mt-3 leading-relaxed">
+          {body}
+        </p>
+      )}
       {subBody && (
         <p className="font-body text-label-sm text-on-surface-variant/80 mt-2">
           {subBody}

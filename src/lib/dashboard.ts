@@ -25,13 +25,19 @@ export async function loadDashboardData(clerkId: string) {
       orderBy: { createdAt: "desc" },
       select: { id: true, videoUrl: true, photoUrl: true, promptText: true, createdAt: true },
     }),
-    // Most recent COACH message — drives the pulsing "Message from Sean" chip
-    // on the home screen. Client-side localStorage decides if it's already seen.
-    prisma.chatMessage.findFirst({
-      where: { userId: user.id, kind: "COACH" },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    }),
+    // Most recent COACH message in the last 30 days — drives the persistent
+    // "Message from Sean" chip on the home screen. The chip stays visible
+    // regardless of read state until the message ages out; the gold halo
+    // only pulses when localStorage says this id hasn't been seen yet.
+    (async () => {
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      return prisma.chatMessage.findFirst({
+        where: { userId: user.id, kind: "COACH", createdAt: { gte: since } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+    })(),
   ]);
 
   // Per-client week numbering — week 1 starts the day she finishes onboarding.
