@@ -48,9 +48,11 @@ export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[
   ).length;
   const isUnread = unreadCount > 0;
 
+  // Unread: solid gold + heartbeat glow (the heartbeat replaces the static
+  // shadow so the chip's elevation breathes). Read: quiet charcoal pill.
   const stateClasses = isUnread
-    ? "bg-gold text-charcoal border-gold/80"
-    : "bg-charcoal text-cream border-charcoal";
+    ? "bg-gold text-charcoal border-gold/80 riven-coach-heartbeat"
+    : "bg-charcoal text-cream border-charcoal shadow-elevation-1";
 
   return (
     <Link
@@ -60,7 +62,7 @@ export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[
           ? `${unreadCount} new ${unreadCount === 1 ? "message" : "messages"} from Sean`
           : "View messages from Sean"
       }
-      className={`fixed top-[calc(env(safe-area-inset-top)_+_12px)] right-3 z-50 inline-flex items-center gap-2 rounded-full border pl-1 pr-3 py-1 shadow-elevation-1 active:scale-95 transition-colors ${stateClasses}`}
+      className={`fixed top-[calc(env(safe-area-inset-top)_+_12px)] right-3 z-50 inline-flex items-center gap-2 rounded-full border pl-1 pr-3 py-1 active:scale-95 transition-colors ${stateClasses}`}
     >
       <span className="relative inline-block w-7 h-7">
         {/* Plain <img> rather than next/image: the asset is tiny, fixed-size,
