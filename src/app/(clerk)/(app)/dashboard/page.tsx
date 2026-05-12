@@ -9,6 +9,7 @@ import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import { NotificationOptIn } from "@/components/notification-opt-in";
 import { CoachMessageBadge } from "@/components/coach-message-badge";
 import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
+import { getMealPacing, type MealPacingTier } from "@/lib/meal-pacing";
 import { LogStepsForm } from "./log-steps-form";
 
 const STEP_GOAL = 10000;
@@ -66,6 +67,15 @@ export default async function DashboardPage() {
   const dailyQuote = pickQuoteForDate(new Date());
   const isSunday = dayName === "Sunday";
 
+  // Meal-pacing — drives the reminder card AND tints the sticky log pill
+  // when she's behind. Best-effort; if it fails we still render the page.
+  let pacing: Awaited<ReturnType<typeof getMealPacing>> = null;
+  try {
+    pacing = await getMealPacing(userId);
+  } catch {
+    /* swallow */
+  }
+
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-3xl mx-auto py-12 space-y-section-gap">
       {recentCoachMessages.length > 0 && (
@@ -92,6 +102,8 @@ export default async function DashboardPage() {
       <NotificationOptIn
         vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
       />
+
+      {pacing?.isBehind && <MealReminderCard tier={pacing.tier} />}
 
       {/* Today's targets — three progress cards */}
       <section className="space-y-3">
@@ -173,13 +185,6 @@ export default async function DashboardPage() {
           </div>
         </Link>
 
-        <Link
-          href="/log"
-          className="block rounded-md bg-charcoal text-cream px-gutter py-4 hover:opacity-90 transition-opacity shadow-elevation-1 flex items-center justify-between"
-        >
-          <span className="font-body text-body-md tracking-wide">Log a meal</span>
-          <span className="material-symbols-outlined">edit_note</span>
-        </Link>
         <LogStepsForm initial={todayTotals.steps} />
       </section>
 
@@ -231,6 +236,8 @@ export default async function DashboardPage() {
       )}
 
       <div className="fixed top-[10%] right-[-10%] w-[35%] h-[35%] bg-gold/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+
+      <StickyLogPill behind={pacing?.isBehind ?? false} />
     </main>
   );
 }
@@ -442,4 +449,72 @@ function pickGreeting(name: string): string {
   if (hour < 12) return `Good morning, ${name}.`;
   if (hour < 18) return `Afternoon, ${name}.`;
   return `Evening, ${name}.`;
+}
+
+function MealReminderCard({ tier }: { tier: MealPacingTier }) {
+  const { eyebrow, body } = reminderCopyFor(tier);
+  return (
+    <Link
+      href="/log"
+      className="block rounded-md bg-gold/15 border border-gold/60 px-gutter py-4 shadow-elevation-1 hover:bg-gold/20 transition-colors"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="font-body text-label-md tracking-widest uppercase text-on-secondary-container">
+            {eyebrow}
+          </p>
+          <p className="font-body text-body-md text-charcoal mt-1">{body}</p>
+        </div>
+        <span className="material-symbols-outlined text-charcoal/70 shrink-0">
+          arrow_forward
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function reminderCopyFor(tier: MealPacingTier): { eyebrow: string; body: string } {
+  switch (tier) {
+    case "midday":
+      return {
+        eyebrow: "Haven't logged yet",
+        body: "What did breakfast look like? Takes 5 seconds with voice.",
+      };
+    case "afternoon":
+      return {
+        eyebrow: "Half the day's gone",
+        body: "Catch up the morning and lunch before you forget the details.",
+      };
+    case "evening":
+      return {
+        eyebrow: "Light day on the log",
+        body: "Run through what you ate today — even rough numbers beat zero.",
+      };
+    // Early/late tiers shouldn't trigger isBehind, but keep the type exhaustive.
+    case "early":
+    case "late":
+      return {
+        eyebrow: "Log a meal",
+        body: "Voice or text — it takes a few seconds.",
+      };
+  }
+}
+
+function StickyLogPill({ behind }: { behind: boolean }) {
+  // Floats above the bottom nav. Charcoal pill on a calm day, gold when she's
+  // behind so the eye catches it on the same page where the reminder card
+  // lives. Tap routes to /log.
+  const tone = behind
+    ? "bg-gold text-charcoal border border-gold riven-pulse-soft"
+    : "bg-charcoal text-cream border border-charcoal";
+  return (
+    <Link
+      href="/log"
+      aria-label="Log a meal"
+      className={`fixed bottom-[calc(env(safe-area-inset-bottom)_+_84px)] left-3 right-3 z-40 inline-flex items-center justify-center gap-2 rounded-full py-3.5 font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-[0.98] transition-all max-w-3xl mx-auto ${tone}`}
+    >
+      <span className="material-symbols-outlined text-[20px] filled">mic</span>
+      Log a meal
+    </Link>
+  );
 }

@@ -16,7 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/profile", label: "Profile", icon: "person" },
 ];
 
-export function BottomNav() {
+export function BottomNav({ mealsBehind = false }: { mealsBehind?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -27,6 +27,7 @@ export function BottomNav() {
       {NAV_ITEMS.map((item) => {
         const isActive =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const showLogDot = item.href === "/log" && mealsBehind && !isActive;
         return (
           <Link
             key={item.href}
@@ -38,10 +39,18 @@ export function BottomNav() {
             }`}
             aria-current={isActive ? "page" : undefined}
           >
-            <span
-              className={`material-symbols-outlined ${isActive ? "filled" : ""}`}
-            >
-              {item.icon}
+            <span className="relative inline-block">
+              <span
+                className={`material-symbols-outlined ${isActive ? "filled" : ""}`}
+              >
+                {item.icon}
+              </span>
+              {showLogDot && (
+                <span
+                  aria-label="You're behind on logging today"
+                  className="absolute -top-0.5 -right-1 inline-block w-2 h-2 rounded-full bg-gold ring-2 ring-cream"
+                />
+              )}
             </span>
             <span className="font-body text-label-md mt-1">{item.label}</span>
           </Link>
