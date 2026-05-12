@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureUserExists } from "@/lib/user-bootstrap";
-import { OnboardingForm } from "./onboarding-form";
+import { OnboardingFlow } from "./onboarding-flow";
 
 export default async function OnboardingPage() {
   const { userId } = auth();
@@ -30,24 +30,7 @@ export default async function OnboardingPage() {
   }
   if (shouldRedirectTo) redirect(shouldRedirectTo);
 
-  return (
-    <main className="relative min-h-screen px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-12">
-      <header className="mb-section-gap space-y-3">
-        <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-          Step one of one
-        </p>
-        <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal text-balance">
-          Welcome — let&apos;s set up your profile.
-        </h1>
-        <p className="font-body text-body-lg text-on-surface-variant max-w-md">
-          A few quick questions so RIVEN can calibrate your calorie and protein targets to you.
-        </p>
-      </header>
-
-      <OnboardingForm />
-
-      {/* Ambient warm glow (matches welcome screen) */}
-      <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-gold/5 blur-[120px] rounded-full pointer-events-none -z-10" />
-    </main>
-  );
+  // The flow handles its own layout / header / progress dots / Sean voice
+  // — no outer wrapper so each step owns the full screen.
+  return <OnboardingFlow />;
 }

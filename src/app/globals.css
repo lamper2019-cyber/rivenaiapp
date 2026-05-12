@@ -148,3 +148,56 @@ body {
     animation: none;
   }
 }
+
+/* Brand-styled native range slider used by the onboarding step flow.
+   Charcoal track with a gold thumb — bigger thumb on touch so it's
+   thumb-sized, not mouse-sized. The webkit and moz prefixes have to be
+   listed separately; combined selectors silently no-op in Chromium. */
+.riven-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  cursor: pointer;
+}
+.riven-slider:focus {
+  outline: none;
+}
+.riven-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #1A1A1A;
+  border-radius: 9999px;
+}
+.riven-slider::-moz-range-track {
+  height: 4px;
+  background: #1A1A1A;
+  border-radius: 9999px;
+}
+.riven-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -12px;
+  border-radius: 9999px;
+  background: #C9A961;
+  border: 3px solid #FAF7F2;
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.18);
+  transition: transform 0.12s ease;
+}
+.riven-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: #C9A961;
+  border: 3px solid #FAF7F2;
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.18);
+  transition: transform 0.12s ease;
+}
+.riven-slider:active::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+.riven-slider:active::-moz-range-thumb {
+  transform: scale(1.12);
+}
