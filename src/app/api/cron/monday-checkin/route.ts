@@ -4,7 +4,8 @@ import { runMondayCheckinBatch } from "@/lib/monday-checkin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // 5 min — gives Claude headroom for N clients
+export const maxDuration = 800; // ~13 min safety net; the batch itself runs
+// 5 clients in parallel and should finish in under 3 min for ≤50 clients.
 
 /**
  * Monday-morning Sean check-in (scheduled).

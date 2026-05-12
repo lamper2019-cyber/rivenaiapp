@@ -289,59 +289,76 @@ export async function runMondayCheckinBatch(): Promise<MondayCheckinBatchResult>
   let skipped = 0;
   const errors: MondayCheckinBatchResult["errors"] = [];
 
-  // Sequential — gentle on the Anthropic API and on Railway's container
-  // memory. With small client counts this finishes well under any timeout.
-  for (const client of clients) {
-    try {
-      const result = await generateMondayCheckin({ clientUserId: client.id });
-      if (!result.ok) {
+  // Process in batches of CONCURRENCY clients at a time. Each per-client unit
+  // is ~10-15s wall clock (mostly Claude generation), so sequential blew
+  // past the 5-min route timeout once the client list crossed ~20. Five in
+  // parallel keeps us well under Anthropic's default rate ceiling while
+  // dropping batch wall time roughly 5x.
+  const CONCURRENCY = 5;
+  for (let i = 0; i < clients.length; i += CONCURRENCY) {
+    const batch = clients.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(
+      batch.map((client) => processOneClient(client, coach?.id ?? null)),
+    );
+    for (const r of results) {
+      if (r.sent) sent++;
+      else {
         skipped++;
-        errors.push({ clientId: client.id, reason: result.error });
-        console.error(
-          `[monday-checkin] generation failed for ${client.email}:`,
-          result.error
-        );
-        continue;
+        if (r.error) errors.push(r.error);
       }
-
-      const message = await prisma.chatMessage.create({
-        data: {
-          userId: client.id,
-          role: "ASSISTANT",
-          kind: "COACH",
-          senderUserId: coach?.id ?? null,
-          content: result.message,
-        },
-        select: { id: true },
-      });
-
-      try {
-        await sendPushToUser(client.id, {
-          title: "Monday from Sean",
-          body: preview(result.message, 110),
-          url: "/messages",
-          tag: `monday-checkin-${message.id}`,
-        });
-      } catch (pushErr) {
-        console.error(
-          `[monday-checkin] push failed for ${client.email}:`,
-          pushErr
-        );
-      }
-
-      sent++;
-    } catch (err) {
-      skipped++;
-      const reason = err instanceof Error ? err.message : "unknown";
-      errors.push({ clientId: client.id, reason });
-      console.error(
-        `[monday-checkin] unexpected error for ${client.email}:`,
-        err
-      );
     }
   }
 
   return { clientsTargeted: clients.length, sent, skipped, errors };
+}
+
+type ClientRow = { id: string; email: string };
+type ProcessResult =
+  | { sent: true }
+  | { sent: false; error: { clientId: string; reason: string } };
+
+async function processOneClient(
+  client: ClientRow,
+  coachId: string | null,
+): Promise<ProcessResult> {
+  try {
+    const result = await generateMondayCheckin({ clientUserId: client.id });
+    if (!result.ok) {
+      console.error(
+        `[monday-checkin] generation failed for ${client.email}:`,
+        result.error,
+      );
+      return { sent: false, error: { clientId: client.id, reason: result.error } };
+    }
+
+    const message = await prisma.chatMessage.create({
+      data: {
+        userId: client.id,
+        role: "ASSISTANT",
+        kind: "COACH",
+        senderUserId: coachId,
+        content: result.message,
+      },
+      select: { id: true },
+    });
+
+    try {
+      await sendPushToUser(client.id, {
+        title: "Monday from Sean",
+        body: preview(result.message, 110),
+        url: "/messages",
+        tag: `monday-checkin-${message.id}`,
+      });
+    } catch (pushErr) {
+      console.error(`[monday-checkin] push failed for ${client.email}:`, pushErr);
+    }
+
+    return { sent: true };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "unknown";
+    console.error(`[monday-checkin] unexpected error for ${client.email}:`, err);
+    return { sent: false, error: { clientId: client.id, reason } };
+  }
 }
 
 function preview(content: string, max: number): string {
