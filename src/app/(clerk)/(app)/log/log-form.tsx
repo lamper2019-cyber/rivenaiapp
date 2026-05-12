@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { logMeal, undoLastMeal, type LogMealResult } from "./actions";
 
 type RecentMeal = {
@@ -31,6 +31,26 @@ export function LogForm({
   const [pending, startTransition] = useTransition();
   const [undoPending, startUndo] = useTransition();
   const [undoMessage, setUndoMessage] = useState<string | null>(null);
+
+  // Voice recording state — mirrors the pattern in chat-ui.tsx so behavior
+  // is consistent across the app. Recording is tap-to-toggle (not push-to-
+  // hold) for accessibility.
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [recordingMs, setRecordingMs] = useState(0);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingStartRef = useRef<number>(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state === "recording") recorder.stop();
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    };
+  }, []);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -80,6 +100,91 @@ export function LogForm({
     });
   }
 
+  async function startRecording() {
+    setVoiceError(null);
+    if (recording || transcribing || pending) return;
+
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setVoiceError("This browser doesn't support voice. Type the meal instead.");
+      return;
+    }
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setVoiceError("Microphone access denied. Allow it in your browser settings.");
+      return;
+    }
+
+    // Chrome → webm/opus, Safari → mp4/m4a — pick the best the browser supports.
+    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/mpeg"];
+    const supported = candidates.find(
+      (m) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m),
+    );
+    const recorder = new MediaRecorder(stream, supported ? { mimeType: supported } : undefined);
+
+    recordedChunksRef.current = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) recordedChunksRef.current.push(event.data);
+    };
+
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+
+      const chunks = recordedChunksRef.current;
+      recordedChunksRef.current = [];
+      if (chunks.length === 0) {
+        setRecording(false);
+        return;
+      }
+      const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+      setRecording(false);
+      setTranscribing(true);
+
+      try {
+        const fd = new FormData();
+        fd.append("audio", blob, "voice-memo");
+        const resp = await fetch("/api/chat/transcribe", { method: "POST", body: fd });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.error ?? `Transcribe failed: ${resp.status}`);
+        }
+        const data = (await resp.json()) as { text: string };
+        // Drop the transcript into the textarea; she taps Log to confirm.
+        // Auto-submit is tempting but burns an API call on every misheard
+        // word — preview-then-submit is safer.
+        setDescription((prev) => (prev.trim() ? `${prev} ${data.text}` : data.text));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Transcription failed.";
+        setVoiceError(msg);
+      } finally {
+        setTranscribing(false);
+      }
+    };
+
+    recorder.start();
+    recorderRef.current = recorder;
+    recordingStartRef.current = Date.now();
+    setRecordingMs(0);
+    recordingTimerRef.current = setInterval(() => {
+      setRecordingMs(Date.now() - recordingStartRef.current);
+    }, 200);
+    setRecording(true);
+  }
+
+  function stopRecording() {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state === "recording") recorder.stop();
+  }
+
+  const seconds = Math.floor(recordingMs / 1000);
+  const recordingLabel = `${String(Math.floor(seconds / 60)).padStart(1, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+
   return (
     <div className="space-y-section-gap">
       {totals && (
@@ -99,27 +204,91 @@ export function LogForm({
         </div>
       )}
 
+      {/* Voice hero — primary input path. Big tap target, prominent visual. */}
+      <section
+        className="rounded-md bg-gradient-to-br from-secondary-container/40 via-cream to-tertiary-container/20 border border-gold/40 shadow-elevation-1 px-gutter py-6"
+        aria-label="Voice meal logger"
+      >
+        <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant text-center">
+          {recording ? "Listening…" : transcribing ? "Reading the plate…" : "What did you eat?"}
+        </p>
+
+        <div className="mt-4 flex flex-col items-center gap-3">
+          {!recording && !transcribing && (
+            <button
+              type="button"
+              onClick={startRecording}
+              aria-label="Tap to record a voice memo"
+              className="relative inline-flex items-center justify-center w-24 h-24 rounded-full bg-charcoal text-cream shadow-elevation-2 active:scale-95 hover:opacity-90 transition-all"
+            >
+              <span className="absolute inset-0 rounded-full bg-gold/30 riven-glow" aria-hidden />
+              <span className="material-symbols-outlined relative text-cream text-[42px] filled">
+                mic
+              </span>
+            </button>
+          )}
+
+          {recording && (
+            <button
+              type="button"
+              onClick={stopRecording}
+              aria-label="Stop recording"
+              className="relative inline-flex items-center justify-center w-24 h-24 rounded-full bg-soft-red text-cream shadow-elevation-2 active:scale-95 riven-pulse-strong"
+            >
+              <span className="material-symbols-outlined text-cream text-[42px] filled">
+                stop
+              </span>
+            </button>
+          )}
+
+          {transcribing && (
+            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-charcoal/80 text-cream shadow-elevation-2">
+              <span className="material-symbols-outlined text-cream text-[32px] animate-spin">
+                progress_activity
+              </span>
+            </div>
+          )}
+
+          <p className="font-body text-body-md text-on-surface-variant">
+            {recording
+              ? `Recording ${recordingLabel} — tap to stop`
+              : transcribing
+                ? "Transcribing your voice memo…"
+                : "Tap the mic and describe your meal"}
+          </p>
+
+          {voiceError && (
+            <p className="font-body text-label-sm text-soft-red mt-1">{voiceError}</p>
+          )}
+        </div>
+      </section>
+
+      {/* Text fallback — still here, demoted under the mic. */}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block space-y-2">
-          <span className="font-body text-label-md tracking-wide uppercase text-on-surface-variant">
-            What did you eat?
-          </span>
-          <textarea
-            name="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            disabled={pending}
-            rows={3}
-            maxLength={500}
-            placeholder="Two scrambled eggs, half an avocado, and a slice of sourdough toast"
-            className="w-full bg-surface-container-lowest rounded-md border border-outline-variant focus:border-gold focus:ring-0 outline-none p-4 font-body text-body-md text-charcoal placeholder:text-on-surface-variant/50 transition-colors resize-none disabled:opacity-60"
-            required
-          />
-          <div className="flex justify-between text-label-sm text-on-surface-variant/70">
-            <span>RIVEN estimates the macros and gives a quick read.</span>
-            <span>{description.length} / 500</span>
+        <details className="group" open={description.length > 0}>
+          <summary className="cursor-pointer list-none inline-flex items-center gap-2 font-body text-label-md tracking-widest uppercase text-on-surface-variant hover:text-charcoal transition-colors">
+            <span className="material-symbols-outlined text-[18px] transition-transform group-open:rotate-90">
+              chevron_right
+            </span>
+            Or type it instead
+          </summary>
+          <div className="mt-3 space-y-2">
+            <textarea
+              name="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={pending}
+              rows={3}
+              maxLength={500}
+              placeholder="Two scrambled eggs, half an avocado, and a slice of sourdough toast"
+              className="w-full bg-surface-container-lowest rounded-md border border-outline-variant focus:border-gold focus:ring-0 outline-none p-4 font-body text-body-md text-charcoal placeholder:text-on-surface-variant/50 transition-colors resize-none disabled:opacity-60"
+            />
+            <div className="flex justify-between text-label-sm text-on-surface-variant/70">
+              <span>RIVEN estimates the macros and gives a quick read.</span>
+              <span>{description.length} / 500</span>
+            </div>
           </div>
-        </label>
+        </details>
 
         <button
           type="submit"
