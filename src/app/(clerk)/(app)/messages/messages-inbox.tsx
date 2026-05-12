@@ -10,13 +10,12 @@ export type CoachMessage = {
 };
 
 /**
- * Renders the coach-message list and clears the dashboard's pulsing chip
- * on mount by persisting the latest message id as "seen" in localStorage.
+ * Renders the coach-message list and clears the dashboard's unread state on
+ * mount by writing the current timestamp as "last seen at" in localStorage.
  */
 export function MessagesInbox({ messages }: { messages: CoachMessage[] }) {
   useEffect(() => {
-    const latest = messages[0];
-    if (latest) markCoachMessageSeen(latest.id);
+    if (messages.length > 0) markCoachMessageSeen();
   }, [messages]);
 
   return (

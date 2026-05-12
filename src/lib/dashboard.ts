@@ -12,7 +12,7 @@ export async function loadDashboardData(clerkId: string) {
   const today = startOfDay(new Date());
   const weekStart = startOfIsoWeek(new Date());
 
-  const [todayTotals, weekCheckIn, weekContent, latestCoachMessage] = await Promise.all([
+  const [todayTotals, weekCheckIn, weekContent, recentCoachMessages] = await Promise.all([
     prisma.dailyTotals.findUnique({
       where: { userId_date: { userId: user.id, date: today } },
     }),
@@ -25,17 +25,18 @@ export async function loadDashboardData(clerkId: string) {
       orderBy: { createdAt: "desc" },
       select: { id: true, videoUrl: true, photoUrl: true, promptText: true, createdAt: true },
     }),
-    // Most recent COACH message in the last 30 days — drives the persistent
-    // "Message from Sean" chip on the home screen. The chip stays visible
-    // regardless of read state until the message ages out; the gold halo
-    // only pulses when localStorage says this id hasn't been seen yet.
+    // COACH messages from the last 30 days — drives the persistent "Message
+    // from Sean" chip on the home screen. The chip stays visible regardless
+    // of read state until the messages age out; the client counts how many
+    // are newer than the localStorage "last seen at" timestamp to render the
+    // unread dot.
     (async () => {
       const since = new Date();
       since.setDate(since.getDate() - 30);
-      return prisma.chatMessage.findFirst({
+      return prisma.chatMessage.findMany({
         where: { userId: user.id, kind: "COACH", createdAt: { gte: since } },
         orderBy: { createdAt: "desc" },
-        select: { id: true },
+        select: { id: true, createdAt: true },
       });
     })(),
   ]);
@@ -65,7 +66,11 @@ export async function loadDashboardData(clerkId: string) {
     clientWeek,
     isCheckInDay,
     dayName,
-    latestCoachMessage,
+    recentCoachMessages: recentCoachMessages.map((m) => ({
+      id: m.id,
+      // Serialize Date → ISO so the value crosses the server/client boundary.
+      createdAt: m.createdAt.toISOString(),
+    })),
   };
 }
 

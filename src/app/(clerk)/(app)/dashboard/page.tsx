@@ -55,7 +55,7 @@ export default async function DashboardPage() {
     weekContent,
     prompt,
     dayName,
-    latestCoachMessage,
+    recentCoachMessages,
   } = data;
 
   const calorieRemaining = profile.cutCalories - todayTotals.calories;
@@ -68,8 +68,8 @@ export default async function DashboardPage() {
 
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-3xl mx-auto py-12 space-y-section-gap">
-      {latestCoachMessage && (
-        <CoachMessageBadge latestMessageId={latestCoachMessage.id} />
+      {recentCoachMessages.length > 0 && (
+        <CoachMessageBadge messages={recentCoachMessages} />
       )}
 
       <header className="space-y-2">
