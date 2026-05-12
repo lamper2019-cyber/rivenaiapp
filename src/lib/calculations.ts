@@ -1,7 +1,8 @@
 /**
  * RIVEN nutrition target calculations.
  * Mifflin-St Jeor formula for BMR, then activity multiplier for maintenance,
- * minus 500 cal for cut target. Protein floor is 0.8g/lb of goal weight, min 130g.
+ * minus 23% for cut target (floored at 1400 cal). Protein floor is 0.8g/lb of
+ * goal weight, min 130g.
  */
 
 import type { ActivityLevel } from "@prisma/client";
@@ -13,6 +14,9 @@ const ACTIVITY_MULTIPLIER: Record<ActivityLevel, number> = {
   ACTIVE: 1.725,
   VERY_ACTIVE: 1.9,
 };
+
+const CUT_PERCENTAGE = 0.23;
+const MIN_CUT_CALORIES = 1400;
 
 export type TargetInputs = {
   age: number;
@@ -44,7 +48,10 @@ export function calculateTargets(inputs: TargetInputs): Targets {
       : 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
 
   const maintenanceCalories = Math.round(bmr * ACTIVITY_MULTIPLIER[activityLevel]);
-  const cutCalories = maintenanceCalories - 500;
+  const cutCalories = Math.max(
+    Math.round(maintenanceCalories * (1 - CUT_PERCENTAGE)),
+    MIN_CUT_CALORIES,
+  );
   const weeklyBudget = cutCalories * 7;
   const proteinFloor = Math.max(Math.round(goalWeight * 0.8), 130);
 
