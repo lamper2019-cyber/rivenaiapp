@@ -67,17 +67,35 @@ export async function GET(req: NextRequest) {
   const ext = guessExtension(sourceUrl, kind);
   const filename = `riven-${clientName}-${dateLabel}.${ext}`;
 
-  let signedUrl: string;
+  // Try the signed-URL path first (gives us the proper attachment filename),
+  // but verify it actually resolves before sending the browser there.
+  // Background: R2 has returned NoSuchKey in production for some submissions,
+  // most likely because R2_PUBLIC_URL and R2_BUCKET_NAME on Railway don't
+  // match what was used when the file was uploaded — so our extracted key
+  // doesn't exist in the bucket we're signing against. The public CDN URL
+  // (sourceUrl) still works because R2's public host serves whatever path
+  // resolves there. If signing or HEAD verification fails, fall back so the
+  // coach still gets the file.
+  let signedUrl: string | null = null;
   try {
     signedUrl = await presignDownload({ publicUrl: sourceUrl, filename });
+    const head = await fetch(signedUrl, { method: "HEAD" });
+    if (!head.ok) {
+      console.error(
+        `[coach/download] signed URL returned ${head.status} for submission ${submissionId}; falling back to public URL.`
+      );
+      signedUrl = null;
+    }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Signing failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[coach/download] presignDownload threw:", err);
+    signedUrl = null;
   }
 
-  // 302 so the browser follows. R2 honors ResponseContentDisposition baked
-  // into the signed URL and serves with the attachment filename header.
-  return NextResponse.redirect(signedUrl, 302);
+  // 302 to whichever URL we trust. Signed URL has Content-Disposition:
+  // attachment baked in (preferred). Fallback public URL downloads with
+  // R2's default Content-Disposition (usually inline) — coach can still
+  // save-as in the browser.
+  return NextResponse.redirect(signedUrl ?? sourceUrl, 302);
 }
 
 function guessExtension(url: string, kind: string): string {

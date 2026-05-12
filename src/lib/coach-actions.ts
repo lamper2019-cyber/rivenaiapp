@@ -5,6 +5,7 @@ import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
+import { getAnthropicClient, isAnthropicConfigured } from "@/lib/anthropic";
 
 const SendSchema = z.object({
   clientUserId: z.string().min(1),
@@ -235,4 +236,109 @@ function buildTargetChangeAnnouncement(args: {
   // proteinChanged only
   const direction = args.newProtein > args.oldProtein ? "Raising" : "Adjusting";
   return `${direction} your protein floor to ${args.newProtein}g. Hit it every day — that's non-negotiable.`;
+}
+
+/* ──────────────────────────────────────────────────────────── */
+
+const RewriteSchema = z.object({
+  draft: z
+    .string()
+    .min(1, "Type a message first.")
+    .max(4000, "Message is too long to rewrite — under 4000 characters."),
+});
+
+export type RewriteCoachMessageResult =
+  | { ok: true; rewritten: string }
+  | { ok: false; error: string };
+
+/**
+ * Voice-rewrite the coach's draft message in Sean's R.I.S.E.-aware tone.
+ * Coach-only. Doesn't touch the DB; the rewrite just replaces the textarea
+ * value client-side before Send is tapped. Original text never persists.
+ *
+ * System prompt is the verbatim spec the coach provided so the voice stays
+ * consistent and is easy to tune. Don't shorten it.
+ */
+const REWRITE_SYSTEM_PROMPT = `You are rewriting messages for Sean, a nutrition coach. Sean's voice is:
+- Direct, warm, no-BS. He's a coach who cares, not a guru or salesman.
+- Speaks like a real person who's been through it — Sean went from 241 lbs to fit, so he understands the struggle firsthand
+- Casual but never sloppy. Uses contractions, short sentences, occasional profanity is fine but not constant
+- No fluff, no 'crush your goals,' no 'transformation journey' language
+- Doesn't shame the client. Recognizes what happened, reframes it as a system issue (not a moral failing), gives one small specific fix, sets the next expectation
+- Uses the R.I.S.E. formula for any negative client update (missed meals, fell off, binged, no steps):
+  R = Recognize what she said, no judgment
+  I = Interpret it as a system issue, not her fault
+  S = Solve with ONE small specific fix doable now
+  E = Expect — reset standard, forward momentum, clear next action
+- Keep responses under 5 sentences when possible
+- Always end with a concrete next step
+
+Rewrite the user's message in Sean's voice. If it's a negative client update, apply R.I.S.E. If it's a general coaching message (encouragement, check-in, instruction), keep it warm, direct, and end with a clear action. Return ONLY the rewritten message — no preamble, no explanation, no quotes around it.`;
+
+export async function rewriteCoachMessage(
+  formData: FormData
+): Promise<RewriteCoachMessageResult> {
+  const { userId } = auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: isClerkConfigured ? "Not signed in." : "Add Clerk keys to .env.local.",
+    };
+  }
+
+  if (!isAnthropicConfigured) {
+    return {
+      ok: false,
+      error: "AI rewrite isn't configured. Set ANTHROPIC_API_KEY in Railway env vars.",
+    };
+  }
+
+  const parsed = RewriteSchema.safeParse({ draft: formData.get("draft") });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  // Confirm role=COACH. Same gating pattern as sendCoachMessage so this
+  // endpoint can't be used by random signed-in clients to burn API budget.
+  let coach;
+  try {
+    coach = await prisma.user.findUnique({
+      where: { clerkId: userId },
+      select: { role: true },
+    });
+  } catch {
+    return { ok: false, error: "Database not connected." };
+  }
+  if (!coach) return { ok: false, error: "Coach record not found." };
+  if (coach.role !== "COACH") {
+    return { ok: false, error: "Only coaches can rewrite messages." };
+  }
+
+  try {
+    const anthropic = getAnthropicClient();
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      system: REWRITE_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: parsed.data.draft }],
+    });
+
+    // Concatenate any text blocks; the model occasionally returns multiple.
+    const rewritten = response.content
+      .flatMap((block) => (block.type === "text" ? [block.text] : []))
+      .join("\n")
+      .trim()
+      // Strip surrounding quotes if the model wraps the response, despite
+      // the system prompt asking it not to. Belt-and-suspenders.
+      .replace(/^["“”']+|["“”']+$/g, "")
+      .trim();
+
+    if (!rewritten) {
+      return { ok: false, error: "Couldn't rewrite — try again." };
+    }
+    return { ok: true, rewritten };
+  } catch (err) {
+    console.error("rewriteCoachMessage failed", err);
+    return { ok: false, error: "Couldn't rewrite — try again." };
+  }
 }
