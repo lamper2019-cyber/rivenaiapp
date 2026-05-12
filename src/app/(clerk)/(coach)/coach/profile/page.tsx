@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { SignOutButton } from "@clerk/nextjs";
 import { auth, currentUser, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { TriggerMondayCheckinsButton } from "./trigger-monday-checkins-button";
 
 /**
  * Coach profile page. Lives under (coach) so the layout already gates by
@@ -82,6 +83,14 @@ export default async function CoachProfilePage() {
             </div>
           </div>
         )}
+      </section>
+
+      {/* Coaching tools — manual triggers Sean reaches for periodically. */}
+      <section className="space-y-3">
+        <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+          Coaching tools
+        </h2>
+        <TriggerMondayCheckinsButton />
       </section>
 
       {/* Account actions */}

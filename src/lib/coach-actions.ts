@@ -6,6 +6,10 @@ import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { getAnthropicClient, isAnthropicConfigured } from "@/lib/anthropic";
+import {
+  runMondayCheckinBatch,
+  type MondayCheckinBatchResult,
+} from "@/lib/monday-checkin";
 
 const SendSchema = z.object({
   clientUserId: z.string().min(1),
@@ -341,4 +345,56 @@ export async function rewriteCoachMessage(
     console.error("rewriteCoachMessage failed", err);
     return { ok: false, error: "Couldn't rewrite — try again." };
   }
+}
+
+/* ──────────────────────────────────────────────────────────── */
+
+export type TriggerMondayCheckinsResult =
+  | ({ ok: true } & MondayCheckinBatchResult)
+  | { ok: false; error: string };
+
+/**
+ * Manual trigger for the Monday check-in batch. Same work as the scheduled
+ * cron route, but gated by Clerk + role=COACH instead of CRON_SECRET so
+ * Sean can fire it from the coach profile page (useful for previewing
+ * voice + verifying the system before the cron service is wired up, and
+ * for catching up if a Monday gets missed).
+ */
+export async function triggerMondayCheckinBatch(): Promise<TriggerMondayCheckinsResult> {
+  const { userId } = auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: isClerkConfigured ? "Not signed in." : "Add Clerk keys to .env.local.",
+    };
+  }
+
+  let coach;
+  try {
+    coach = await prisma.user.findUnique({
+      where: { clerkId: userId },
+      select: { role: true },
+    });
+  } catch {
+    return { ok: false, error: "Database not connected." };
+  }
+  if (!coach) return { ok: false, error: "Coach record not found." };
+  if (coach.role !== "COACH") {
+    return { ok: false, error: "Only coaches can run this." };
+  }
+
+  if (!isAnthropicConfigured) {
+    return {
+      ok: false,
+      error: "AI rewrite isn't configured. Set ANTHROPIC_API_KEY on Railway.",
+    };
+  }
+
+  const result = await runMondayCheckinBatch();
+
+  revalidatePath("/messages");
+  revalidatePath("/dashboard");
+  revalidatePath("/coach/clients");
+
+  return { ok: true, ...result };
 }

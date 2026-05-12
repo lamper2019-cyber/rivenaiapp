@@ -9,6 +9,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getAnthropicClient, isAnthropicConfigured } from "@/lib/anthropic";
+import { sendPushToUser } from "@/lib/push";
 
 const MODEL = "claude-sonnet-4-6";
 
@@ -249,4 +250,102 @@ function buildContext(args: {
   );
 
   return lines.join("\n");
+}
+
+/* ──────────────────────────────────────────────────────────── */
+
+export type MondayCheckinBatchResult = {
+  clientsTargeted: number;
+  sent: number;
+  skipped: number;
+  errors: Array<{ clientId: string; reason: string }>;
+};
+
+/**
+ * Run the Monday check-in for every active CLIENT. Generates per-client via
+ * `generateMondayCheckin`, persists each as a COACH-kind ChatMessage signed
+ * by Sean, fires the phone push. Per-client failures are isolated.
+ *
+ * Pure batch logic — shared by the scheduled cron route and the manual
+ * "Send Monday check-ins now" button on the coach profile page. Neither
+ * caller wraps this in auth (cron uses CRON_SECRET, button uses Clerk +
+ * role=COACH), so callers must do their own gating.
+ */
+export async function runMondayCheckinBatch(): Promise<MondayCheckinBatchResult> {
+  const coach = await prisma.user.findFirst({
+    where: { role: "COACH" },
+    select: { id: true },
+  });
+
+  const clients = await prisma.user.findMany({
+    where: {
+      role: "CLIENT",
+      profile: { isNot: null },
+    },
+    select: { id: true, email: true },
+  });
+
+  let sent = 0;
+  let skipped = 0;
+  const errors: MondayCheckinBatchResult["errors"] = [];
+
+  // Sequential — gentle on the Anthropic API and on Railway's container
+  // memory. With small client counts this finishes well under any timeout.
+  for (const client of clients) {
+    try {
+      const result = await generateMondayCheckin({ clientUserId: client.id });
+      if (!result.ok) {
+        skipped++;
+        errors.push({ clientId: client.id, reason: result.error });
+        console.error(
+          `[monday-checkin] generation failed for ${client.email}:`,
+          result.error
+        );
+        continue;
+      }
+
+      const message = await prisma.chatMessage.create({
+        data: {
+          userId: client.id,
+          role: "ASSISTANT",
+          kind: "COACH",
+          senderUserId: coach?.id ?? null,
+          content: result.message,
+        },
+        select: { id: true },
+      });
+
+      try {
+        await sendPushToUser(client.id, {
+          title: "Monday from Sean",
+          body: preview(result.message, 110),
+          url: "/messages",
+          tag: `monday-checkin-${message.id}`,
+        });
+      } catch (pushErr) {
+        console.error(
+          `[monday-checkin] push failed for ${client.email}:`,
+          pushErr
+        );
+      }
+
+      sent++;
+    } catch (err) {
+      skipped++;
+      const reason = err instanceof Error ? err.message : "unknown";
+      errors.push({ clientId: client.id, reason });
+      console.error(
+        `[monday-checkin] unexpected error for ${client.email}:`,
+        err
+      );
+    }
+  }
+
+  return { clientsTargeted: clients.length, sent, skipped, errors };
+}
+
+function preview(content: string, max: number): string {
+  const collapsed = content.replace(/\s+/g, " ").trim();
+  if (collapsed.length <= max) return collapsed;
+  return collapsed.slice(0, max - 1).trimEnd() + "…";
 }
