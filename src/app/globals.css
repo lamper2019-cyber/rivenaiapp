@@ -123,51 +123,28 @@ body {
   animation: riven-glow 2.8s ease-in-out infinite;
 }
 
-/* Coach-message chip heartbeat. Continuous soft gold glow with a stronger
-   expanding ring every 3s — calls attention to an unread message without
-   strobing. Lives directly on the chip's box-shadow so it replaces the
-   normal elevation while unread. */
-@keyframes riven-coach-heartbeat {
-  0% {
-    box-shadow:
-      0 0 0 0 rgba(201, 169, 97, 0.55),
-      0 0 12px 0 rgba(201, 169, 97, 0.35);
+/* Coach-message chip breath. Continuous soft gold halo around the glass
+   bubble — a slow 2.8s in/out cycle that feels like breathing, not a
+   heartbeat. Lives directly on the chip's box-shadow so the gold radiates
+   outward without overlaying the bubble itself. Alpha is baked into the
+   shadow color, so a single keyframe handles both opacity and spread. */
+@keyframes riven-coach-breath {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(201, 169, 97, 0);
   }
-  35% {
-    box-shadow:
-      0 0 0 4px rgba(201, 169, 97, 0),
-      0 0 16px 2px rgba(201, 169, 97, 0.45);
-  }
-  60% {
-    box-shadow:
-      0 0 0 0 rgba(201, 169, 97, 0.55),
-      0 0 12px 0 rgba(201, 169, 97, 0.35);
-  }
-  78% {
-    box-shadow:
-      0 0 0 8px rgba(201, 169, 97, 0.55),
-      0 0 28px 6px rgba(201, 169, 97, 0.7);
-  }
-  90% {
-    box-shadow:
-      0 0 0 16px rgba(201, 169, 97, 0),
-      0 0 32px 10px rgba(201, 169, 97, 0);
-  }
-  100% {
-    box-shadow:
-      0 0 0 0 rgba(201, 169, 97, 0.55),
-      0 0 12px 0 rgba(201, 169, 97, 0.35);
+  50% {
+    box-shadow: 0 0 28px 6px rgba(201, 169, 97, 0.6);
   }
 }
-.riven-coach-heartbeat {
-  animation: riven-coach-heartbeat 3s ease-in-out infinite;
+.riven-coach-breath {
+  animation: riven-coach-breath 2.8s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .riven-pulse-soft,
   .riven-pulse-strong,
   .riven-glow,
-  .riven-coach-heartbeat {
+  .riven-coach-breath {
     animation: none;
   }
 }

@@ -48,10 +48,14 @@ export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[
   ).length;
   const isUnread = unreadCount > 0;
 
-  // Unread: solid gold + heartbeat glow (the heartbeat replaces the static
-  // shadow so the chip's elevation breathes). Read: quiet charcoal pill.
+  // Unread: liquid-glass bubble with a soft gold breath halo radiating out
+  // every 2.8s — translucent white over the dashboard's cream, backdrop-blur
+  // for the frosted effect, brighter top border for the light-highlight
+  // detail. Read: solid charcoal pill, quiet. backdrop-blur-xl emits both
+  // backdrop-filter and -webkit-backdrop-filter so iOS Safari renders the
+  // frost.
   const stateClasses = isUnread
-    ? "bg-gold text-charcoal border-gold/80 riven-coach-heartbeat"
+    ? "bg-white/55 backdrop-blur-xl text-charcoal border-white/40 border-t-white/70 riven-coach-breath"
     : "bg-charcoal text-cream border-charcoal shadow-elevation-1";
 
   return (
@@ -75,7 +79,7 @@ export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[
         />
         {isUnread && (
           <span
-            className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-[3px] rounded-full bg-red-500 text-cream text-[10px] font-semibold leading-none ring-2 ring-gold"
+            className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-[3px] rounded-full bg-red-500 text-cream text-[10px] font-semibold leading-none ring-2 ring-cream"
             aria-hidden
           >
             {unreadCount > 9 ? "9+" : unreadCount}
