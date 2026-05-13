@@ -57,9 +57,13 @@ export async function POST(req: Request) {
   }
 
   // MediaRecorder commonly produces webm/opus on Chrome, mp4 on Safari.
-  // Accept anything in the allowlist; default to webm if the browser left it blank.
+  // Strip codec parameters before allowlist lookup — iOS Safari sends
+  // "audio/mp4;codecs=mp4a.40.2" which our previous code silently fell
+  // back to "audio/webm" for, then handed Whisper an mp4 byte stream
+  // labeled webm. Whisper rejected those and we returned a generic 502.
   const declaredType = (file as Blob).type;
-  const mime = ALLOWED_MIME.has(declaredType) ? declaredType : "audio/webm";
+  const baseType = declaredType.split(";")[0].trim().toLowerCase();
+  const mime = ALLOWED_MIME.has(baseType) ? baseType : "audio/webm";
 
   // Reconstruct as a Blob with the right type so Whisper extension-detection works.
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -71,6 +75,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ text });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Transcription failed.";
+    // Log to server console so the actual upstream Whisper error surfaces
+    // in Railway logs — a bare 502 in the client is opaque otherwise.
+    console.error(
+      `[transcribe] failed for user ${userId}, declared=${declaredType}, resolved=${mime}:`,
+      msg,
+    );
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 }
