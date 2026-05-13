@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import Image from "next/image";
 import { createProfile, type ProfileFormState } from "./actions";
 import { calculateTargets } from "@/lib/calculations";
 
@@ -261,13 +260,12 @@ function Header({ step, onBack }: { step: number; onBack: () => void }) {
 function SeanSays({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3 mb-8">
-      <Image
-        src="/sean.jpg"
-        alt="Sean"
-        width={48}
-        height={48}
-        className="w-12 h-12 rounded-full object-cover shrink-0 shadow-elevation-1"
-      />
+      <span
+        aria-hidden
+        className="flex w-12 h-12 rounded-full bg-charcoal text-gold items-center justify-center font-display text-[28px] leading-none shrink-0 shadow-elevation-1"
+      >
+        S
+      </span>
       <div className="flex-1 relative rounded-2xl rounded-tl-sm bg-secondary-container/40 border border-gold/40 px-4 py-3 shadow-elevation-1">
         <p className="font-body text-body-md text-charcoal leading-relaxed">
           {children}

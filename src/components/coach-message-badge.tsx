@@ -69,14 +69,14 @@ export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[
       className={`fixed top-[calc(env(safe-area-inset-top)_+_12px)] right-3 z-50 inline-flex items-center gap-2 rounded-full border pl-1 pr-3 py-1 active:scale-95 transition-colors ${stateClasses}`}
     >
       <span className="relative inline-block w-7 h-7">
-        {/* Plain <img> rather than next/image: the asset is tiny, fixed-size,
-            and always rendered — Image optimization adds no real win here. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/sean.jpg"
-          alt=""
-          className="w-7 h-7 rounded-full object-cover"
-        />
+        {/* Brand monogram instead of a photo — reads cleanly at any size and
+            matches the serif typography elsewhere in RIVEN. */}
+        <span
+          aria-hidden
+          className="flex w-7 h-7 rounded-full bg-charcoal text-gold items-center justify-center font-display text-[16px] leading-none"
+        >
+          S
+        </span>
         {isUnread && (
           <span
             className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-[3px] rounded-full bg-red-500 text-cream text-[10px] font-semibold leading-none ring-2 ring-cream"
