@@ -444,7 +444,17 @@ function UnauthedPlaceholder({ children }: { children: React.ReactNode }) {
 }
 
 function pickGreeting(name: string): string {
-  const hour = new Date().getHours();
+  // Compute the hour in Central time. The server runs UTC on Railway, so
+  // `new Date().getHours()` would say it's 1 AM when the user opens the
+  // app at 8 PM CDT — wrong greeting, broken brand voice.
+  const hour = parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      hour: "numeric",
+      hour12: false,
+    }).format(new Date()),
+    10,
+  );
   if (hour < 5) return `Up early, ${name}.`;
   if (hour < 12) return `Good morning, ${name}.`;
   if (hour < 18) return `Afternoon, ${name}.`;

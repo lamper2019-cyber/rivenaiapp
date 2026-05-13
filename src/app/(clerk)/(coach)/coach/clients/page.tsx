@@ -128,6 +128,7 @@ export default async function CoachClientsPage({
               ? lastCheckIn.weekStart.toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
+                  timeZone: "America/Chicago",
                 })
               : "no check-in yet";
 
@@ -190,7 +191,7 @@ export default async function CoachClientsPage({
                         </div>
                       ) : (
                         <p className="font-body text-label-sm text-on-surface-variant mt-3 italic">
-                          Signed up {c.createdAt.toLocaleDateString()}, hasn&apos;t finished onboarding.
+                          Signed up {c.createdAt.toLocaleDateString("en-US", { timeZone: "America/Chicago" })}, hasn&apos;t finished onboarding.
                         </p>
                       )}
                     </div>

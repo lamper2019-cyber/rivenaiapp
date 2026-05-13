@@ -86,7 +86,7 @@ export default async function ContentPage() {
             Submitted this week
           </p>
           <p className="font-body text-body-md text-charcoal mt-2">
-            Recorded {existing.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
+            Recorded {existing.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Chicago" })}.
             Submit again below to replace.
           </p>
         </div>
@@ -110,6 +110,7 @@ export default async function ContentPage() {
                   {s.week.toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
+                    timeZone: "America/Chicago",
                   })}
                 </span>
                 {(s.videoUrl ?? s.photoUrl) && (

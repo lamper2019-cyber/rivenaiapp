@@ -145,7 +145,7 @@ export default async function CoachClientDetailPage({
             </span>
           )}
           <span className="font-body text-label-md text-on-surface-variant">
-            Signed up {client.createdAt.toLocaleDateString()}
+            Signed up {client.createdAt.toLocaleDateString("en-US", { timeZone: "America/Chicago" })}
           </span>
         </div>
       </header>
@@ -294,6 +294,7 @@ export default async function CoachClientDetailPage({
                       day: "numeric",
                       hour: "numeric",
                       minute: "2-digit",
+                      timeZone: "America/Chicago",
                     })}
                   </p>
                 </div>

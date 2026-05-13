@@ -32,6 +32,7 @@ export default async function CoachProfilePage() {
     ? dbUser.createdAt.toLocaleDateString("en-US", {
         month: "long",
         year: "numeric",
+        timeZone: "America/Chicago",
       })
     : null;
 
