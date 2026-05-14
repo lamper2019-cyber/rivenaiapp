@@ -20,6 +20,9 @@ const MealAnalysisSchema = z.object({
   protein: z.number().int().min(0).max(500),
   fat: z.number().int().min(0).max(500),
   carbs: z.number().int().min(0).max(2000),
+  shortName: z.string().min(1).max(80),
+  processedFlag: z.boolean(),
+  flagReason: z.string().max(400),
   coaching: z.string().min(1).max(1000),
 });
 
@@ -158,11 +161,16 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
       data: {
         userId: user.id,
         description,
+        shortName: analysis.shortName,
         calories: analysis.calories,
         protein: analysis.protein,
         fat: analysis.fat,
         carbs: analysis.carbs,
         aiResponse: analysis.coaching,
+        processedFlag: analysis.processedFlag,
+        // Persist the flag reason even when not flagged (just empty) so it's
+        // easy to inspect after the fact what Claude saw or didn't see.
+        flagReason: analysis.flagReason || null,
       },
     }),
     prisma.dailyTotals.upsert({
@@ -282,7 +290,17 @@ export async function undoLastMeal(): Promise<UndoLastMealResult> {
   };
 }
 
-export async function getRecentMeals(limit = 8) {
+export type RecentMealRow = {
+  id: string;
+  description: string;
+  shortName: string | null;
+  calories: number;
+  protein: number;
+  processedFlag: boolean;
+  createdAt: Date;
+};
+
+export async function getRecentMeals(limit = 8): Promise<RecentMealRow[]> {
   const { userId } = auth();
   if (!userId) return [];
   try {
@@ -292,8 +310,83 @@ export async function getRecentMeals(limit = 8) {
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: limit,
-      select: { id: true, description: true, calories: true, protein: true, createdAt: true },
+      select: {
+        id: true,
+        description: true,
+        shortName: true,
+        calories: true,
+        protein: true,
+        processedFlag: true,
+        createdAt: true,
+      },
     });
+  } catch {
+    return [];
+  }
+}
+
+export type FrequentMealRow = {
+  shortName: string;
+  count: number;
+  // The most recent matching log's id — used so a one-tap "log this again"
+  // can pre-fill the textarea with the prior description without having to
+  // round-trip another query.
+  lastDescription: string;
+  avgCalories: number;
+  processedFlag: boolean;
+};
+
+/**
+ * Top N most-logged meals over the last 30 days, grouped by shortName.
+ * Drives the "Frequent" section on /log. Skips rows with null shortName
+ * (legacy data) so the section only ever shows clean labels.
+ */
+export async function getFrequentMeals(limit = 5): Promise<FrequentMealRow[]> {
+  const { userId } = auth();
+  if (!userId) return [];
+  try {
+    const user = await prisma.user.findUnique({ where: { clerkId: userId } });
+    if (!user) return [];
+
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+
+    // Group by shortName, count occurrences, average calories.
+    const grouped = await prisma.mealLog.groupBy({
+      by: ["shortName"],
+      where: {
+        userId: user.id,
+        createdAt: { gte: since },
+        shortName: { not: null },
+      },
+      _count: { _all: true },
+      _avg: { calories: true },
+      orderBy: { _count: { shortName: "desc" } },
+      take: limit,
+    });
+
+    // For each group, look up the most recent description + processedFlag.
+    const rows = await Promise.all(
+      grouped.map(async (g) => {
+        const latest = await prisma.mealLog.findFirst({
+          where: {
+            userId: user.id,
+            shortName: g.shortName,
+            createdAt: { gte: since },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { description: true, processedFlag: true },
+        });
+        return {
+          shortName: g.shortName ?? "",
+          count: g._count._all,
+          lastDescription: latest?.description ?? "",
+          avgCalories: Math.round(g._avg.calories ?? 0),
+          processedFlag: latest?.processedFlag ?? false,
+        };
+      }),
+    );
+    return rows.filter((r) => r.shortName.length > 0);
   } catch {
     return [];
   }

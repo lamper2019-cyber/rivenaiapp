@@ -122,11 +122,21 @@ model MealLog {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   description String
+  // 3-5 word AI-generated label for compact display ("Eggs, bacon, toast").
+  // Nullable for legacy rows logged before this field existed; new rows always
+  // get one from Claude's structured output.
+  shortName   String?
   calories    Int
   protein     Int
   fat         Int
   carbs       Int
   aiResponse  String   @db.Text
+
+  // Heads-up flag for ultra-processed / refined / seed-oil / sugary content.
+  // The "why" is in flagReason — surfaced in the response card to teach,
+  // not preach.
+  processedFlag Boolean @default(false)
+  flagReason    String? @db.Text
 
   createdAt   DateTime @default(now())
 

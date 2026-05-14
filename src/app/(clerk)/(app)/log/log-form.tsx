@@ -3,12 +3,22 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { logMeal, undoLastMeal, type LogMealResult } from "./actions";
 
-type RecentMeal = {
+type MealRow = {
   id: string;
   description: string;
+  shortName: string | null;
   calories: number;
   protein: number;
+  processedFlag: boolean;
   createdAt: Date;
+};
+
+type FrequentMeal = {
+  shortName: string;
+  count: number;
+  lastDescription: string;
+  avgCalories: number;
+  processedFlag: boolean;
 };
 
 type Totals = {
@@ -19,10 +29,14 @@ type Totals = {
 } | null;
 
 export function LogForm({
-  recentMeals,
+  todayMeals,
+  earlierMeals,
+  frequentMeals,
   initialTotals,
 }: {
-  recentMeals: RecentMeal[];
+  todayMeals: MealRow[];
+  earlierMeals: MealRow[];
+  frequentMeals: FrequentMeal[];
   initialTotals: Totals;
 }) {
   const [description, setDescription] = useState("");
@@ -319,11 +333,44 @@ export function LogForm({
         </div>
       )}
 
-      {recentMeals.length > 0 && (
+      {frequentMeals.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+            Frequent
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {frequentMeals.map((m) => (
+              <button
+                key={m.shortName}
+                type="button"
+                onClick={() => setDescription(m.lastDescription)}
+                disabled={pending}
+                className="group inline-flex items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-4 py-2 font-body text-body-md text-charcoal hover:border-gold hover:bg-cream transition-colors disabled:opacity-60"
+                title={`Logged ${m.count}× in last 30 days · avg ${m.avgCalories} cal`}
+              >
+                {m.processedFlag && (
+                  <span
+                    aria-hidden
+                    className="material-symbols-outlined text-soft-red text-[16px]"
+                  >
+                    error
+                  </span>
+                )}
+                <span className="truncate max-w-[16rem]">{m.shortName}</span>
+                <span className="font-body text-label-sm text-on-surface-variant/70 whitespace-nowrap">
+                  ×{m.count}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {todayMeals.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-              Recent meals
+              Today
             </h2>
             <button
               type="button"
@@ -336,26 +383,95 @@ export function LogForm({
               {undoPending ? "Undoing…" : "Undo last"}
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {recentMeals.map((m) => (
-              <button
+          <ul className="space-y-2">
+            {todayMeals.map((m) => (
+              <MealRowItem
                 key={m.id}
-                type="button"
-                onClick={() => setDescription(m.description)}
+                meal={m}
+                onTap={() => setDescription(m.description)}
                 disabled={pending}
-                className="group inline-flex items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-4 py-2 font-body text-body-md text-charcoal hover:border-gold hover:bg-cream transition-colors disabled:opacity-60"
-                title={`${m.calories} cal · ${m.protein}g protein`}
-              >
-                <span className="truncate max-w-[16rem]">{m.description}</span>
-                <span className="font-body text-label-sm text-on-surface-variant/70 whitespace-nowrap">
-                  {m.calories} cal
-                </span>
-              </button>
+              />
             ))}
-          </div>
+          </ul>
+        </section>
+      )}
+
+      {earlierMeals.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+            Earlier this week
+          </h2>
+          <ul className="space-y-2">
+            {earlierMeals.map((m) => (
+              <MealRowItem
+                key={m.id}
+                meal={m}
+                onTap={() => setDescription(m.description)}
+                disabled={pending}
+                muted
+              />
+            ))}
+          </ul>
         </section>
       )}
     </div>
+  );
+}
+
+function MealRowItem({
+  meal,
+  onTap,
+  disabled,
+  muted = false,
+}: {
+  meal: MealRow;
+  onTap: () => void;
+  disabled: boolean;
+  muted?: boolean;
+}) {
+  // Prefer the AI-extracted shortName; fall back to a truncated description
+  // for legacy rows logged before shortName existed.
+  const label =
+    meal.shortName ??
+    (meal.description.length > 48
+      ? `${meal.description.slice(0, 48).trim()}…`
+      : meal.description);
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onTap}
+        disabled={disabled}
+        className={`group w-full flex items-center justify-between gap-3 rounded-md border px-gutter py-3 text-left transition-colors disabled:opacity-60 ${
+          muted
+            ? "border-outline-variant/40 bg-surface-container-lowest/70 hover:border-outline-variant"
+            : "border-outline-variant bg-surface-container-lowest hover:border-gold hover:bg-cream"
+        }`}
+        title={meal.description}
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {meal.processedFlag && (
+            <span
+              aria-label="Flagged: ultra-processed or refined"
+              className="material-symbols-outlined text-soft-red text-[18px] shrink-0"
+            >
+              error
+            </span>
+          )}
+          <span className="font-body text-body-md text-charcoal truncate">
+            {label}
+          </span>
+        </div>
+        <div className="flex items-baseline gap-3 shrink-0">
+          <span className="font-body text-label-sm text-on-surface-variant/80 whitespace-nowrap">
+            {meal.protein}g
+          </span>
+          <span className="font-body text-body-md text-charcoal whitespace-nowrap">
+            {meal.calories} cal
+          </span>
+        </div>
+      </button>
+    </li>
   );
 }
 
@@ -401,12 +517,45 @@ function ResultCard({
   onUndo,
   undoPending,
 }: {
-  analysis: { calories: number; protein: number; fat: number; carbs: number; coaching: string };
+  analysis: {
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+    shortName: string;
+    processedFlag: boolean;
+    flagReason: string;
+    coaching: string;
+  };
   onUndo: () => void;
   undoPending: boolean;
 }) {
   return (
     <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter md:p-6 shadow-elevation-2 space-y-4">
+      {/* Flag pill — only when something refined / processed is on the plate.
+          Sits above the coaching prose so the "why" reads as context, not a
+          lecture appended at the end. */}
+      {analysis.processedFlag && analysis.flagReason && (
+        <div className="rounded-md bg-soft-red/10 border border-soft-red/40 px-gutter py-3">
+          <div className="flex items-start gap-2">
+            <span
+              aria-hidden
+              className="material-symbols-outlined text-soft-red text-[20px] shrink-0 mt-0.5"
+            >
+              error
+            </span>
+            <div className="flex-1">
+              <p className="font-body text-label-md tracking-widest uppercase text-soft-red mb-1">
+                Heads up
+              </p>
+              <p className="font-body text-body-md text-charcoal leading-relaxed">
+                {analysis.flagReason}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="font-body text-body-md text-charcoal leading-relaxed">
         {analysis.coaching}
       </p>
