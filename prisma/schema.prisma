@@ -66,6 +66,15 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Stripe billing. stripeCustomerId is the durable Stripe customer record
+  // (one per User, created lazily on first Checkout). subscriptionStatus
+  // mirrors Stripe values — "trialing" | "active" | "past_due" | "canceled"
+  // | "incomplete" | "incomplete_expired" | "unpaid" — plus our own
+  // "comped" value for beta clients who get the app free for life.
+  stripeCustomerId             String?   @unique
+  subscriptionStatus           String?
+  subscriptionCurrentPeriodEnd DateTime?
+
   profile           Profile?
   mealLogs          MealLog[]
   dailyTotals       DailyTotals[]
