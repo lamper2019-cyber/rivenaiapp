@@ -13,10 +13,6 @@ const isPublicRoute = createRouteMatcher([
   "/api/cron/(.*)",
   "/manifest.json",
   "/sw.js",
-  // Clerk's internal proxy/handshake URLs — must bypass our auth.protect()
-  // call so Clerk's middleware can handle them itself. Without this, deployed
-  // dev-key apps loop on /clerk_<timestamp> paths and 500 with ECONNRESET.
-  "/clerk_(.*)",
 ]);
 
 // Dev escape hatch: when CLERK_SECRET_KEY is the placeholder from .env.example,
