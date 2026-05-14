@@ -3,9 +3,12 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
+  "/pricing",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks/(.*)",
+  // Stripe webhook is signature-verified, not Clerk-protected.
+  "/api/stripe/webhook",
   // Cron endpoints are protected by CRON_SECRET, not Clerk session.
   "/api/cron/(.*)",
   "/manifest.json",
