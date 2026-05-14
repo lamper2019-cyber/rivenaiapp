@@ -3,6 +3,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { ensureUserExists, type BootstrappedUser } from "@/lib/user-bootstrap";
 import { getMealPacing } from "@/lib/meal-pacing";
+import { hasActiveSubscription, isStripeConfigured } from "@/lib/stripe";
 
 /**
  * Protected client routes. Bootstraps the User row, then redirects coaches
@@ -28,6 +29,20 @@ export default async function AppLayout({
     }
   }
   if (user?.role === "COACH") redirect("/coach");
+
+  // Paywall — clients need an active subscription, trial, or comped status
+  // to access the app. Coaches bypass (already redirected above). Skips
+  // the gate when Stripe isn't configured (e.g. earliest local dev) so the
+  // app still boots without billing wired up. The redirect MUST stay
+  // outside any try/catch — see CLAUDE.md gotcha #1.
+  if (
+    isStripeConfigured &&
+    user &&
+    user.role === "CLIENT" &&
+    !hasActiveSubscription(user.subscriptionStatus)
+  ) {
+    redirect("/pricing");
+  }
 
   // Ambient signal for the bottom nav: gold dot on the Log icon when the
   // client is meaningfully behind on calories for the time of day. Best-

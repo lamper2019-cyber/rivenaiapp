@@ -23,6 +23,7 @@ export type BootstrappedUser = {
   clerkId: string;
   email: string;
   role: Role;
+  subscriptionStatus: string | null;
 };
 
 export async function ensureUserExists(
@@ -30,7 +31,7 @@ export async function ensureUserExists(
 ): Promise<BootstrappedUser | null> {
   const existing = await prisma.user.findUnique({
     where: { clerkId },
-    select: { id: true, clerkId: true, email: true, role: true },
+    select: { id: true, clerkId: true, email: true, role: true, subscriptionStatus: true },
   });
 
   if (existing) {
@@ -38,7 +39,7 @@ export async function ensureUserExists(
       const upgraded = await prisma.user.update({
         where: { id: existing.id },
         data: { role: "COACH" },
-        select: { id: true, clerkId: true, email: true, role: true },
+        select: { id: true, clerkId: true, email: true, role: true, subscriptionStatus: true },
       });
       return upgraded;
     }
@@ -56,7 +57,7 @@ export async function ensureUserExists(
 
   const created = await prisma.user.create({
     data: { clerkId, email, role },
-    select: { id: true, clerkId: true, email: true, role: true },
+    select: { id: true, clerkId: true, email: true, role: true, subscriptionStatus: true },
   });
   return created;
 }
