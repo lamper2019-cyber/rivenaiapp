@@ -148,16 +148,21 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
     return { ok: false, error: `Claude API error: ${msg}` };
   }
 
-  // Persist the meal log + atomically bump today's totals.
-  const newTotals = {
-    calories: currentTotals.calories + analysis.calories,
-    protein: currentTotals.protein + analysis.protein,
-    fat: currentTotals.fat + analysis.fat,
-    carbs: currentTotals.carbs + analysis.carbs,
-  };
+  // Date range for "today" in Central time — used to scope the sum-recompute
+  // below. Same bounds the undo flow uses, so writes and reads always agree.
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const [mealLog] = await prisma.$transaction([
-    prisma.mealLog.create({
+  // Use an interactive transaction so we can: (1) create the meal log,
+  // (2) re-sum ALL of today's meal logs (including the one just created),
+  // (3) upsert DailyTotals with that authoritative sum. This is more robust
+  // than increment/decrement math — past bugs (e.g. the recent TZ-fix
+  // migration that left some users with mis-bucketed DailyTotals rows)
+  // self-heal on the next log/undo because we're always recomputing from
+  // source-of-truth MealLog rows, never blindly adding deltas to a row
+  // that may already be drifted.
+  const txResult = await prisma.$transaction(async (tx) => {
+    const created = await tx.mealLog.create({
       data: {
         userId: user.id,
         description,
@@ -168,34 +173,56 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
         carbs: analysis.carbs,
         aiResponse: analysis.coaching,
         processedFlag: analysis.processedFlag,
-        // Persist the flag reason even when not flagged (just empty) so it's
-        // easy to inspect after the fact what Claude saw or didn't see.
         flagReason: analysis.flagReason || null,
       },
-    }),
-    prisma.dailyTotals.upsert({
+    });
+    const todayMeals = await tx.mealLog.findMany({
+      where: {
+        userId: user.id,
+        createdAt: { gte: today, lt: tomorrow },
+      },
+      select: { calories: true, protein: true, fat: true, carbs: true },
+    });
+    const sums = todayMeals.reduce(
+      (acc, m) => ({
+        calories: acc.calories + m.calories,
+        protein: acc.protein + m.protein,
+        fat: acc.fat + m.fat,
+        carbs: acc.carbs + m.carbs,
+      }),
+      { calories: 0, protein: 0, fat: 0, carbs: 0 },
+    );
+    await tx.dailyTotals.upsert({
       where: { userId_date: { userId: user.id, date: today } },
+      // Preserve totalSteps when overwriting macro totals. Steps are managed
+      // by a separate action and aren't part of this recompute.
       update: {
-        totalCalories: { increment: analysis.calories },
-        totalProtein: { increment: analysis.protein },
-        totalFat: { increment: analysis.fat },
-        totalCarbs: { increment: analysis.carbs },
+        totalCalories: sums.calories,
+        totalProtein: sums.protein,
+        totalFat: sums.fat,
+        totalCarbs: sums.carbs,
       },
       create: {
         userId: user.id,
         date: today,
-        totalCalories: analysis.calories,
-        totalProtein: analysis.protein,
-        totalFat: analysis.fat,
-        totalCarbs: analysis.carbs,
+        totalCalories: sums.calories,
+        totalProtein: sums.protein,
+        totalFat: sums.fat,
+        totalCarbs: sums.carbs,
       },
-    }),
-  ]);
+    });
+    return { mealLog: created, sums };
+  });
 
   revalidatePath("/log");
   revalidatePath("/dashboard");
 
-  return { ok: true, analysis, totals: newTotals, mealLogId: mealLog.id };
+  return {
+    ok: true,
+    analysis,
+    totals: txResult.sums,
+    mealLogId: txResult.mealLog.id,
+  };
 }
 
 export type UndoLastMealResult =
@@ -256,19 +283,52 @@ export async function undoLastMeal(): Promise<UndoLastMealResult> {
     };
   }
 
-  // Decrement totals + delete meal in one transaction.
-  const [, updatedTotals] = await prisma.$transaction([
-    prisma.mealLog.delete({ where: { id: lastMeal.id } }),
-    prisma.dailyTotals.update({
-      where: { userId_date: { userId: user.id, date: today } },
-      data: {
-        totalCalories: { decrement: lastMeal.calories },
-        totalProtein: { decrement: lastMeal.protein },
-        totalFat: { decrement: lastMeal.fat },
-        totalCarbs: { decrement: lastMeal.carbs },
+  // Delete the meal, then recompute today's DailyTotals from the SUM of the
+  // remaining meals — never blindly decrement. This is robust against the
+  // TZ-fix migration drift (where some users had MealLogs counted in OLD
+  // UTC-midnight DailyTotals buckets but the current row is at the new
+  // Central-midnight key — decrementing would have driven the row negative).
+  // Same pattern as logMeal: the DailyTotals row is always exactly the sum
+  // of the matching MealLog rows.
+  const updatedTotals = await prisma.$transaction(async (tx) => {
+    await tx.mealLog.delete({ where: { id: lastMeal.id } });
+    const remaining = await tx.mealLog.findMany({
+      where: {
+        userId: user.id,
+        createdAt: { gte: today, lt: tomorrow },
       },
-    }),
-  ]);
+      select: { calories: true, protein: true, fat: true, carbs: true },
+    });
+    const sums = remaining.reduce(
+      (acc, m) => ({
+        calories: acc.calories + m.calories,
+        protein: acc.protein + m.protein,
+        fat: acc.fat + m.fat,
+        carbs: acc.carbs + m.carbs,
+      }),
+      { calories: 0, protein: 0, fat: 0, carbs: 0 },
+    );
+    // The row should exist (we just deleted from it), but use upsert
+    // defensively so a missing row doesn't 500. totalSteps preserved.
+    await tx.dailyTotals.upsert({
+      where: { userId_date: { userId: user.id, date: today } },
+      update: {
+        totalCalories: sums.calories,
+        totalProtein: sums.protein,
+        totalFat: sums.fat,
+        totalCarbs: sums.carbs,
+      },
+      create: {
+        userId: user.id,
+        date: today,
+        totalCalories: sums.calories,
+        totalProtein: sums.protein,
+        totalFat: sums.fat,
+        totalCarbs: sums.carbs,
+      },
+    });
+    return sums;
+  });
 
   revalidatePath("/log");
   revalidatePath("/dashboard");
@@ -281,12 +341,7 @@ export async function undoLastMeal(): Promise<UndoLastMealResult> {
       calories: lastMeal.calories,
       protein: lastMeal.protein,
     },
-    totals: {
-      calories: Math.max(0, updatedTotals.totalCalories),
-      protein: Math.max(0, updatedTotals.totalProtein),
-      fat: Math.max(0, updatedTotals.totalFat),
-      carbs: Math.max(0, updatedTotals.totalCarbs),
-    },
+    totals: updatedTotals,
   };
 }
 
