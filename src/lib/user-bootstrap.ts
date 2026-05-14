@@ -46,15 +46,38 @@ export async function ensureUserExists(
     return existing;
   }
 
-  // First-time row. Pull email from Clerk.
+  // First-time clerkId. Pull email from Clerk so we can look for an existing
+  // User row matching this email — happens when migrating Clerk instances
+  // (dev → live) or if a user wipes their Clerk account and re-registers.
+  // The DB User stays the same; only the clerkId pointer updates.
   const clerkUser = await currentUser();
   const email =
     clerkUser?.primaryEmailAddress?.emailAddress ??
     clerkUser?.emailAddresses[0]?.emailAddress ??
     `${clerkId}@noemail.local`;
 
-  const role: Role = isCoachEmail(email) ? "COACH" : "CLIENT";
+  const existingByEmail = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, clerkId: true, email: true, role: true, subscriptionStatus: true },
+  });
+  if (existingByEmail) {
+    // Re-link: same person, new Clerk identity. Preserve their existing row
+    // (subscription status, comped flag, profile, history) and just update
+    // the clerkId pointer. Auto-upgrade to COACH if email now matches.
+    const nextRole: Role =
+      existingByEmail.role === "CLIENT" && isCoachEmail(email)
+        ? "COACH"
+        : existingByEmail.role;
+    const relinked = await prisma.user.update({
+      where: { id: existingByEmail.id },
+      data: { clerkId, role: nextRole },
+      select: { id: true, clerkId: true, email: true, role: true, subscriptionStatus: true },
+    });
+    return relinked;
+  }
 
+  // True first-time signup.
+  const role: Role = isCoachEmail(email) ? "COACH" : "CLIENT";
   const created = await prisma.user.create({
     data: { clerkId, email, role },
     select: { id: true, clerkId: true, email: true, role: true, subscriptionStatus: true },
