@@ -28,6 +28,8 @@ export default async function ProfilePage() {
   const { userId } = auth();
 
   let profile = null;
+  let hasStripeCustomer = false;
+  let subscriptionStatus: string | null = null;
   let checkIns: Awaited<ReturnType<typeof prisma.weeklyCheckIn.findMany>> = [];
   let wins: Win[] = [];
   let weekCheckIn: {
@@ -51,6 +53,8 @@ export default async function ProfilePage() {
         include: { profile: true },
       });
       profile = user?.profile ?? null;
+      hasStripeCustomer = !!user?.stripeCustomerId;
+      subscriptionStatus = user?.subscriptionStatus ?? null;
 
       if (user) {
         [checkIns, weekCheckIn, weekContent] = await Promise.all([
@@ -242,6 +246,34 @@ export default async function ProfilePage() {
           vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
         />
       </section>
+
+      {hasStripeCustomer && (
+        <section className="space-y-3">
+          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+            Billing
+          </h2>
+          <p className="font-body text-body-md text-on-surface-variant">
+            {subscriptionStatus === "trialing"
+              ? "You're on a free trial. Card will be charged on day 8."
+              : subscriptionStatus === "active"
+                ? "Subscription is active. $50 / month."
+                : subscriptionStatus === "past_due"
+                  ? "Payment failed. Update your card to keep access."
+                  : subscriptionStatus === "canceled"
+                    ? "Subscription canceled. Renew anytime."
+                    : "Manage your billing on Stripe's secure portal."}
+          </p>
+          <form action="/api/stripe/portal" method="POST">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 font-body text-label-md tracking-widest uppercase text-charcoal underline underline-offset-4 hover:opacity-80"
+            >
+              <span className="material-symbols-outlined text-[18px]">credit_card</span>
+              Manage billing
+            </button>
+          </form>
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
