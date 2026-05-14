@@ -3,6 +3,14 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { logMeal, undoLastMeal, type LogMealResult } from "./actions";
 
+type MealItem = {
+  name: string;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+};
+
 type MealRow = {
   id: string;
   description: string;
@@ -11,14 +19,13 @@ type MealRow = {
   protein: number;
   processedFlag: boolean;
   createdAt: Date;
+  items: MealItem[];
 };
 
-type FrequentMeal = {
-  shortName: string;
+type FrequentItem = {
+  name: string;
   count: number;
-  lastDescription: string;
   avgCalories: number;
-  processedFlag: boolean;
 };
 
 type Totals = {
@@ -36,7 +43,7 @@ export function LogForm({
 }: {
   todayMeals: MealRow[];
   earlierMeals: MealRow[];
-  frequentMeals: FrequentMeal[];
+  frequentMeals: FrequentItem[];
   initialTotals: Totals;
 }) {
   const [description, setDescription] = useState("");
@@ -362,27 +369,22 @@ export function LogForm({
           <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
             Frequent
           </h2>
+          <p className="font-body text-label-sm text-on-surface-variant/70">
+            Per-food count over the last 30 days. Tap to log just that item.
+          </p>
           <div className="flex flex-wrap gap-2">
-            {frequentMeals.map((m) => (
+            {frequentMeals.map((item) => (
               <button
-                key={m.shortName}
+                key={item.name}
                 type="button"
-                onClick={() => setDescription(m.lastDescription)}
+                onClick={() => setDescription(item.name)}
                 disabled={pending}
-                className="group inline-flex items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-4 py-2 font-body text-body-md text-charcoal hover:border-gold hover:bg-cream transition-colors disabled:opacity-60"
-                title={`Logged ${m.count}× in last 30 days · avg ${m.avgCalories} cal`}
+                className="inline-flex items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-4 py-2 font-body text-body-md text-charcoal hover:border-gold hover:bg-cream transition-colors disabled:opacity-60"
+                title={`${item.name} — logged ${item.count}× in last 30 days · avg ${item.avgCalories} cal`}
               >
-                {m.processedFlag && (
-                  <span
-                    aria-hidden
-                    className="material-symbols-outlined text-soft-red text-[16px]"
-                  >
-                    error
-                  </span>
-                )}
-                <span className="truncate max-w-[16rem]">{m.shortName}</span>
+                <span className="truncate max-w-[16rem]">{item.name}</span>
                 <span className="font-body text-label-sm text-on-surface-variant/70 whitespace-nowrap">
-                  ×{m.count}
+                  ×{item.count}
                 </span>
               </button>
             ))}
@@ -412,7 +414,8 @@ export function LogForm({
               <MealRowItem
                 key={m.id}
                 meal={m}
-                onTap={() => setDescription(m.description)}
+                onTapMeal={() => setDescription(m.description)}
+                onTapItem={(name) => setDescription(name)}
                 disabled={pending}
               />
             ))}
@@ -430,7 +433,8 @@ export function LogForm({
               <MealRowItem
                 key={m.id}
                 meal={m}
-                onTap={() => setDescription(m.description)}
+                onTapMeal={() => setDescription(m.description)}
+                onTapItem={(name) => setDescription(name)}
                 disabled={pending}
                 muted
               />
@@ -444,34 +448,39 @@ export function LogForm({
 
 function MealRowItem({
   meal,
-  onTap,
+  onTapItem,
+  onTapMeal,
   disabled,
   muted = false,
 }: {
   meal: MealRow;
-  onTap: () => void;
+  onTapItem: (name: string) => void;
+  onTapMeal: () => void;
   disabled: boolean;
   muted?: boolean;
 }) {
   // Prefer the AI-extracted shortName; fall back to a truncated description
   // for legacy rows logged before shortName existed.
-  const label =
+  const headerLabel =
     meal.shortName ??
     (meal.description.length > 48
       ? `${meal.description.slice(0, 48).trim()}…`
       : meal.description);
   return (
-    <li>
+    <li
+      className={`rounded-md border px-gutter py-3 transition-colors ${
+        muted
+          ? "border-outline-variant/40 bg-surface-container-lowest/70"
+          : "border-outline-variant bg-surface-container-lowest"
+      }`}
+    >
+      {/* Header: tap the whole row to re-log the full meal. */}
       <button
         type="button"
-        onClick={onTap}
+        onClick={onTapMeal}
         disabled={disabled}
-        className={`group w-full flex items-center justify-between gap-3 rounded-md border px-gutter py-3 text-left transition-colors disabled:opacity-60 ${
-          muted
-            ? "border-outline-variant/40 bg-surface-container-lowest/70 hover:border-outline-variant"
-            : "border-outline-variant bg-surface-container-lowest hover:border-gold hover:bg-cream"
-        }`}
-        title={meal.description}
+        className="w-full flex items-center justify-between gap-3 text-left disabled:opacity-60"
+        title={`Log this whole meal again: ${meal.description}`}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {meal.processedFlag && (
@@ -483,7 +492,7 @@ function MealRowItem({
             </span>
           )}
           <span className="font-body text-body-md text-charcoal truncate">
-            {label}
+            {headerLabel}
           </span>
         </div>
         <div className="flex items-baseline gap-3 shrink-0">
@@ -495,6 +504,29 @@ function MealRowItem({
           </span>
         </div>
       </button>
+
+      {/* Item pills — each one is a separate button so she can re-log just
+          that food. Only renders when items are present (legacy rows
+          without items still show the header above and skip this row). */}
+      {meal.items.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5 pt-2 border-t border-outline-variant/40">
+          {meal.items.map((item, idx) => (
+            <button
+              key={`${meal.id}-${idx}-${item.name}`}
+              type="button"
+              onClick={() => onTapItem(item.name)}
+              disabled={disabled}
+              className="inline-flex items-center gap-1.5 rounded-full bg-cream border border-outline-variant/60 px-3 py-1 text-label-sm font-body text-charcoal hover:border-gold hover:bg-surface-container-lowest transition-colors disabled:opacity-60"
+              title={`Log just ${item.name} again — ${item.calories} cal`}
+            >
+              <span className="truncate max-w-[12rem]">{item.name}</span>
+              <span className="text-on-surface-variant/70 whitespace-nowrap">
+                {item.calories}c
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </li>
   );
 }
@@ -547,6 +579,7 @@ function ResultCard({
     fat: number;
     carbs: number;
     shortName: string;
+    items: MealItem[];
     processedFlag: boolean;
     flagReason: string;
     coaching: string;
@@ -583,6 +616,24 @@ function ResultCard({
       <p className="font-body text-body-md text-charcoal leading-relaxed">
         {analysis.coaching}
       </p>
+
+      {/* Per-item breakdown — shows exactly how Claude split the meal so the
+          client sees the math before it lands in her history list. */}
+      {analysis.items.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 pt-3 border-t border-outline-variant/40">
+          {analysis.items.map((item, idx) => (
+            <span
+              key={`${idx}-${item.name}`}
+              className="inline-flex items-center gap-1.5 rounded-full bg-cream border border-outline-variant/60 px-3 py-1 text-label-sm font-body text-charcoal"
+              title={`${item.protein}g protein, ${item.fat}g fat, ${item.carbs}g carbs`}
+            >
+              <span className="truncate max-w-[12rem]">{item.name}</span>
+              <span className="text-on-surface-variant/70">{item.calories}c</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-4 gap-2 pt-3 border-t border-outline-variant/40">
         <Macro label="Cal" value={analysis.calories} unit="" />
         <Macro label="Protein" value={analysis.protein} unit="g" />

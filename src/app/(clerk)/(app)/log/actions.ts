@@ -15,12 +15,25 @@ import {
 
 const MEAL_DESCRIPTION_MAX = 500;
 
+const MealItemSchema = z.object({
+  name: z.string().min(1).max(60),
+  calories: z.number().int().min(0).max(3000),
+  protein: z.number().int().min(0).max(200),
+  fat: z.number().int().min(0).max(300),
+  carbs: z.number().int().min(0).max(800),
+});
+export type MealItem = z.infer<typeof MealItemSchema>;
+
 const MealAnalysisSchema = z.object({
   calories: z.number().int().min(0).max(5000),
   protein: z.number().int().min(0).max(500),
   fat: z.number().int().min(0).max(500),
   carbs: z.number().int().min(0).max(2000),
   shortName: z.string().min(1).max(80),
+  // Per-item breakdown — at least one item, max 12. Single-component meals
+  // get a one-element array. Sum should ~match the top-level totals (Claude
+  // is reminded in the prompt; small rounding drift is acceptable).
+  items: z.array(MealItemSchema).min(1).max(12),
   processedFlag: z.boolean(),
   flagReason: z.string().max(400),
   coaching: z.string().min(1).max(1000),
@@ -172,6 +185,9 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
         fat: analysis.fat,
         carbs: analysis.carbs,
         aiResponse: analysis.coaching,
+        // Persist per-item breakdown as JSON. Used by the UI to render
+        // individual food pills inside the meal card on /log.
+        items: analysis.items,
         processedFlag: analysis.processedFlag,
         flagReason: analysis.flagReason || null,
       },
@@ -345,6 +361,14 @@ export async function undoLastMeal(): Promise<UndoLastMealResult> {
   };
 }
 
+export type RecentMealItem = {
+  name: string;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+};
+
 export type RecentMealRow = {
   id: string;
   description: string;
@@ -353,6 +377,7 @@ export type RecentMealRow = {
   protein: number;
   processedFlag: boolean;
   createdAt: Date;
+  items: RecentMealItem[];
 };
 
 export async function getRecentMeals(limit = 8): Promise<RecentMealRow[]> {
@@ -361,7 +386,7 @@ export async function getRecentMeals(limit = 8): Promise<RecentMealRow[]> {
   try {
     const user = await prisma.user.findUnique({ where: { clerkId: userId } });
     if (!user) return [];
-    return await prisma.mealLog.findMany({
+    const rows = await prisma.mealLog.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -373,30 +398,68 @@ export async function getRecentMeals(limit = 8): Promise<RecentMealRow[]> {
         protein: true,
         processedFlag: true,
         createdAt: true,
+        items: true,
       },
     });
+    return rows.map((r) => ({
+      id: r.id,
+      description: r.description,
+      shortName: r.shortName,
+      calories: r.calories,
+      protein: r.protein,
+      processedFlag: r.processedFlag,
+      createdAt: r.createdAt,
+      items: parseItemsJson(r.items),
+    }));
   } catch {
     return [];
   }
 }
 
-export type FrequentMealRow = {
-  shortName: string;
+/**
+ * Defensive parser for the MealLog.items JSON column. Rejects anything
+ * that doesn't look like a valid item array so a corrupt row never crashes
+ * rendering — UI falls back to the combined shortName for legacy rows.
+ */
+function parseItemsJson(raw: unknown): RecentMealItem[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RecentMealItem[] = [];
+  for (const x of raw) {
+    if (
+      x &&
+      typeof x === "object" &&
+      typeof (x as { name?: unknown }).name === "string" &&
+      typeof (x as { calories?: unknown }).calories === "number"
+    ) {
+      const item = x as Record<string, unknown>;
+      out.push({
+        name: item.name as string,
+        calories: item.calories as number,
+        protein: typeof item.protein === "number" ? item.protein : 0,
+        fat: typeof item.fat === "number" ? item.fat : 0,
+        carbs: typeof item.carbs === "number" ? item.carbs : 0,
+      });
+    }
+  }
+  return out;
+}
+
+export type FrequentItemRow = {
+  name: string;
   count: number;
-  // The most recent matching log's id — used so a one-tap "log this again"
-  // can pre-fill the textarea with the prior description without having to
-  // round-trip another query.
-  lastDescription: string;
   avgCalories: number;
-  processedFlag: boolean;
 };
 
 /**
- * Top N most-logged meals over the last 30 days, grouped by shortName.
- * Drives the "Frequent" section on /log. Skips rows with null shortName
- * (legacy data) so the section only ever shows clean labels.
+ * Top N most-logged individual food items over the last 30 days, aggregated
+ * across all MealLog.items arrays. So if she logs "Big Mac, fries, chips"
+ * and another day "Big Mac, salad", Big Mac surfaces as count=2, NOT as
+ * two separate combo-shortName buckets.
+ *
+ * Drives the "Frequent" section on /log. One tap pre-fills the textarea
+ * with just that item's name.
  */
-export async function getFrequentMeals(limit = 5): Promise<FrequentMealRow[]> {
+export async function getFrequentMeals(limit = 5): Promise<FrequentItemRow[]> {
   const { userId } = auth();
   if (!userId) return [];
   try {
@@ -406,42 +469,51 @@ export async function getFrequentMeals(limit = 5): Promise<FrequentMealRow[]> {
     const since = new Date();
     since.setDate(since.getDate() - 30);
 
-    // Group by shortName, count occurrences, average calories.
-    const grouped = await prisma.mealLog.groupBy({
-      by: ["shortName"],
-      where: {
-        userId: user.id,
-        createdAt: { gte: since },
-        shortName: { not: null },
-      },
-      _count: { _all: true },
-      _avg: { calories: true },
-      orderBy: { _count: { shortName: "desc" } },
-      take: limit,
+    // Pull every MealLog's items array over the window. Volume is small
+    // (a couple hundred rows per client over 30d), aggregating in JS is fine.
+    const rows = await prisma.mealLog.findMany({
+      where: { userId: user.id, createdAt: { gte: since } },
+      select: { items: true },
     });
 
-    // For each group, look up the most recent description + processedFlag.
-    const rows = await Promise.all(
-      grouped.map(async (g) => {
-        const latest = await prisma.mealLog.findFirst({
-          where: {
-            userId: user.id,
-            shortName: g.shortName,
-            createdAt: { gte: since },
-          },
-          orderBy: { createdAt: "desc" },
-          select: { description: true, processedFlag: true },
-        });
-        return {
-          shortName: g.shortName ?? "",
-          count: g._count._all,
-          lastDescription: latest?.description ?? "",
-          avgCalories: Math.round(g._avg.calories ?? 0),
-          processedFlag: latest?.processedFlag ?? false,
-        };
-      }),
-    );
-    return rows.filter((r) => r.shortName.length > 0);
+    const tally = new Map<string, { count: number; calorieSum: number }>();
+    for (const row of rows) {
+      for (const item of parseItemsJson(row.items)) {
+        // Normalize on lower-case for grouping so casing variations don't
+        // create separate buckets ("Big Mac" vs "big mac"). Display uses
+        // the first-encountered casing.
+        const key = item.name.trim().toLowerCase();
+        if (!key) continue;
+        const existing = tally.get(key);
+        if (existing) {
+          existing.count += 1;
+          existing.calorieSum += item.calories;
+        } else {
+          tally.set(key, { count: 1, calorieSum: item.calories });
+        }
+      }
+    }
+
+    // Need a separate display-name map since the tally key is lower-cased.
+    const displayName = new Map<string, string>();
+    for (const row of rows) {
+      for (const item of parseItemsJson(row.items)) {
+        const key = item.name.trim().toLowerCase();
+        if (key && !displayName.has(key)) {
+          displayName.set(key, item.name.trim());
+        }
+      }
+    }
+
+    const ranked: FrequentItemRow[] = Array.from(tally.entries())
+      .map(([key, v]) => ({
+        name: displayName.get(key) ?? key,
+        count: v.count,
+        avgCalories: Math.round(v.calorieSum / v.count),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+    return ranked;
   } catch {
     return [];
   }

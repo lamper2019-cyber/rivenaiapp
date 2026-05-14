@@ -132,6 +132,12 @@ model MealLog {
   carbs       Int
   aiResponse  String   @db.Text
 
+  // AI-extracted per-item breakdown. Each item is { name, calories, protein,
+  // fat, carbs }. Lets the UI render individual food chips (Big Mac, fries,
+  // chips) instead of forcing the whole combo as a single tappable unit.
+  // Nullable for legacy rows; new logs always include at least one item.
+  items       Json?
+
   // Heads-up flag for ultra-processed / refined / seed-oil / sugary content.
   // The "why" is in flagReason — surfaced in the response card to teach,
   // not preach.
