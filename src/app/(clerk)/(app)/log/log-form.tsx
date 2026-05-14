@@ -57,12 +57,24 @@ export function LogForm({
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingStartRef = useRef<number>(0);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Mic stream kept alive across recordings within one page session — saves
+  // her from a second permission prompt on each subsequent tap. iOS still
+  // re-prompts cross-session (when the PWA is fully closed and reopened);
+  // that's an Apple limitation we can't override. Released on unmount so we
+  // don't leave the mic indicator on after she leaves /log.
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     return () => {
       const recorder = recorderRef.current;
       if (recorder && recorder.state === "recording") recorder.stop();
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      // Release the persistent mic stream so the mic indicator goes off.
+      const stream = streamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
     };
   }, []);
 
@@ -123,12 +135,22 @@ export function LogForm({
       return;
     }
 
+    // Reuse the existing mic stream if one is alive — saves a permission
+    // prompt for every recording after the first within this page session.
+    // If the stream's tracks ended (e.g. iOS revoked them after a long
+    // background period) we fall back to requesting a fresh one.
     let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setVoiceError("Microphone access denied. Allow it in your browser settings.");
-      return;
+    const existing = streamRef.current;
+    if (existing && existing.getTracks().some((t) => t.readyState === "live")) {
+      stream = existing;
+    } else {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+      } catch {
+        setVoiceError("Microphone access denied. Allow it in your browser settings.");
+        return;
+      }
     }
 
     // Chrome → webm/opus, Safari → mp4/m4a — pick the best the browser supports.
@@ -144,7 +166,9 @@ export function LogForm({
     };
 
     recorder.onstop = async () => {
-      stream.getTracks().forEach((t) => t.stop());
+      // Intentionally do NOT stop the stream tracks here — keeping them alive
+      // lets the next tap of the mic skip the permission prompt. Unmount
+      // (see useEffect above) releases them.
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
