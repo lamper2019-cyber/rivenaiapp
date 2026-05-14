@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { startOfCentralDay } from "@/lib/dates";
 
 const StepsSchema = z.object({
   steps: z.coerce.number().int().min(0).max(100000),
@@ -33,7 +34,7 @@ export async function logSteps(formData: FormData): Promise<LogStepsResult> {
   }
   if (!user) return { ok: false, error: "Complete onboarding first." };
 
-  const today = startOfDay(new Date());
+  const today = startOfCentralDay();
   await prisma.dailyTotals.upsert({
     where: { userId_date: { userId: user.id, date: today } },
     update: { totalSteps: parsed.data.steps },
@@ -48,8 +49,3 @@ export async function logSteps(formData: FormData): Promise<LogStepsResult> {
   return { ok: true, steps: parsed.data.steps };
 }
 
-function startOfDay(d: Date): Date {
-  const out = new Date(d);
-  out.setHours(0, 0, 0, 0);
-  return out;
-}

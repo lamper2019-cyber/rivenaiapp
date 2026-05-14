@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import { startOfCentralDay } from "@/lib/dates";
 
 export type MealPacingTier =
   | "early" // before 11am Central — too early to nudge
@@ -32,10 +33,9 @@ export const getMealPacing = cache(async (userId: string): Promise<MealPacing | 
   });
   if (!user?.profile) return null;
 
-  // Match the convention used by dashboard.ts and log/actions.ts —
-  // server-local-midnight (UTC on Railway). Reading any other key would
-  // miss the row.
-  const today = startOfDay(new Date());
+  // Canonical Central-time-day key. Writes (log/actions.ts) use the same
+  // helper so the values match for upsert/lookup.
+  const today = startOfCentralDay();
   const totals = await prisma.dailyTotals.findUnique({
     where: { userId_date: { userId: user.id, date: today } },
     select: { totalCalories: true },
@@ -85,8 +85,3 @@ function computeIsBehind(
   }
 }
 
-function startOfDay(d: Date): Date {
-  const out = new Date(d);
-  out.setHours(0, 0, 0, 0);
-  return out;
-}

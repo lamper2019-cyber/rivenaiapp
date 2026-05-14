@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { startOfIsoWeek } from "@/lib/week";
+import { startOfCentralDay } from "@/lib/dates";
 import { getPromptForClientWeek, getClientWeekNumber } from "@/lib/content-prompts";
 
 export async function loadDashboardData(clerkId: string) {
@@ -9,7 +10,7 @@ export async function loadDashboardData(clerkId: string) {
   });
   if (!user || !user.profile) return null;
 
-  const today = startOfDay(new Date());
+  const today = startOfCentralDay();
   const weekStart = startOfIsoWeek(new Date());
 
   const [todayTotals, weekCheckIn, weekContent, recentCoachMessages] = await Promise.all([
@@ -74,8 +75,3 @@ export async function loadDashboardData(clerkId: string) {
   };
 }
 
-function startOfDay(d: Date): Date {
-  const out = new Date(d);
-  out.setHours(0, 0, 0, 0);
-  return out;
-}

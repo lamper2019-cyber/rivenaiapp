@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { startOfCentralDay } from "@/lib/dates";
 import { getAnthropicClient, isAnthropicConfigured } from "@/lib/anthropic";
 import {
   CHAT_MODEL,
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
   });
   const history = historyDesc.reverse();
 
-  const today = startOfDay(new Date());
+  const today = startOfCentralDay();
   const todayTotals = await prisma.dailyTotals.findUnique({
     where: { userId_date: { userId: user.id, date: today } },
   });
@@ -217,8 +218,3 @@ function buildMessageContent(
   return [...blocks, { type: "text", text }];
 }
 
-function startOfDay(d: Date): Date {
-  const out = new Date(d);
-  out.setHours(0, 0, 0, 0);
-  return out;
-}

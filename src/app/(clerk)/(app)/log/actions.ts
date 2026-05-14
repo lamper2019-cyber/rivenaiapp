@@ -5,6 +5,7 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { startOfCentralDay } from "@/lib/dates";
 import {
   getAnthropicClient,
   isAnthropicConfigured,
@@ -88,7 +89,7 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
   }
   const profile = user.profile;
 
-  const today = startOfDay(new Date());
+  const today = startOfCentralDay();
   const todayTotals = await prisma.dailyTotals.findUnique({
     where: { userId_date: { userId: user.id, date: today } },
   });
@@ -220,7 +221,7 @@ export async function undoLastMeal(): Promise<UndoLastMealResult> {
   }
   if (!user) return { ok: false, error: "Complete onboarding first." };
 
-  const today = startOfDay(new Date());
+  const today = startOfCentralDay();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -307,7 +308,7 @@ export async function getTodayTotals() {
       include: { profile: { select: { cutCalories: true, proteinFloor: true } } },
     });
     if (!user || !user.profile) return null;
-    const today = startOfDay(new Date());
+    const today = startOfCentralDay();
     const totals = await prisma.dailyTotals.findUnique({
       where: { userId_date: { userId: user.id, date: today } },
     });
@@ -347,8 +348,3 @@ MEAL TO ANALYZE
 "${description}"`;
 }
 
-function startOfDay(d: Date): Date {
-  const out = new Date(d);
-  out.setHours(0, 0, 0, 0);
-  return out;
-}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getClientWeekNumber } from "@/lib/content-prompts";
 import { startOfIsoWeek } from "@/lib/week";
+import { startOfCentralDay } from "@/lib/dates";
 
 const PHASE_LABEL: Record<string, string> = {
   PHASE_1: "Phase 1",
@@ -19,7 +20,7 @@ export default async function CoachClientsPage({
 }) {
   const query = (searchParams.q ?? "").trim();
   const weekStart = startOfIsoWeek(new Date());
-  const today = startOfDay(new Date());
+  const today = startOfCentralDay();
 
   const clients = await prisma.user.findMany({
     where: {
@@ -211,8 +212,3 @@ export default async function CoachClientsPage({
   );
 }
 
-function startOfDay(d: Date): Date {
-  const out = new Date(d);
-  out.setHours(0, 0, 0, 0);
-  return out;
-}
