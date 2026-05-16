@@ -1,21 +1,18 @@
-import { getFrequentMeals, getRecentMeals, getTodayTotals } from "./actions";
+import { getRecentMeals, getTodayTotals } from "./actions";
 import { LogForm } from "./log-form";
 import { startOfCentralDay } from "@/lib/dates";
 
 export default async function LogPage() {
-  // Pull 20 recent meals so we can comfortably split into "today" + "earlier"
-  // — most clients log 3-5/day so 20 covers ~4-5 days of history.
-  const [recentMeals, frequentMeals, todayTotals] = await Promise.all([
-    getRecentMeals(20),
-    getFrequentMeals(5),
+  // Pull recent meals and slice to today's only. We deliberately keep just
+  // the "Today" section in the UI — no Frequent, no Earlier this week — so
+  // the log page stays focused on what's happening right now.
+  const [recentMeals, todayTotals] = await Promise.all([
+    getRecentMeals(12),
     getTodayTotals(),
   ]);
 
-  // Split server-side by Central-time today vs earlier, so the client doesn't
-  // have to reason about timezones.
   const todayStart = startOfCentralDay();
   const todayMeals = recentMeals.filter((m) => m.createdAt >= todayStart);
-  const earlierMeals = recentMeals.filter((m) => m.createdAt < todayStart).slice(0, 8);
 
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-12">
@@ -31,12 +28,7 @@ export default async function LogPage() {
         </p>
       </header>
 
-      <LogForm
-        todayMeals={todayMeals}
-        earlierMeals={earlierMeals}
-        frequentMeals={frequentMeals}
-        initialTotals={todayTotals}
-      />
+      <LogForm todayMeals={todayMeals} initialTotals={todayTotals} />
 
       <div className="fixed top-[-10%] right-[-10%] w-[30%] h-[30%] bg-gold/5 blur-[100px] rounded-full pointer-events-none -z-10" />
     </main>

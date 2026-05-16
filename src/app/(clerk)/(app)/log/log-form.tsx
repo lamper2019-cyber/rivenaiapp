@@ -22,12 +22,6 @@ type MealRow = {
   items: MealItem[];
 };
 
-type FrequentItem = {
-  name: string;
-  count: number;
-  avgCalories: number;
-};
-
 type Totals = {
   cutCalories: number;
   proteinFloor: number;
@@ -37,13 +31,9 @@ type Totals = {
 
 export function LogForm({
   todayMeals,
-  earlierMeals,
-  frequentMeals,
   initialTotals,
 }: {
   todayMeals: MealRow[];
-  earlierMeals: MealRow[];
-  frequentMeals: FrequentItem[];
   initialTotals: Totals;
 }) {
   const [description, setDescription] = useState("");
@@ -364,34 +354,6 @@ export function LogForm({
         </div>
       )}
 
-      {frequentMeals.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-            Frequent
-          </h2>
-          <p className="font-body text-label-sm text-on-surface-variant/70">
-            Per-food count over the last 30 days. Tap to log just that item.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {frequentMeals.map((item) => (
-              <button
-                key={item.name}
-                type="button"
-                onClick={() => setDescription(item.name)}
-                disabled={pending}
-                className="inline-flex items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-4 py-2 font-body text-body-md text-charcoal hover:border-gold hover:bg-cream transition-colors disabled:opacity-60"
-                title={`${item.name} — logged ${item.count}× in last 30 days · avg ${item.avgCalories} cal`}
-              >
-                <span className="truncate max-w-[16rem]">{item.name}</span>
-                <span className="font-body text-label-sm text-on-surface-variant/70 whitespace-nowrap">
-                  ×{item.count}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
       {todayMeals.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
@@ -423,25 +385,6 @@ export function LogForm({
         </section>
       )}
 
-      {earlierMeals.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-            Earlier this week
-          </h2>
-          <ul className="space-y-2">
-            {earlierMeals.map((m) => (
-              <MealRowItem
-                key={m.id}
-                meal={m}
-                onTapMeal={() => setDescription(m.description)}
-                onTapItem={(name) => setDescription(name)}
-                disabled={pending}
-                muted
-              />
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }
