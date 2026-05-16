@@ -225,10 +225,18 @@ model ChatMessage {
   // Public R2 URLs for images attached to USER messages, passed to Claude vision.
   imageUrls String[] @default([])
 
+  // Proactive-messaging category. Null for normal chat / hand-written coach
+  // messages. Set to a category string like "rhythm_wed_pm" or
+  // "behavioral_24h" when the Sean-messages tick fires a templated nudge.
+  // Used for cooldown enforcement (same category can't fire twice in 48h)
+  // and daily-cap counting (max 3 proactive sends per client per day).
+  category  String?
+
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([senderUserId])
+  @@index([userId, category, createdAt])
 }
 
 model PushSubscription {
