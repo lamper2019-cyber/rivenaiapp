@@ -1,6 +1,6 @@
 # RIVEN — Session Handoff Context
 
-Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated 2026-05-14, end of the "go live" session.
+Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated 2026-05-17, end of the "post-launch polish" session (proactive Sean messaging engine, per-item meal breakdown, daily reset, streak celebrations).
 
 Also read `CLAUDE.md` at the repo root — it captures the design system and Sean-voice rules in a form that auto-loads into every Claude Code session.
 
@@ -86,9 +86,10 @@ Project: `bubbly-perception` / production.
 - `Profile { userId, name, age, heightInches, startWeight, currentWeight, goalWeight, activityLevel, cycleStatus, phase, maintenanceCalories, cutCalories, weeklyBudget, proteinFloor, onboardedAt, tutorialStep }`
   - `tutorialStep` migration `20260511135659_add_tutorial_step`. Default 5 (done). New profiles explicitly set 0.
   - **Calorie targets** computed via `calculateTargets()` in `src/lib/calculations.ts`. Cut = `max(maintenance × 0.77, 1400)` — 23% off maintenance with a 1400 floor so petite clients don't get pushed into under-eating territory. Protein floor = `max(goalWeight × 0.8, 130)`. Female Mifflin-St Jeor by default.
-- `MealLog { userId, description, shortName, calories, protein, fat, carbs, aiResponse, processedFlag, flagReason, createdAt }`
+- `MealLog { userId, description, shortName, calories, protein, fat, carbs, aiResponse, items, processedFlag, flagReason, createdAt }`
   - `shortName`, `processedFlag`, `flagReason` added via migration `20260514040000_meal_log_shortname_and_flag`.
-  - `shortName` is the 3-5-word AI-extracted label used by "Today" / "Earlier" / "Frequent" sections on /log. Nullable for legacy rows pre-migration; the UI falls back to a truncated description.
+  - `items` (Json) added via migration `20260514130000_meal_log_items` — per-item breakdown `[{ name, calories, protein, fat, carbs }, ...]`. Drives the per-item pill display under each meal card on /log. Tap a pill → pre-fills the textarea with just that item's name for selective re-logging. Nullable on legacy rows; new logs always populate.
+  - `shortName` is the 3-5-word AI-extracted label used by the "Today" section on /log. Nullable for legacy rows pre-migration; the UI falls back to a truncated description.
   - `processedFlag` + `flagReason` drive the soft-red "Heads up" pill on the result card. Only set true when the meal contains ultra-processed / refined / seed-oil-fried / sugary stuff in noticeable quantity.
 - `DailyTotals { userId, date, totalCalories, totalProtein, totalFat, totalCarbs, totalSteps }` — unique on (userId, date)
   - **`date` is keyed by `startOfCentralDay()`** from `src/lib/dates.ts` — the UTC instant of midnight Central time. Historical rows (pre-commit `3efd4e2`) were keyed at server-local UTC midnight; those become mis-bucketed after the fix but are not deleted. New writes and reads agree.
@@ -101,6 +102,7 @@ Project: `bubbly-perception` / production.
 
 **Migrations folder** (in order, newest at top):
 ```
+20260514130000_meal_log_items                 -- MealLog.items JSON column for per-item breakdown
 20260514040000_meal_log_shortname_and_flag    -- shortName / processedFlag / flagReason
 20260514010000_comp_initial_beta_clients      -- one-time UPDATE: marks the 8 original beta clients as comped
 20260513170000_add_stripe_subscription_fields -- stripeCustomerId / subscriptionStatus / period end
@@ -124,7 +126,7 @@ Project: `bubbly-perception` / production.
 Gated by **paywall middleware** in `(app)/layout.tsx`: redirects to `/pricing` unless `subscriptionStatus` is `trialing | active | comped`. Coaches bypass entirely.
 
 - `/dashboard` — home: today's cal/protein/steps, rotating "Ask RIVEN" prompts, Sunday check-in card (sage when done, pulse when locked), weekly content prompt card (gold when submitted), PWA install banner, notification opt-in card, **time-aware meal-pacing reminder card** (only when she's behind for the hour), **"Message from Sean" liquid-glass chip top-right with gold breath halo when unread** (charcoal-pill monogram "S" — no photo), **sticky "Log a meal" pill floating above the bottom nav** (charcoal when on track, gold + soft pulse when behind on logging).
-- `/log` — voice-first meal logging. Mic hero (big charcoal circle with mic icon) at the top; text input demoted into an "Or type it instead" disclosure. Tap mic → record → tap stop → Whisper transcribes → fills textarea → tap Log to submit. Result card includes a **soft-red "Heads up" pill with flagReason** when the meal contains processed/refined food. Three meal-history sections below: **Frequent** (top 5 most-logged shortNames over 30 days, one-tap re-log), **Today** (Central-time today's meals with ⚠ icon if flagged), **Earlier this week** (last 8 older meals, muted). Mic stream is reused across recordings in one session to reduce permission re-prompts.
+- `/log` — voice-first meal logging. Mic hero (big charcoal circle with mic icon) at the top; text input demoted into an "Or type it instead" disclosure. Tap mic → record → tap stop → Whisper transcribes → fills textarea → tap Log to submit. Result card includes a **soft-red "Heads up" pill with flagReason** when the meal contains processed/refined food, plus per-item pills showing how Claude split the meal. **Today section** below shows current Central-day meals — each card has a header (combined label + total cals + ⚠ icon if flagged) AND a row of per-item pills underneath; tap the header to re-log the whole combo, tap a pill to re-log just that food. Mic stream is reused across recordings in one session to reduce permission re-prompts. No more Frequent or Earlier-this-week sections — kept the UI focused on the current day (Sean's call).
 - `/chat` — RIVEN AI (filtered to `kind: "AI"` — coach messages do NOT appear here)
 - `/messages` — coach inbox (kind: "COACH" only, 30-day window, marks seen on visit by writing `Date.now()` to `riven_seen_coach_msg_at` in localStorage)
 - `/check-in` — Sunday weekly check-in form (locks except Sunday)
@@ -192,6 +194,29 @@ Auto-redirects from any `(app)` route. Bottom nav: Clients / Profile.
 
 19. **Coach message chip is liquid glass + gold breath halo when unread.** `coach-message-badge.tsx`. Unread state: translucent `bg-white/55` + `backdrop-blur-xl` + `border-white/40` with `border-t-white/70` for the light-highlight detail. Animated via `riven-coach-breath` keyframe — soft gold halo that breathes outward every 2.8s. Red unread-count dot in the corner. Read state: solid charcoal pill, no glow. Avatar is a charcoal-gold serif "S" monogram, NOT a photo (we tried photos; they don't crop well at 28 px). Server passes the full last-30-days list of coach messages; client counts unreads by comparing each `createdAt` to a `riven_seen_coach_msg_at` localStorage timestamp.
 
+20. **DailyTotals are recomputed, not incremented.** `logMeal` and `undoLastMeal` both wrap their work in an interactive Prisma transaction that: (1) creates/deletes the MealLog, (2) re-sums ALL of today's MealLog rows for that user via `where: { createdAt: { gte: today, lt: tomorrow } }`, (3) UPSERTs DailyTotals with that authoritative sum. This is more robust than `{ increment: X }` math — past bugs (mis-bucketed rows from the TZ-fix migration window) self-heal on the next log/undo because writes are always re-derived from source-of-truth MealLog rows. The macro upsert preserves `totalSteps` since steps are managed by a separate action.
+
+21. **Per-item meal breakdown.** Claude's structured output for meal logs returns an `items` array (1-12 items, each `{ name, calories, protein, fat, carbs }`). Stored as JSON on `MealLog.items`. UI renders each item as a tappable pill inside the meal card on /log — tap a pill to pre-fill the textarea with just that food's name. Lets a client who logged "Big Mac, large fries, quest chips" re-log just the Big Mac without committing to the whole combo. System prompt in `src/lib/anthropic.ts` enforces: brand names when applicable ("Big Mac" not "burger"), sides/drinks split out as separate items, components of a single named dish (mac and cheese, oxtails with rice and peas) stay merged.
+
+22. **Daily reset is automatic at midnight Central.** `/dashboard` and `/log` both have `export const dynamic = "force-dynamic"` (no static caching) AND mount `<RefreshOnDayChange />` (`src/components/refresh-on-day-change.tsx`). That component does two things: (a) on `visibilitychange` (tab becomes visible after being backgrounded), it calls `router.refresh()` so a PWA opened in the morning picks up fresh server data; (b) every 60s it polls the Central date and calls `router.refresh()` when the date rolls over so a tab sitting open at midnight transitions cleanly from yesterday's totals to today's 0. Pure SSR-revalidation — preserves client state, just re-fetches data.
+
+23. **Proactive Sean messaging engine.** `src/lib/sean-messages.ts` runs as an hourly cron via `/api/cron/sean-messages` (new Railway service: `sean-messages`, hits the endpoint on `0 * * * *`). Per-client decision tree fires categories based on Central-time hour + activity history. Guardrails: 48h cooldown per category, max 3 proactive sends per client per Central day, only fires for `trialing | active | comped` clients. Categories live as exported arrays of variants in `src/lib/sean-message-variants.ts` (plain TypeScript strings — edit any line directly).
+
+    **Categories currently live:**
+    - `rhythm_wed_pm` (Wed 7 PM) — 100 variants
+    - `rhythm_fri_pm` (Fri 7 PM) — 100 variants
+    - `behavioral_24h` (6 PM if no log in 24h) — 100 variants
+    - `behavioral_72h` (7 AM if no log in 72h) — 100 variants
+    - `progress_streak_3` (7 AM after 3-day log streak) — 30 variants
+    - `progress_streak_5` (7 AM after 5-day log streak) — 30 variants
+    - `progress_streak_7` (7 AM after 7-day log streak) — 30 variants
+
+    **Streak logic:** `computeStreakEndingYesterday` counts consecutive Central-time calendar days, ENDING YESTERDAY, that have at least one MealLog. Picks the HIGHEST applicable threshold so a 7-day streak fires the 7-day celebration only (not all three stacked). When she breaks and rebuilds a streak, the lower-threshold messages re-fire — cooldown's expired, year-long dedup picks a fresh variant.
+
+    **Year-long dedup:** `pickFreshVariant` queries the client's last 365 days of received messages in that category, builds a Set of seen content, picks random from the unseen bank. Fallback to full bank only if she's burned through all 100 in a year (basically impossible for rhythms, possible for behavioral_24h on max-frequency).
+
+    All streak variants explicitly reference LOGGING ("you logged 3 days," "5-day log streak," "every meal tracked"). No vague "rhythm" / "body chemistry" language — the celebration matches what the client actually controlled.
+
 ## What's deliberately not built (v2/v3)
 
 - Coach inbox/triage view ("/coach" landing, currently redirects to /coach/clients)
@@ -248,7 +273,20 @@ Auto-redirects from any `(app)` route. Bottom nav: Clients / Profile.
 
 ## Recent commits (chronological — newest first, this session top, prior sessions below)
 
-This-session commits (the "go live" sprint, 2026-05-13 to 2026-05-14):
+Post-launch polish (2026-05-14 to 2026-05-17):
+
+```
+8c93e55 Streak variants: anchor every line to LOGGING, not vague consistency
+7122cf5 Sean messages: progress streak celebrations at 3, 5, and 7 days
+491c510 Sean messages: 400 variants in Sean's voice + 365-day dedup per client
+ad4ed6e Force fresh render + auto-refresh on day change so totals reset at midnight
+b1af3fd Log page: keep only Today, drop Frequent and Earlier this week
+f4272f1 Proactive Sean-voice messaging — Phase 1 (rhythm + 24/72h behavioral)
+01ef4a9 Meal log: per-item breakdown + per-item Frequent + item pills in cards
+e94325f Fix negative DailyTotals — recompute from MealLog sum instead of incrementing
+```
+
+Launch sprint commits (2026-05-13 to 2026-05-14):
 
 ```
 d673291 Voice log: reuse mic stream across recordings in one session
@@ -401,6 +439,7 @@ src/
       coach/download/                       # signed GET + HEAD verify + fallback
       cron/sunday-reminder/                 # Sunday push reminder
       cron/monday-checkin/                  # Monday Sean check-in batch (5-parallel)
+      cron/sean-messages/                   # hourly proactive-messaging tick
       stripe/
         webhook/                            # signature-verified Stripe event listener
         portal/                             # Customer Portal redirect
