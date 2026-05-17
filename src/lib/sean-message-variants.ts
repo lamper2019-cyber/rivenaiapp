@@ -78,6 +78,36 @@ export const BEHAVIORAL_72H_TITLES: string[] = [
   "Sean after 3 days",
 ];
 
+export const PROGRESS_STREAK_3_TITLES: string[] = [
+  "3 days locked in",
+  "Sean: 3-day streak",
+  "Three straight",
+  "3 days",
+  "Pattern's forming",
+  "Sean noticed: 3 days",
+  "Three days locked",
+];
+
+export const PROGRESS_STREAK_5_TITLES: string[] = [
+  "5-day streak",
+  "Sean: five days",
+  "Five straight",
+  "5 days locked",
+  "Sean noticed: 5 days",
+  "Five days in",
+  "Sean: 5 days",
+];
+
+export const PROGRESS_STREAK_7_TITLES: string[] = [
+  "7 days. Locked in.",
+  "Sean: one full week",
+  "7-day streak",
+  "Seven straight",
+  "Full week",
+  "Sean noticed: 7 days",
+  "Sean: full week",
+];
+
 /* ────────────────────────────────────────────────────────────── *
  * RHYTHM — WEDNESDAY 7 PM
  * Midweek reflection / honest check-in.
@@ -508,4 +538,126 @@ export const BEHAVIORAL_72H_VARIANTS: string[] = [
   `Three days. The momentum waits for the return. Make it.`,
   `72 hours. Be honest with yourself first. Then with me.`,
   `Three days. Don't make this a story. Just make this a stumble.`,
+];
+
+/* ────────────────────────────────────────────────────────────── *
+ * PROGRESS — 3-DAY LOGGING STREAK
+ * Fires the morning after she completes 3 consecutive days with a log.
+ * Banks are smaller (~30) than rhythm/behavioral because streaks fire
+ * far less often — most clients hit a 3-day streak only a handful of
+ * times per year (when starting or rebuilding after a slip).
+ * ────────────────────────────────────────────────────────────── */
+
+export const PROGRESS_STREAK_3_VARIANTS: string[] = [
+  `3 days locked in. That's the rhythm.`,
+  `Three straight. The pattern's starting.`,
+  `3 days logged. Consistency is what builds bodies.`,
+  `Three days in a row. Don't break this.`,
+  `3 days. The hardest stretch is the first three. You did it.`,
+  `Three. The body's starting to notice.`,
+  `3 days straight. This is what showing up looks like.`,
+  `Three days. The rhythm's catching.`,
+  `3 days logged. Average women don't do this. Keep going.`,
+  `Three straight days. Lock it in.`,
+  `3-day streak. Small numbers, big start.`,
+  `Three days. The momentum begins here.`,
+  `3 days. The body's listening. Don't stop now.`,
+  `Three days in. Make it five.`,
+  `3-day streak going. The work compounds.`,
+  `Three days. The pattern starts mattering at day three.`,
+  `3 days locked. Let's get to 7.`,
+  `Three straight. The consistency engine is on.`,
+  `3 days. Stack a fourth.`,
+  `Three days logged. Showing up is the whole game.`,
+  `3 days. The week's almost yours.`,
+  `Three days in a row. Don't underestimate this.`,
+  `3 days straight. The first three are the hardest. They get easier.`,
+  `Three. The discipline's getting quieter and stronger.`,
+  `3 days. Build on it tomorrow.`,
+  `Three straight days logged. Real talk: this matters.`,
+  `3 days locked in. Body chemistry shifts at this kind of consistency.`,
+  `Three days. Show up tomorrow.`,
+  `3-day streak. Average is one. You're past average.`,
+  `Three days. Make this the new normal.`,
+];
+
+/* ────────────────────────────────────────────────────────────── *
+ * PROGRESS — 5-DAY LOGGING STREAK
+ * Fires the morning after she completes 5 consecutive days with a log.
+ * Won't fire if a 7-day milestone is also crossed — the engine picks
+ * the highest applicable threshold so she gets one big celebration,
+ * not three stacked pings.
+ * ────────────────────────────────────────────────────────────── */
+
+export const PROGRESS_STREAK_5_VARIANTS: string[] = [
+  `5 days straight. The pattern's no longer accidental.`,
+  `Five days locked in. This is real consistency.`,
+  `5-day streak. The week's almost yours.`,
+  `Five straight days logged. The body's responding now.`,
+  `5 days. The work's becoming a habit.`,
+  `Five days. Stack two more and you're on a 7.`,
+  `5 days in a row. Most women never get past 3.`,
+  `Five days. The pattern's locked.`,
+  `5-day streak. The consistency engine is humming.`,
+  `Five straight. Keep going.`,
+  `5 days. The discipline is becoming identity.`,
+  `Five days in. Make it a full week.`,
+  `5 days logged. The body is paying attention.`,
+  `Five days. This is what shows up in the mirror in 6 weeks.`,
+  `5-day streak. You're proving something to yourself.`,
+  `Five days. The work compounds.`,
+  `5 days. The hard part's behind you.`,
+  `Five straight days. Lock it in.`,
+  `5 days locked. This is who you're becoming.`,
+  `Five days. Don't break this for the weekend.`,
+  `5-day streak. Most diets die at day 4. You're past it.`,
+  `Five days in. The momentum's real now.`,
+  `5 days straight. Big difference between this woman and the one who started.`,
+  `Five days. The body's chemistry is shifting under the surface.`,
+  `5 days. Keep showing up.`,
+  `Five days logged. The rhythm's natural now.`,
+  `5-day streak. Two more and you're on a 7. Stay sharp.`,
+  `Five days. This is the work.`,
+  `5 days. Different woman than the one who started.`,
+  `Five straight. The pattern's the win.`,
+];
+
+/* ────────────────────────────────────────────────────────────── *
+ * PROGRESS — 7-DAY LOGGING STREAK
+ * Fires the morning after she completes 7 consecutive days with a log.
+ * The big one — a full week of consistency. Most apps' clients never
+ * see this; the celebration should land accordingly.
+ * ────────────────────────────────────────────────────────────── */
+
+export const PROGRESS_STREAK_7_VARIANTS: string[] = [
+  `7 straight days logged. This is what consistency looks like. Most women never get here. You did.`,
+  `Seven days locked in. A full week. That's a different woman.`,
+  `7-day streak. The pattern's real now.`,
+  `Seven straight. The body's responding at the cellular level.`,
+  `7 days. A full week of showing up. Don't underestimate this.`,
+  `Seven days. Build the next one.`,
+  `7 days locked in. This is the work that changes everything.`,
+  `Seven straight days. You're not "trying" anymore. You're doing.`,
+  `7 days. Two weeks in a row would change everything.`,
+  `Seven days. The body's chemistry has shifted.`,
+  `7-day streak. Real talk: this is rare.`,
+  `Seven days logged. The discipline is now identity.`,
+  `7 days. The momentum's real. Don't stop here.`,
+  `Seven days in a row. The pattern's locked.`,
+  `7 days locked in. Stack another week.`,
+  `Seven straight. Most women never see this kind of consistency.`,
+  `7 days. The rhythm's permanent now.`,
+  `Seven days logged. Lock it in.`,
+  `7-day streak. The body's paying attention.`,
+  `Seven days. The first week is the hardest. They get easier.`,
+  `7 days straight. You earned this.`,
+  `Seven days. The work compounds from here.`,
+  `7 days. The next week matters more — keep showing up.`,
+  `Seven straight days. This is the new normal.`,
+  `7-day streak. Different woman than the one who started.`,
+  `Seven days locked. The body chemistry shifts at this kind of consistency.`,
+  `7 days. The pattern's the win, not the number.`,
+  `Seven days in a row. The discipline's becoming quiet and powerful.`,
+  `7 days. Two weeks in a row would be elite.`,
+  `Seven straight days. The rhythm's real. Keep going.`,
 ];

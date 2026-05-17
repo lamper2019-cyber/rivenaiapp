@@ -30,6 +30,12 @@ import {
   BEHAVIORAL_24H_VARIANTS,
   BEHAVIORAL_72H_TITLES,
   BEHAVIORAL_72H_VARIANTS,
+  PROGRESS_STREAK_3_TITLES,
+  PROGRESS_STREAK_3_VARIANTS,
+  PROGRESS_STREAK_5_TITLES,
+  PROGRESS_STREAK_5_VARIANTS,
+  PROGRESS_STREAK_7_TITLES,
+  PROGRESS_STREAK_7_VARIANTS,
   RHYTHM_FRI_PM_TITLES,
   RHYTHM_FRI_PM_VARIANTS,
   RHYTHM_WED_PM_TITLES,
@@ -47,7 +53,10 @@ type Category =
   | "rhythm_wed_pm"
   | "rhythm_fri_pm"
   | "behavioral_24h"
-  | "behavioral_72h";
+  | "behavioral_72h"
+  | "progress_streak_3"
+  | "progress_streak_5"
+  | "progress_streak_7";
 
 /** Pool of message bodies per category — picked at send time, deduplicated
  *  against the client's last 365 days of received messages. */
@@ -56,6 +65,9 @@ const VARIANT_BANKS: Record<Category, string[]> = {
   rhythm_fri_pm: RHYTHM_FRI_PM_VARIANTS,
   behavioral_24h: BEHAVIORAL_24H_VARIANTS,
   behavioral_72h: BEHAVIORAL_72H_VARIANTS,
+  progress_streak_3: PROGRESS_STREAK_3_VARIANTS,
+  progress_streak_5: PROGRESS_STREAK_5_VARIANTS,
+  progress_streak_7: PROGRESS_STREAK_7_VARIANTS,
 };
 
 /** Pool of push-notification titles per category — picked random per send,
@@ -65,6 +77,9 @@ const TITLE_POOLS: Record<Category, string[]> = {
   rhythm_fri_pm: RHYTHM_FRI_PM_TITLES,
   behavioral_24h: BEHAVIORAL_24H_TITLES,
   behavioral_72h: BEHAVIORAL_72H_TITLES,
+  progress_streak_3: PROGRESS_STREAK_3_TITLES,
+  progress_streak_5: PROGRESS_STREAK_5_TITLES,
+  progress_streak_7: PROGRESS_STREAK_7_TITLES,
 };
 
 /**
@@ -204,7 +219,72 @@ async function evaluateClient(
     }
   }
 
+  // === PROGRESS STREAK CHECK ===
+  // Fire at 7 AM Central — celebrate completed streaks the morning AFTER
+  // she crossed the milestone. Pick the HIGHEST applicable threshold so
+  // she gets ONE celebration, not three stacked. Cooldown prevents the
+  // same milestone from re-firing within 48 hours; year-long dedup picks
+  // a fresh variant each time.
+  //
+  // If she breaks a streak and rebuilds, the lower-threshold messages
+  // re-fire naturally (different streak, cooldown long expired, fresh
+  // variant from the bank).
+  if (central.hour === 7) {
+    const streak = await computeStreakEndingYesterday(userId);
+    if (streak >= 7) eligible.push("progress_streak_7");
+    else if (streak >= 5) eligible.push("progress_streak_5");
+    else if (streak >= 3) eligible.push("progress_streak_3");
+  }
+
   return eligible;
+}
+
+/**
+ * Count consecutive Central-time calendar days, ending YESTERDAY, that
+ * have at least one MealLog. We end at yesterday (not today) because
+ * today's still in progress at 7 AM — she may or may not have logged
+ * breakfast yet, and the celebration is for completed days.
+ *
+ * Walks backward day by day from yesterday. Stops at the first day with
+ * no logs. Pulls 30 days of meals as a window — wider than any streak
+ * milestone we care about, and small enough to be cheap per check.
+ */
+async function computeStreakEndingYesterday(userId: string): Promise<number> {
+  const windowStart = new Date();
+  windowStart.setDate(windowStart.getDate() - 30);
+
+  const meals = await prisma.mealLog.findMany({
+    where: { userId, createdAt: { gte: windowStart } },
+    select: { createdAt: true },
+  });
+  if (meals.length === 0) return 0;
+
+  const loggedDays = new Set<string>();
+  for (const m of meals) {
+    loggedDays.add(centralDayKey(m.createdAt));
+  }
+
+  // Start from yesterday and walk backward.
+  const cursor = new Date();
+  cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  // Bounded loop — never run more than 30 iterations (the data we pulled).
+  for (let i = 0; i < 30; i++) {
+    const key = centralDayKey(cursor);
+    if (!loggedDays.has(key)) break;
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+function centralDayKey(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 type SendOutcome = "sent" | "cooldown" | "daily_cap" | "skipped";
