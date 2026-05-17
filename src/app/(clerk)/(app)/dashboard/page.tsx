@@ -11,6 +11,15 @@ import { CoachMessageBadge } from "@/components/coach-message-badge";
 import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
 import { getMealPacing, type MealPacingTier } from "@/lib/meal-pacing";
 import { LogStepsForm } from "./log-steps-form";
+import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
+
+// Force a fresh server render on every request. The page reads `auth()` so
+// it's already implicitly dynamic, but pinning it explicitly is belt-and-
+// suspenders against any future Next.js change in default behavior. Pairs
+// with <RefreshOnDayChange /> below — the server side is always fresh, the
+// client side re-asks for it the moment the Central date rolls over or the
+// tab becomes visible after being away.
+export const dynamic = "force-dynamic";
 
 const STEP_GOAL = 10000;
 
@@ -78,6 +87,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-3xl mx-auto py-12 space-y-section-gap">
+      <RefreshOnDayChange />
       {recentCoachMessages.length > 0 && (
         <CoachMessageBadge messages={recentCoachMessages} />
       )}

@@ -1,6 +1,14 @@
 import { getRecentMeals, getTodayTotals } from "./actions";
 import { LogForm } from "./log-form";
 import { startOfCentralDay } from "@/lib/dates";
+import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
+
+// Force fresh render per request — without this, a tab opened yesterday
+// would still show yesterday's "Today" meals after the date rolls over.
+// Paired with <RefreshOnDayChange /> which triggers a soft refresh when
+// the tab becomes visible after being hidden, or when the Central date
+// changes.
+export const dynamic = "force-dynamic";
 
 export default async function LogPage() {
   // Pull recent meals and slice to today's only. We deliberately keep just
@@ -16,6 +24,7 @@ export default async function LogPage() {
 
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-12">
+      <RefreshOnDayChange />
       <header className="mb-section-gap space-y-3">
         <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
           Log a meal
