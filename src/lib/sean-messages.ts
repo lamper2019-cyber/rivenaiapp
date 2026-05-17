@@ -25,49 +25,46 @@
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { startOfCentralDay } from "@/lib/dates";
+import {
+  BEHAVIORAL_24H_TITLES,
+  BEHAVIORAL_24H_VARIANTS,
+  BEHAVIORAL_72H_TITLES,
+  BEHAVIORAL_72H_VARIANTS,
+  RHYTHM_FRI_PM_TITLES,
+  RHYTHM_FRI_PM_VARIANTS,
+  RHYTHM_WED_PM_TITLES,
+  RHYTHM_WED_PM_VARIANTS,
+} from "@/lib/sean-message-variants";
 
 const MAX_PROACTIVE_PER_DAY = 3;
 const COOLDOWN_HOURS = 48;
+/** How far back to look when filtering already-sent variants for a client.
+ *  365 days = no client sees the same body twice in a calendar year. */
+const DEDUP_WINDOW_DAYS = 365;
 
-/** All proactive-message category identifiers. Keep in sync with TEMPLATES. */
+/** All proactive-message category identifiers. Keep in sync with VARIANT_BANKS. */
 type Category =
   | "rhythm_wed_pm"
   | "rhythm_fri_pm"
   | "behavioral_24h"
   | "behavioral_72h";
 
-type Template = {
-  /** Stored on ChatMessage.content. Plain text, multi-line OK. */
-  body: string;
-  /** Push notification body — short, attention-grabbing. */
-  pushTitle: string;
+/** Pool of message bodies per category — picked at send time, deduplicated
+ *  against the client's last 365 days of received messages. */
+const VARIANT_BANKS: Record<Category, string[]> = {
+  rhythm_wed_pm: RHYTHM_WED_PM_VARIANTS,
+  rhythm_fri_pm: RHYTHM_FRI_PM_VARIANTS,
+  behavioral_24h: BEHAVIORAL_24H_VARIANTS,
+  behavioral_72h: BEHAVIORAL_72H_VARIANTS,
 };
 
-const TEMPLATES: Record<Category, Template> = {
-  rhythm_wed_pm: {
-    pushTitle: "Mid-week check from Sean",
-    body: `Wednesday night. Halfway through the week.
-
-How we doing? Be honest with yourself before you log.`,
-  },
-  rhythm_fri_pm: {
-    pushTitle: "Weekend incoming",
-    body: `Tomorrow is Saturday. You already know what tends to happen.
-
-Have your fun. Hit your protein. Don't undo the week.`,
-  },
-  behavioral_24h: {
-    pushTitle: "Sean noticed",
-    body: `Didn't see you in here today. Everything good?
-
-Don't disappear when it gets hard. That's when I need you here more.`,
-  },
-  behavioral_72h: {
-    pushTitle: "Three days, Sean's checking in",
-    body: `Three days. Talk to me.
-
-What's actually going on?`,
-  },
+/** Pool of push-notification titles per category — picked random per send,
+ *  no dedup (the title is the small attention-grabber on the lockscreen). */
+const TITLE_POOLS: Record<Category, string[]> = {
+  rhythm_wed_pm: RHYTHM_WED_PM_TITLES,
+  rhythm_fri_pm: RHYTHM_FRI_PM_TITLES,
+  behavioral_24h: BEHAVIORAL_24H_TITLES,
+  behavioral_72h: BEHAVIORAL_72H_TITLES,
 };
 
 /**
@@ -253,7 +250,7 @@ async function trySend(
   });
   if (sentToday >= MAX_PROACTIVE_PER_DAY) return "daily_cap";
 
-  const template = TEMPLATES[category];
+  const picked = await pickFreshVariant(userId, category);
 
   const message = await prisma.chatMessage.create({
     data: {
@@ -261,7 +258,7 @@ async function trySend(
       role: "ASSISTANT",
       kind: "COACH",
       senderUserId: coachId,
-      content: template.body,
+      content: picked.body,
       category,
     },
     select: { id: true },
@@ -269,8 +266,8 @@ async function trySend(
 
   try {
     await sendPushToUser(userId, {
-      title: template.pushTitle,
-      body: previewLine(template.body, 110),
+      title: picked.title,
+      body: previewLine(picked.body, 110),
       url: "/messages",
       tag: `sean-${category}-${message.id}`,
     });
@@ -281,6 +278,54 @@ async function trySend(
   }
 
   return "sent";
+}
+
+/**
+ * Pick a body + title for the given client/category that the client has
+ * NOT received in the last DEDUP_WINDOW_DAYS days.
+ *
+ * Algorithm:
+ *   1. Query every ChatMessage this client has received in this category
+ *      over the dedup window.
+ *   2. Build a Set of the content strings they've already seen.
+ *   3. Filter the bank to variants whose body is NOT in that Set.
+ *   4. Pick random from the unseen pool.
+ *   5. If all 100 variants have already been used in the window (very rare
+ *      — would require near-max-frequency sends for ~6+ months), fall
+ *      back to a random pick from the whole bank. Repeats happen but
+ *      always with the longest possible gap, since they were used at
+ *      different points throughout the year.
+ *
+ * Title is picked independently — title-pool is small (~10) on purpose
+ * and dedup isn't worth the complexity for the lockscreen line.
+ */
+async function pickFreshVariant(
+  userId: string,
+  category: Category,
+): Promise<{ title: string; body: string }> {
+  const dedupSince = new Date();
+  dedupSince.setDate(dedupSince.getDate() - DEDUP_WINDOW_DAYS);
+
+  const recent = await prisma.chatMessage.findMany({
+    where: {
+      userId,
+      kind: "COACH",
+      category,
+      createdAt: { gte: dedupSince },
+    },
+    select: { content: true },
+  });
+  const seen = new Set(recent.map((m) => m.content));
+
+  const bank = VARIANT_BANKS[category];
+  const unseen = bank.filter((body) => !seen.has(body));
+  const pool = unseen.length > 0 ? unseen : bank;
+  const body = pool[Math.floor(Math.random() * pool.length)];
+
+  const titlePool = TITLE_POOLS[category];
+  const title = titlePool[Math.floor(Math.random() * titlePool.length)];
+
+  return { title, body };
 }
 
 function readCentralTime(d: Date): { hour: number; weekday: string } {
