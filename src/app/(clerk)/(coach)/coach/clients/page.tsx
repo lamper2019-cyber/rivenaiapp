@@ -3,6 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getClientWeekNumber } from "@/lib/content-prompts";
 import { startOfIsoWeek } from "@/lib/week";
 import { startOfCentralDay } from "@/lib/dates";
+import {
+  buildHeatmapByClient,
+  streakEndingYesterdayFromHeatmap,
+  take7,
+} from "@/lib/coach-heatmap";
+import { computeTriageEvents } from "@/lib/coach-triage";
+import { TriageFeed } from "@/components/triage-feed";
+import { LogHeatmap } from "@/components/log-heatmap";
 
 const PHASE_LABEL: Record<string, string> = {
   PHASE_1: "Phase 1",
@@ -10,6 +18,10 @@ const PHASE_LABEL: Record<string, string> = {
   PHASE_3: "Phase 3",
   PHASE_4: "Phase 4",
 };
+
+// Fetch 14 days so we can render a 7-day heatmap AND detect streak milestones
+// up to 13 days (we excluded today from the streak — see streakEndingYesterday).
+const HEATMAP_DAYS = 14;
 
 type RosterSearchParams = { q?: string };
 
@@ -19,8 +31,11 @@ export default async function CoachClientsPage({
   searchParams: RosterSearchParams;
 }) {
   const query = (searchParams.q ?? "").trim();
-  const weekStart = startOfIsoWeek(new Date());
-  const today = startOfCentralDay();
+  const now = new Date();
+  const weekStart = startOfIsoWeek(now);
+  const today = startOfCentralDay(now);
+  const heatmapStart = new Date(today);
+  heatmapStart.setDate(heatmapStart.getDate() - (HEATMAP_DAYS - 1));
 
   const clients = await prisma.user.findMany({
     where: {
@@ -52,7 +67,7 @@ export default async function CoachClientsPage({
       weeklyCheckIns: {
         orderBy: { weekStart: "desc" },
         take: 1,
-        select: { weekStart: true, weight: true },
+        select: { weekStart: true, weight: true, createdAt: true },
       },
       dailyTotals: {
         where: { date: today },
@@ -61,6 +76,70 @@ export default async function CoachClientsPage({
       },
     },
     orderBy: [{ profile: { name: "asc" } }, { email: "asc" }],
+  });
+
+  const clientIds = clients.map((c) => c.id);
+
+  // Bulk fetch: every meal-log createdAt in the last HEATMAP_DAYS Central days
+  // for all matched clients. One query feeds heatmap + streak + no-log triage.
+  const mealLogs = clientIds.length
+    ? await prisma.mealLog.findMany({
+        where: {
+          userId: { in: clientIds },
+          createdAt: { gte: heatmapStart },
+        },
+        select: { userId: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+
+  // Bulk fetch: latest COACH-from-Sean ChatMessage per client. Used to detect
+  // a pending Sunday check-in (submitted this week but Sean hasn't replied since).
+  const latestCoachReplies = clientIds.length
+    ? await prisma.chatMessage.findMany({
+        where: {
+          userId: { in: clientIds },
+          kind: "COACH",
+          role: "ASSISTANT",
+        },
+        orderBy: { createdAt: "desc" },
+        distinct: ["userId"],
+        select: { userId: true, createdAt: true },
+      })
+    : [];
+  const latestCoachReplyByUser = new Map<string, Date>();
+  for (const r of latestCoachReplies) {
+    latestCoachReplyByUser.set(r.userId, r.createdAt);
+  }
+
+  // Latest MealLog.createdAt per user — mealLogs is DESC so the first match wins.
+  const latestMealLogByUser = new Map<string, Date>();
+  for (const m of mealLogs) {
+    if (!latestMealLogByUser.has(m.userId)) {
+      latestMealLogByUser.set(m.userId, m.createdAt);
+    }
+  }
+
+  const heatmapByUser = buildHeatmapByClient(mealLogs, HEATMAP_DAYS);
+
+  const triageEvents = computeTriageEvents({
+    clients: clients.map((c) => ({
+      id: c.id,
+      name: c.profile?.name ?? c.email.split("@")[0],
+      lastMealLogAt: latestMealLogByUser.get(c.id) ?? null,
+      latestCheckIn: c.weeklyCheckIns[0]
+        ? {
+            weekStart: c.weeklyCheckIns[0].weekStart,
+            createdAt: c.weeklyCheckIns[0].createdAt,
+          }
+        : null,
+      latestCoachReplyAt: latestCoachReplyByUser.get(c.id) ?? null,
+      streakEndingYesterday: streakEndingYesterdayFromHeatmap(
+        heatmapByUser.get(c.id) ?? [],
+      ),
+    })),
+    now,
+    currentWeekStart: weekStart,
   });
 
   const checkedInThisWeek = (lastCheckInWeekStart: Date | undefined) =>
@@ -82,6 +161,8 @@ export default async function CoachClientsPage({
           {query ? ` matching "${query}"` : ""}.
         </p>
       </header>
+
+      <TriageFeed events={triageEvents} />
 
       <form className="flex gap-2" action="/coach/clients" method="GET">
         <input
@@ -137,6 +218,10 @@ export default async function CoachClientsPage({
               ? getClientWeekNumber(profile.onboardedAt)
               : null;
 
+            const heatmap14 =
+              heatmapByUser.get(c.id) ?? new Array(HEATMAP_DAYS).fill(false);
+            const heatmap7 = take7(heatmap14);
+
             return (
               <li key={c.id}>
                 <Link
@@ -163,33 +248,38 @@ export default async function CoachClientsPage({
                       </p>
 
                       {profile ? (
-                        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
-                          <div>
-                            <p className="font-body text-label-sm text-on-surface-variant/80">
-                              Today
-                            </p>
-                            <p className="font-body text-body-md text-charcoal">
-                              {todayCalories.toLocaleString()}
-                              <span className="text-on-surface-variant/70">
-                                {" "}
-                                / {calorieTarget.toLocaleString()} cal
-                              </span>
-                              <span className="text-on-surface-variant/60 text-label-sm ml-1">
-                                ({calPct}%)
-                              </span>
-                            </p>
+                        <>
+                          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                            <div>
+                              <p className="font-body text-label-sm text-on-surface-variant/80">
+                                Today
+                              </p>
+                              <p className="font-body text-body-md text-charcoal">
+                                {todayCalories.toLocaleString()}
+                                <span className="text-on-surface-variant/70">
+                                  {" "}
+                                  / {calorieTarget.toLocaleString()} cal
+                                </span>
+                                <span className="text-on-surface-variant/60 text-label-sm ml-1">
+                                  ({calPct}%)
+                                </span>
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-body text-label-sm text-on-surface-variant/80">
+                                Last check-in
+                              </p>
+                              <p className="font-body text-body-md text-charcoal">
+                                {lastCheckInLabel}
+                                {lastCheckIn?.weight !== undefined &&
+                                  ` · ${lastCheckIn.weight} lbs`}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-body text-label-sm text-on-surface-variant/80">
-                              Last check-in
-                            </p>
-                            <p className="font-body text-body-md text-charcoal">
-                              {lastCheckInLabel}
-                              {lastCheckIn?.weight !== undefined &&
-                                ` · ${lastCheckIn.weight} lbs`}
-                            </p>
+                          <div className="mt-3">
+                            <LogHeatmap days={heatmap7} />
                           </div>
-                        </div>
+                        </>
                       ) : (
                         <p className="font-body text-label-sm text-on-surface-variant mt-3 italic">
                           Signed up {c.createdAt.toLocaleDateString("en-US", { timeZone: "America/Chicago" })}, hasn&apos;t finished onboarding.
@@ -211,4 +301,3 @@ export default async function CoachClientsPage({
     </main>
   );
 }
-

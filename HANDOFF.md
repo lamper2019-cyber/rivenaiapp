@@ -6,6 +6,14 @@ Also read `CLAUDE.md` at the repo root — it captures the design system and Sea
 
 ---
 
+## Working style with the coding agent
+
+**When Sean asks for UI/UX ideas, illustrate with code, not just prose.** Any time he asks "what are some ideas for...", "how should X look?", "what are my options for the dashboard...", each option in your response should include a short JSX snippet (5-15 lines, using existing brand tokens — cream/charcoal/gold/sage, font-display/font-body, existing component patterns) showing the actual layout. He thinks visually and makes faster, better decisions when he can *see* the shape. Prose-only bullet lists force him to translate words to visuals in his head, which is slower and loses fidelity.
+
+The code illustrates *what* the option looks like; keep the one-line tradeoff and final recommendation in prose. This rule does NOT apply when he asks for a build directly (the visual is implied in the code being written) or for backend/architecture questions.
+
+---
+
 ## What RIVEN is
 
 Premium mobile-first coaching app for Black women 35–55 in a body-recomposition program. Built around one coach (Sean Williams) and his clients. Brand: luxurious essentialism — cream backgrounds, charcoal text, gold/sage accents, DM Serif Display headlines, Plus Jakarta Sans body. Direct/no-BS voice, never preachy.
