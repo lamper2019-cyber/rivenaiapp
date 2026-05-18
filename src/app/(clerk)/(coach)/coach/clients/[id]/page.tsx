@@ -4,6 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { getClientWeekNumber } from "@/lib/content-prompts";
 import { Sparkline } from "@/components/sparkline";
 import { toWeightSeries, toWaistSeries } from "@/lib/progress";
+import { startOfCentralDay } from "@/lib/dates";
+import { buildCalendarDays } from "@/lib/meal-calendar";
+import {
+  buildHeatmapByClient,
+  take7,
+} from "@/lib/coach-heatmap";
+import { CoachClientTabs } from "@/components/coach-client-tabs";
+import { MealCalendar } from "@/components/meal-calendar";
+import { LogHeatmap } from "@/components/log-heatmap";
 import { SendMessageForm } from "./send-message-form";
 import { EditTargetsForm } from "./edit-targets-form";
 
@@ -28,11 +37,18 @@ const ADHERENCE_LABEL: Record<string, string> = {
   NOT_REALLY: "Not really",
 };
 
+const CALENDAR_DAYS = 28;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 export default async function CoachClientDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
+  const today = startOfCentralDay();
+  const calendarStart = new Date(today);
+  calendarStart.setDate(calendarStart.getDate() - (CALENDAR_DAYS - 1));
+
   const client = await prisma.user.findUnique({
     where: { id: params.id },
     select: {
@@ -41,9 +57,6 @@ export default async function CoachClientDetailPage({
       role: true,
       createdAt: true,
       profile: true,
-      // Trimmed to the most recent 12 check-ins for the sparkline + latest-
-      // checkin card. Over a year, this caps the payload at a fixed size.
-      // Re-reversed below to give the sparkline ascending order.
       weeklyCheckIns: {
         orderBy: { weekStart: "desc" },
         take: 12,
@@ -64,17 +77,23 @@ export default async function CoachClientDetailPage({
         },
       },
       mealLogs: {
+        where: { createdAt: { gte: calendarStart } },
         orderBy: { createdAt: "desc" },
-        take: 10,
         select: {
           id: true,
           description: true,
+          shortName: true,
           calories: true,
           protein: true,
           fat: true,
           carbs: true,
           createdAt: true,
         },
+      },
+      dailyTotals: {
+        where: { date: today },
+        take: 1,
+        select: { totalCalories: true, totalProtein: true },
       },
       // Sender join dropped — UI hardcodes "Sean" for COACH messages now,
       // so we don't need to fetch the related User row.
@@ -107,50 +126,86 @@ export default async function CoachClientDetailPage({
   if (!client || client.role !== "CLIENT") notFound();
 
   const profile = client.profile;
-  // Query returns DESC (newest first) so we can pair `take: 12` with sparkline
-  // order. The sparkline + "latest" lookup below want ascending order.
+  // weeklyCheckIns is DESC newest-first. Sparkline + "latest" need ASC.
   const checkIns = [...client.weeklyCheckIns].reverse();
   const latestCheckIn = checkIns[checkIns.length - 1];
   const chatMessagesAsc = [...client.chatMessages].reverse();
 
   const week = profile ? getClientWeekNumber(profile.onboardedAt) : null;
 
-  return (
-    <main className="relative px-container-mobile md:px-container-desktop max-w-3xl mx-auto py-8 space-y-section-gap">
-      <Link
-        href="/coach/clients"
-        className="inline-flex items-center gap-1 font-body text-label-md tracking-widest uppercase text-on-surface-variant hover:text-charcoal transition-colors"
-      >
-        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-        All clients
-      </Link>
+  // Derived: today's calories, days since last check-in, 7-day log heatmap.
+  const todayCalories = client.dailyTotals[0]?.totalCalories ?? 0;
+  const daysSinceCheckIn =
+    latestCheckIn !== undefined
+      ? Math.floor(
+          (today.getTime() -
+            startOfCentralDay(latestCheckIn.createdAt).getTime()) /
+            MS_PER_DAY,
+        )
+      : null;
 
-      {/* Header */}
-      <header className="space-y-2">
-        <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal">
-          {profile?.name ?? client.email.split("@")[0]}
-        </h1>
-        <p className="font-body text-body-md text-on-surface-variant">
-          {client.email}
-        </p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-          {week !== null && (
-            <span className="font-body text-label-md text-charcoal">
-              Week {week}
-            </span>
-          )}
-          {profile && (
-            <span className="font-body text-label-md text-charcoal">
-              {PHASE_LABEL[profile.phase] ?? profile.phase}
-            </span>
-          )}
-          <span className="font-body text-label-md text-on-surface-variant">
-            Signed up {client.createdAt.toLocaleDateString("en-US", { timeZone: "America/Chicago" })}
-          </span>
-        </div>
-      </header>
+  // 28-day calendar data — also feeds the 7-day Overview heatmap so we don't
+  // re-query MealLog. Single source of truth.
+  const calendarDays = buildCalendarDays({
+    meals: client.mealLogs,
+    daysBack: CALENDAR_DAYS,
+    cutCalorieTarget: profile?.cutCalories ?? 0,
+  });
+  const heatmap28 =
+    buildHeatmapByClient(
+      client.mealLogs.map((m) => ({ userId: client.id, createdAt: m.createdAt })),
+      CALENDAR_DAYS,
+    ).get(client.id) ?? new Array(CALENDAR_DAYS).fill(false);
+  const heatmap7 = take7(heatmap28);
 
-      {/* Profile block */}
+  // ---------------- Tab contents ----------------
+
+  const overviewContent = (
+    <div className="space-y-section-gap">
+      {profile && (
+        <section className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter shadow-elevation-1 space-y-4">
+          <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+            At a glance
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+            <div>
+              <p className="font-body text-label-sm text-on-surface-variant/80">
+                Today
+              </p>
+              <p className="font-body text-body-md text-charcoal">
+                {todayCalories.toLocaleString()}
+                <span className="text-on-surface-variant/70">
+                  {" "}
+                  / {profile.cutCalories.toLocaleString()} cal
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="font-body text-label-sm text-on-surface-variant/80">
+                Last check-in
+              </p>
+              <p className="font-body text-body-md text-charcoal">
+                {daysSinceCheckIn === null
+                  ? "none yet"
+                  : daysSinceCheckIn === 0
+                  ? "today"
+                  : daysSinceCheckIn === 1
+                  ? "yesterday"
+                  : `${daysSinceCheckIn} days ago`}
+              </p>
+            </div>
+            <div>
+              <p className="font-body text-label-sm text-on-surface-variant/80">
+                7-day log
+              </p>
+              <div className="mt-1.5">
+                <LogHeatmap days={heatmap7} />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {profile && (
         <section className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter shadow-elevation-1">
           <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant mb-3">
@@ -160,10 +215,19 @@ export default async function CoachClientDetailPage({
             <Field label="Current weight" value={`${profile.currentWeight} lbs`} />
             <Field label="Goal weight" value={`${profile.goalWeight} lbs`} />
             <Field label="Start weight" value={`${profile.startWeight} lbs`} />
-            <Field label="Cut calories" value={`${profile.cutCalories.toLocaleString()}`} />
+            <Field
+              label="Cut calories"
+              value={`${profile.cutCalories.toLocaleString()}`}
+            />
             <Field label="Protein floor" value={`${profile.proteinFloor}g`} />
-            <Field label="Maintenance" value={`${profile.maintenanceCalories.toLocaleString()}`} />
-            <Field label="Activity" value={profile.activityLevel.replace("_", " ").toLowerCase()} />
+            <Field
+              label="Maintenance"
+              value={`${profile.maintenanceCalories.toLocaleString()}`}
+            />
+            <Field
+              label="Activity"
+              value={profile.activityLevel.replace("_", " ").toLowerCase()}
+            />
             <Field label="Cycle status" value={profile.cycleStatus.toLowerCase()} />
             <Field label="Age" value={`${profile.age}`} />
           </div>
@@ -174,43 +238,125 @@ export default async function CoachClientDetailPage({
           />
         </section>
       )}
+    </div>
+  );
 
-      {/* Trends */}
-      {checkIns.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-            Trends
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter shadow-elevation-1">
-              <p className="font-body text-label-sm text-on-surface-variant mb-2">
-                Weight
-              </p>
-              <Sparkline
-                data={toWeightSeries(checkIns)}
-                unit="lbs"
-                target={profile?.goalWeight}
-                stroke="#1F1A14"
-              />
-            </div>
-            <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter shadow-elevation-1">
-              <p className="font-body text-label-sm text-on-surface-variant mb-2">
-                Waist
-              </p>
-              <Sparkline data={toWaistSeries(checkIns)} unit="″" stroke="#1F1A14" />
-            </div>
+  const mealsContent = (
+    <section className="space-y-3">
+      <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+        Last 28 days
+      </h2>
+      <MealCalendar days={calendarDays} target={profile?.cutCalories ?? 0} />
+    </section>
+  );
+
+  const trendsContent =
+    checkIns.length > 0 ? (
+      <section className="space-y-3">
+        <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+          Trends
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter shadow-elevation-1">
+            <p className="font-body text-label-sm text-on-surface-variant mb-2">
+              Weight
+            </p>
+            <Sparkline
+              data={toWeightSeries(checkIns)}
+              unit="lbs"
+              target={profile?.goalWeight}
+              stroke="#1F1A14"
+            />
           </div>
-        </section>
+          <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter shadow-elevation-1">
+            <p className="font-body text-label-sm text-on-surface-variant mb-2">
+              Waist
+            </p>
+            <Sparkline
+              data={toWaistSeries(checkIns)}
+              unit="″"
+              stroke="#1F1A14"
+            />
+          </div>
+        </div>
+      </section>
+    ) : (
+      <EmptyState message="No check-ins yet — once she submits one, trends show up here." />
+    );
+
+  const chatContent = (
+    <section className="space-y-3">
+      <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+        Conversation preview
+      </h2>
+
+      {chatMessagesAsc.length === 0 ? (
+        <div className="rounded-md bg-surface-container/40 border border-outline-variant/40 px-gutter py-6 text-center">
+          <p className="font-body text-body-md text-on-surface-variant">
+            No chat history yet.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {chatMessagesAsc.map((m) => {
+            const isUser = m.role === "USER";
+            const isCoachMessage = m.kind === "COACH" && !isUser;
+            // All COACH messages render as "Sean" — single-coach brand, never
+            // a stale Profile.name leaking into the UI.
+            const senderName = "Sean";
+
+            if (isUser) {
+              return (
+                <li key={m.id} className="flex justify-end">
+                  <div className="max-w-[85%] rounded-xl px-gutter py-2.5 bg-charcoal text-cream">
+                    <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
+                      {m.content}
+                    </p>
+                  </div>
+                </li>
+              );
+            }
+            return (
+              <li key={m.id} className="flex justify-start">
+                <div
+                  className={`max-w-[85%] rounded-xl px-gutter py-2.5 ${
+                    isCoachMessage
+                      ? "bg-secondary-container/60 border border-gold/50 text-charcoal"
+                      : "bg-surface-container-lowest border border-outline-variant/60 text-charcoal"
+                  }`}
+                >
+                  <p className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant mb-1">
+                    {isCoachMessage ? senderName : "Riven"}
+                  </p>
+                  <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
+                    {m.content}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
-      {/* Latest check-in */}
-      {latestCheckIn && (
+      <div className="rounded-md bg-secondary-container/20 border border-gold/30 p-gutter shadow-elevation-1 mt-4">
+        <p className="font-body text-label-md tracking-widest uppercase text-on-secondary-container mb-3">
+          Send a coach message
+        </p>
+        <SendMessageForm clientUserId={client.id} />
+      </div>
+    </section>
+  );
+
+  const weeklyContent = (
+    <div className="space-y-section-gap">
+      {latestCheckIn ? (
         <section className="space-y-3">
           <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
             Latest check-in · week of{" "}
             {latestCheckIn.weekStart.toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
+              timeZone: "America/Chicago",
             })}
           </h2>
           <div className="rounded-md bg-tertiary-container/30 border border-sage/40 p-gutter shadow-elevation-1 space-y-4">
@@ -221,11 +367,17 @@ export default async function CoachClientDetailPage({
               <Field label="Stress" value={`${latestCheckIn.stress} / 5`} />
               <Field
                 label="Cycle"
-                value={CYCLE_LABEL[latestCheckIn.cycleStatus] ?? latestCheckIn.cycleStatus}
+                value={
+                  CYCLE_LABEL[latestCheckIn.cycleStatus] ??
+                  latestCheckIn.cycleStatus
+                }
               />
               <Field
                 label="Stuck to menu"
-                value={ADHERENCE_LABEL[latestCheckIn.menuAdherence] ?? latestCheckIn.menuAdherence}
+                value={
+                  ADHERENCE_LABEL[latestCheckIn.menuAdherence] ??
+                  latestCheckIn.menuAdherence
+                }
               />
             </div>
 
@@ -270,45 +422,49 @@ export default async function CoachClientDetailPage({
             )}
           </div>
         </section>
+      ) : (
+        <EmptyState message="No check-ins submitted yet." />
       )}
 
-      {/* Recent meals */}
-      {client.mealLogs.length > 0 && (
+      {/* Earlier check-ins, compact */}
+      {checkIns.length > 1 && (
         <section className="space-y-3">
           <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-            Recent meals
+            Earlier check-ins
           </h2>
           <ul className="space-y-2">
-            {client.mealLogs.map((m) => (
-              <li
-                key={m.id}
-                className="rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-3 shadow-elevation-1"
-              >
-                <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <p className="font-body text-body-md text-charcoal">
-                    {m.description}
-                  </p>
-                  <p className="font-body text-label-sm text-on-surface-variant whitespace-nowrap">
-                    {m.createdAt.toLocaleString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                      timeZone: "America/Chicago",
-                    })}
-                  </p>
-                </div>
-                <p className="font-body text-label-sm text-on-surface-variant mt-1">
-                  {m.calories.toLocaleString()} cal · {m.protein}g protein · {m.fat}g fat ·{" "}
-                  {m.carbs}g carbs
-                </p>
-              </li>
-            ))}
+            {checkIns
+              .slice(0, -1)
+              .reverse()
+              .map((c) => (
+                <li
+                  key={c.id}
+                  className="rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-3 shadow-elevation-1"
+                >
+                  <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                    <p className="font-body text-body-md text-charcoal">
+                      Week of{" "}
+                      {c.weekStart.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        timeZone: "America/Chicago",
+                      })}
+                    </p>
+                    <p className="font-body text-label-sm text-on-surface-variant whitespace-nowrap">
+                      {c.weight} lbs · {c.waist}″
+                    </p>
+                  </div>
+                  {c.winsAndStruggles && (
+                    <p className="font-body text-label-sm text-on-surface-variant mt-1 line-clamp-2">
+                      {c.winsAndStruggles}
+                    </p>
+                  )}
+                </li>
+              ))}
           </ul>
         </section>
       )}
 
-      {/* Content submissions */}
       {client.contentSubmissions.length > 0 && (
         <section className="space-y-3">
           <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
@@ -332,6 +488,7 @@ export default async function CoachClientDetailPage({
                     {s.week.toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
+                      timeZone: "America/Chicago",
                     })}
                   </p>
                   <div className="relative">
@@ -386,69 +543,54 @@ export default async function CoachClientDetailPage({
           </ul>
         </section>
       )}
+    </div>
+  );
 
-      {/* Chat preview + compose */}
-      <section className="space-y-3">
-        <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-          Conversation preview
-        </h2>
+  return (
+    <main className="relative px-container-mobile md:px-container-desktop max-w-3xl mx-auto py-8 space-y-section-gap">
+      <Link
+        href="/coach/clients"
+        className="inline-flex items-center gap-1 font-body text-label-md tracking-widest uppercase text-on-surface-variant hover:text-charcoal transition-colors"
+      >
+        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+        All clients
+      </Link>
 
-        {chatMessagesAsc.length === 0 ? (
-          <div className="rounded-md bg-surface-container/40 border border-outline-variant/40 px-gutter py-6 text-center">
-            <p className="font-body text-body-md text-on-surface-variant">
-              No chat history yet.
-            </p>
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {chatMessagesAsc.map((m) => {
-              const isUser = m.role === "USER";
-              const isCoachMessage = m.kind === "COACH" && !isUser;
-              // All COACH messages render as "Sean" — single-coach brand, and
-              // we never want a stale Profile.name (e.g. "Dean" from an old
-              // client test account on the coach's user) leaking into the UI.
-              const senderName = "Sean";
-
-              if (isUser) {
-                return (
-                  <li key={m.id} className="flex justify-end">
-                    <div className="max-w-[85%] rounded-xl px-gutter py-2.5 bg-charcoal text-cream">
-                      <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
-                        {m.content}
-                      </p>
-                    </div>
-                  </li>
-                );
-              }
-              return (
-                <li key={m.id} className="flex justify-start">
-                  <div
-                    className={`max-w-[85%] rounded-xl px-gutter py-2.5 ${
-                      isCoachMessage
-                        ? "bg-secondary-container/60 border border-gold/50 text-charcoal"
-                        : "bg-surface-container-lowest border border-outline-variant/60 text-charcoal"
-                    }`}
-                  >
-                    <p className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant mb-1">
-                      {isCoachMessage ? senderName : "Riven"}
-                    </p>
-                    <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
-                      {m.content}
-                    </p>
-                  </div>
-                </li>
-              );
+      {/* Header */}
+      <header className="space-y-2">
+        <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal">
+          {profile?.name ?? client.email.split("@")[0]}
+        </h1>
+        <p className="font-body text-body-md text-on-surface-variant">
+          {client.email}
+        </p>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+          {week !== null && (
+            <span className="font-body text-label-md text-charcoal">
+              Week {week}
+            </span>
+          )}
+          {profile && (
+            <span className="font-body text-label-md text-charcoal">
+              {PHASE_LABEL[profile.phase] ?? profile.phase}
+            </span>
+          )}
+          <span className="font-body text-label-md text-on-surface-variant">
+            Signed up{" "}
+            {client.createdAt.toLocaleDateString("en-US", {
+              timeZone: "America/Chicago",
             })}
-          </ul>
-        )}
-
-        <div className="rounded-md bg-secondary-container/20 border border-gold/30 p-gutter shadow-elevation-1 mt-4">
-          <p className="font-body text-label-md tracking-widest uppercase text-on-secondary-container mb-3">
-            Send a coach message
-          </p>
-          <SendMessageForm clientUserId={client.id} />
+          </span>
         </div>
-      </section>
+      </header>
+
+      <CoachClientTabs
+        overview={overviewContent}
+        meals={mealsContent}
+        trends={trendsContent}
+        chat={chatContent}
+        weekly={weeklyContent}
+      />
 
       <div className="fixed top-[10%] right-[-10%] w-[35%] h-[35%] bg-gold/5 blur-[120px] rounded-full pointer-events-none -z-10" />
     </main>
@@ -460,6 +602,14 @@ function Field({ label, value }: { label: string; value: string }) {
     <div>
       <p className="font-body text-label-sm text-on-surface-variant/80">{label}</p>
       <p className="font-body text-body-md text-charcoal capitalize">{value}</p>
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="rounded-md bg-surface-container/40 border border-outline-variant/40 px-gutter py-8 text-center">
+      <p className="font-body text-body-md text-on-surface-variant">{message}</p>
     </div>
   );
 }
