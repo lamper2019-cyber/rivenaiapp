@@ -11,6 +11,7 @@ import {
 import { computeBucketedTriage } from "@/lib/coach-triage";
 import { TriageFeed } from "@/components/triage-feed";
 import { LogHeatmap } from "@/components/log-heatmap";
+import { TodayStrip } from "@/components/today-strip";
 
 const PHASE_LABEL: Record<string, string> = {
   PHASE_1: "Phase 1",
@@ -151,6 +152,24 @@ export default async function CoachClientsPage({
   // bottom list focused — Sean already saw the urgent + the wins above.
   const everyoneElse = clients.filter((c) => !bucketedClientIds.has(c.id));
 
+  // "Today" strip: split onboarded clients by whether they've logged any meal
+  // in the current Central day. Non-onboarded clients are excluded — they
+  // can't log meals anyway, and listing them as "quiet" would be misleading.
+  const todayMs = today.getTime();
+  const eligibleForToday = clients.filter((c) => c.profile);
+  const loggedToday: { id: string; firstName: string }[] = [];
+  const quietToday: { id: string; firstName: string }[] = [];
+  for (const c of eligibleForToday) {
+    const fullName = c.profile?.name ?? c.email.split("@")[0];
+    const firstName = fullName.split(/\s+/)[0];
+    const lastLog = latestMealLogByUser.get(c.id);
+    if (lastLog && lastLog.getTime() >= todayMs) {
+      loggedToday.push({ id: c.id, firstName });
+    } else {
+      quietToday.push({ id: c.id, firstName });
+    }
+  }
+
   const checkedInThisWeek = (lastCheckInWeekStart: Date | undefined) =>
     lastCheckInWeekStart
       ? lastCheckInWeekStart.getTime() === weekStart.getTime()
@@ -170,6 +189,8 @@ export default async function CoachClientsPage({
           {query ? ` matching "${query}"` : ""}.
         </p>
       </header>
+
+      <TodayStrip logged={loggedToday} quiet={quietToday} />
 
       <TriageFeed events={needsAttention} title="Needs you" />
       <TriageFeed events={doingWell} title="Doing well" />
