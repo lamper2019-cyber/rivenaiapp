@@ -112,7 +112,7 @@ export function MealCalendar({
               <p className="font-body text-label-sm text-charcoal">
                 Looks incomplete — only {active.meals.length} meal
                 {active.meals.length === 1 ? "" : "s"} logged, well under target.
-                Probably didn't track the rest of the day.
+                Probably didn&apos;t track the rest of the day.
               </p>
             </div>
           )}
