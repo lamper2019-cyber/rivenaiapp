@@ -38,9 +38,11 @@ export function MealCalendar({
               onClick={() =>
                 setActiveKey(d.dateKey === activeKey ? null : d.dateKey)
               }
-              aria-label={`${d.fullDateLabel}, ${d.totalCalories.toLocaleString()} calories`}
+              aria-label={`${d.fullDateLabel}, ${d.totalCalories.toLocaleString()} calories${
+                d.isProbablyIncomplete ? ", probably incomplete" : ""
+              }`}
               aria-pressed={isSelected}
-              className={`aspect-square rounded-md flex items-center justify-center transition-all font-body text-body-md leading-none active:scale-95 ${
+              className={`relative aspect-square rounded-md flex items-center justify-center transition-all font-body text-body-md leading-none active:scale-95 ${
                 STATUS_CELL[d.status]
               } ${
                 isSelected
@@ -51,6 +53,14 @@ export function MealCalendar({
               }`}
             >
               {d.dayLabel}
+              {d.isProbablyIncomplete && (
+                <span
+                  aria-hidden
+                  className="absolute top-0.5 right-1 font-body text-[10px] leading-none text-charcoal/70"
+                >
+                  ?
+                </span>
+              )}
             </button>
           );
         })}
@@ -74,6 +84,10 @@ export function MealCalendar({
           <span className="inline-block w-2.5 h-2.5 rounded-sm bg-on-surface-variant/10" />
           No log
         </span>
+        <span className="flex items-center gap-1.5">
+          <span className="font-body text-charcoal/70 text-[12px] leading-none">?</span>
+          Maybe incomplete
+        </span>
       </div>
 
       {active && (
@@ -92,6 +106,17 @@ export function MealCalendar({
               )}
             </p>
           </div>
+
+          {active.isProbablyIncomplete && (
+            <div className="rounded-md bg-gold/15 border border-gold/45 px-3 py-2 mb-3">
+              <p className="font-body text-label-sm text-charcoal">
+                Looks incomplete — only {active.meals.length} meal
+                {active.meals.length === 1 ? "" : "s"} logged, well under target.
+                Probably didn't track the rest of the day.
+              </p>
+            </div>
+          )}
+
           {active.meals.length === 0 ? (
             <p className="font-body text-body-md text-on-surface-variant">
               No logs that day.

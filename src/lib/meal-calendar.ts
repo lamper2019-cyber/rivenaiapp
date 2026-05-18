@@ -30,6 +30,13 @@ export type CalendarDay = {
   meals: MealForCalendar[];
   status: DayStatus;
   isToday: boolean;
+  /**
+   * True when the day's logs probably don't reflect everything she ate — e.g.
+   * she logged breakfast (520 cal) and nothing else, so the total reads "in
+   * deficit" but she likely just stopped tracking. Heuristic: 1–2 meals AND
+   * the total is under 60% of her cut target. Empty days are NOT flagged.
+   */
+  isProbablyIncomplete: boolean;
 };
 
 type RawMealLog = {
@@ -93,6 +100,16 @@ export function buildCalendarDays(input: {
       status = "red";
     }
 
+    // "Probably incomplete" heuristic — fires when she logged something but
+    // the day reads way too light: 1–2 meals AND total under 60% of target.
+    // Catches the "only breakfast logged, day shows green" trap.
+    const isProbablyIncomplete =
+      target > 0 &&
+      entry.meals.length >= 1 &&
+      entry.meals.length <= 2 &&
+      entry.totalCal > 0 &&
+      entry.totalCal < target * 0.6;
+
     const fmt = (opts: Intl.DateTimeFormatOptions) =>
       new Intl.DateTimeFormat("en-US", {
         timeZone: "America/Chicago",
@@ -109,6 +126,7 @@ export function buildCalendarDays(input: {
       meals: entry.meals,
       status,
       isToday: key === todayKey,
+      isProbablyIncomplete,
     });
   }
 

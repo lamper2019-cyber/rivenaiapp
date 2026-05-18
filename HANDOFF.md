@@ -8,9 +8,11 @@ Also read `CLAUDE.md` at the repo root — it captures the design system and Sea
 
 ## Working style with the coding agent
 
-**When Sean asks for UI/UX ideas, illustrate with code, not just prose.** Any time he asks "what are some ideas for...", "how should X look?", "what are my options for the dashboard...", each option in your response should include a short JSX snippet (5-15 lines, using existing brand tokens — cream/charcoal/gold/sage, font-display/font-body, existing component patterns) showing the actual layout. He thinks visually and makes faster, better decisions when he can *see* the shape. Prose-only bullet lists force him to translate words to visuals in his head, which is slower and loses fidelity.
+**When Sean asks for UI/UX ideas, illustrate with ASCII wireframes — NOT JSX, NOT prose.** Any time he asks "what are some ideas for...", "how should X look?", "what are my options for the dashboard...", each option in your response should be a plain-text ASCII wireframe in a fenced code block. Use boxes (`┌─┐ │ └─┘`), pipes for columns, dashes for dividers, `[ Button ]` for buttons, `( ) (•)` for radios, `[✓]` for checkboxes, `▼` for dropdowns. Use real labels, real button text, real-ish data — never `<Component>` tags. He thinks visually; ASCII shows the actual shape on the page, JSX forces him to mentally parse markup, prose forces him to imagine the layout.
 
-The code illustrates *what* the option looks like; keep the one-line tradeoff and final recommendation in prose. This rule does NOT apply when he asks for a build directly (the visual is implied in the code being written) or for backend/architecture questions.
+**Label options A / B / C / D.** Sean prefers comparing options by letter. Use `**Option A — short name**` then the wireframe, repeat for B/C/D. Keep one tradeoff line per option (Pro / Con) and a final recommendation in prose. Width: ~65–75 chars so wireframes render cleanly.
+
+This rule does NOT apply when he asks for a build directly (the visual is implied in the code being written) or for backend/architecture questions.
 
 ---
 

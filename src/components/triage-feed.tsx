@@ -7,13 +7,19 @@ const SEVERITY_STYLES: Record<TriageSeverity, { bg: string; dot: string }> = {
   sage: { bg: "bg-sage/10 border-sage/40", dot: "bg-sage" },
 };
 
-export function TriageFeed({ events }: { events: TriageEvent[] }) {
+export function TriageFeed({
+  events,
+  title = "Needs you",
+}: {
+  events: TriageEvent[];
+  title?: string;
+}) {
   if (events.length === 0) return null;
 
   return (
     <section className="space-y-3">
       <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-        Needs you
+        {title} <span className="text-on-surface-variant/60">({events.length})</span>
       </h2>
       <ul className="space-y-2">
         {events.map((event) => {

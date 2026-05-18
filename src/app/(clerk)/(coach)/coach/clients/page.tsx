@@ -8,7 +8,7 @@ import {
   streakEndingYesterdayFromHeatmap,
   take7,
 } from "@/lib/coach-heatmap";
-import { computeTriageEvents } from "@/lib/coach-triage";
+import { computeBucketedTriage } from "@/lib/coach-triage";
 import { TriageFeed } from "@/components/triage-feed";
 import { LogHeatmap } from "@/components/log-heatmap";
 
@@ -65,8 +65,11 @@ export default async function CoachClientsPage({
         },
       },
       weeklyCheckIns: {
+        // Two most recent — latest powers the "last check-in" stat AND the
+        // weight-drop celebration; the prior row gives the baseline for the
+        // drop comparison.
         orderBy: { weekStart: "desc" },
-        take: 1,
+        take: 2,
         select: { weekStart: true, weight: true, createdAt: true },
       },
       dailyTotals: {
@@ -122,7 +125,7 @@ export default async function CoachClientsPage({
 
   const heatmapByUser = buildHeatmapByClient(mealLogs, HEATMAP_DAYS);
 
-  const triageEvents = computeTriageEvents({
+  const { needsAttention, doingWell, bucketedClientIds } = computeBucketedTriage({
     clients: clients.map((c) => ({
       id: c.id,
       name: c.profile?.name ?? c.email.split("@")[0],
@@ -131,8 +134,10 @@ export default async function CoachClientsPage({
         ? {
             weekStart: c.weeklyCheckIns[0].weekStart,
             createdAt: c.weeklyCheckIns[0].createdAt,
+            weight: c.weeklyCheckIns[0].weight,
           }
         : null,
+      previousCheckInWeight: c.weeklyCheckIns[1]?.weight ?? null,
       latestCoachReplyAt: latestCoachReplyByUser.get(c.id) ?? null,
       streakEndingYesterday: streakEndingYesterdayFromHeatmap(
         heatmapByUser.get(c.id) ?? [],
@@ -141,6 +146,10 @@ export default async function CoachClientsPage({
     now,
     currentWeekStart: weekStart,
   });
+
+  // Everyone else: clients who didn't make it into either bucket. Keeps the
+  // bottom list focused — Sean already saw the urgent + the wins above.
+  const everyoneElse = clients.filter((c) => !bucketedClientIds.has(c.id));
 
   const checkedInThisWeek = (lastCheckInWeekStart: Date | undefined) =>
     lastCheckInWeekStart
@@ -162,7 +171,8 @@ export default async function CoachClientsPage({
         </p>
       </header>
 
-      <TriageFeed events={triageEvents} />
+      <TriageFeed events={needsAttention} title="Needs you" />
+      <TriageFeed events={doingWell} title="Doing well" />
 
       <form className="flex gap-2" action="/coach/clients" method="GET">
         <input
@@ -189,8 +199,22 @@ export default async function CoachClientsPage({
           </p>
         </div>
       ) : (
+        <section className="space-y-3">
+          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+            Everyone else{" "}
+            <span className="text-on-surface-variant/60">
+              ({everyoneElse.length})
+            </span>
+          </h2>
+          {everyoneElse.length === 0 ? (
+            <div className="rounded-md bg-surface-container/40 border border-outline-variant/40 px-gutter py-6 text-center">
+              <p className="font-body text-body-md text-on-surface-variant">
+                Every client surfaced above. Nothing else to scan.
+              </p>
+            </div>
+          ) : (
         <ul className="space-y-3">
-          {clients.map((c) => {
+          {everyoneElse.map((c) => {
             const profile = c.profile;
             const lastCheckIn = c.weeklyCheckIns[0];
             const todayCalories = c.dailyTotals[0]?.totalCalories ?? 0;
@@ -295,6 +319,8 @@ export default async function CoachClientsPage({
             );
           })}
         </ul>
+          )}
+        </section>
       )}
 
       <div className="fixed top-[10%] right-[-10%] w-[35%] h-[35%] bg-gold/5 blur-[120px] rounded-full pointer-events-none -z-10" />
