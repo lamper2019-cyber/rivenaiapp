@@ -6,7 +6,7 @@ import {
   generateInsights,
   nextStepFor,
   scoreBucket,
-  temperatureFromScore,
+  type BudgetTier,
 } from "@/lib/quiz";
 
 export const metadata = {
@@ -43,8 +43,10 @@ export default async function QuizResultsPage({
   const insights: string[] = parsed.success ? generateInsights(parsed.data) : [];
 
   const bucket = scoreBucket(lead.score);
-  const temperature = temperatureFromScore(lead.score);
-  const nextStep = nextStepFor(temperature, lead.firstName);
+  // CTA routes off her STATED preference in Q14 (BudgetTier) — she asked
+  // for X, she gets X. Score still shows above as readiness context, but
+  // it no longer gates which next step she lands on.
+  const nextStep = nextStepFor(lead.budgetTier as BudgetTier, lead.firstName);
 
   // 10-cell meter — each cell is worth 10 points. Score 76 fills 8 cells
   // (ceil), score 24 fills 3. Easier to read than 100 dots, and keeps the
@@ -197,6 +199,21 @@ export default async function QuizResultsPage({
             </p>
           )}
         </div>
+      </section>
+
+      {/* Secondary option — VSL is always offered now that it's no longer
+          the routed gate for any bucket. Soft underlined link, not a CTA
+          button, so it stays subordinate to her Q14-matched next step. */}
+      <section
+        className="text-center riven-rise-in"
+        style={{ animationDelay: "2500ms" }}
+      >
+        <Link
+          href="/quiz/vsl"
+          className="font-body text-label-md text-charcoal/70 hover:text-charcoal underline underline-offset-4 transition-colors"
+        >
+          Want to see how it works first? Watch the 7-min breakdown →
+        </Link>
       </section>
 
       <section className="text-center pt-2 pb-6">

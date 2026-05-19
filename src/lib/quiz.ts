@@ -443,57 +443,58 @@ export type NextStep = {
 /** Freebie assets live in /public/downloads/ and are served directly
  *  (middleware matcher excludes .pdf and .png from Clerk's path). */
 const FREEBIE_20_POUND = "/downloads/20-pound-truth.pdf";
-const FREEBIE_SOUL_FOOD = "/downloads/freebie.png";
+export const FREEBIE_SOUL_FOOD = "/downloads/freebie.png";
 
 /**
- * Result-page CTA routing, driven by the 0-100 temperature bucket:
+ * Result-page CTA routing, driven by HER STATED PREFERENCE in Q14. She
+ * asked for a specific kind of support — we honor it. The 0–100 score
+ * still drives the bucket headline + insights so she sees readiness
+ * context, but the CTA destination matches what she picked:
  *
- *   HOT  → /sign-up — direct to the existing $50/mo, 7-day trial flow
- *   WARM → /quiz/vsl — watch the breakdown, then sign up
- *   COOL → 20 Pound Truth book preview PDF
- *   COLD → Soul Food cheat-sheet PNG
+ *   "PDF guide"    → 20 Pound Truth book preview
+ *   "App"          → /sign-up (existing $50/mo, 7-day trial)
+ *   "Coach"        → /sign-up — coaching opens when seats free up
+ *   "Done-for-you" → /sign-up — Sean reviews active clients quarterly
  *
- * Every tier eventually lands on the same Stripe checkout via /sign-up;
- * the routing changes the *path* to it, not the price.
+ * The Temperature enum (HOT/WARM/COOL/COLD) is kept around for the
+ * score headline + leads dashboard; it no longer gates the CTA. The
+ * VSL is offered as a secondary link on every results page for anyone
+ * who wants the breakdown before signing up.
  */
-export function nextStepFor(
-  temperature: Temperature,
-  firstName: string,
-): NextStep {
-  switch (temperature) {
-    case "HOT":
+export function nextStepFor(tier: BudgetTier, firstName: string): NextStep {
+  switch (tier) {
+    case "FREE":
       return {
         tag: "Your next step",
-        copy: `${firstName}, you're ready. The work is the work — start your 7-day trial and see RIVEN from the inside today.`,
-        ctaLabel: "Start the 7-day trial",
-        ctaHref: "/sign-up",
-        note: "Card held during the trial. Charged $50 on day 8. Cancel before then and pay nothing.",
-      };
-    case "WARM":
-      return {
-        tag: "Your next step",
-        copy: `${firstName}, before you decide — watch the 7-minute breakdown. It shows exactly how peaceful discipline turns into pounds-off for women 35+. Then choose.`,
-        ctaLabel: "Watch the breakdown",
-        ctaHref: "/quiz/vsl",
-        note: "Free · no signup needed to watch.",
-      };
-    case "COOL":
-      return {
-        tag: "Your next step",
-        copy: `${firstName}, the framework matters before the app does. Read the first three chapters of The 20 Pound Truth — it's the foundation of everything RIVEN does.`,
-        ctaLabel: "Download the free chapters",
+        copy: `${firstName}, you asked for the guide — here it is. The 20 Pound Truth preview is the foundation of everything RIVEN does. Read it, then decide if you want the system around it.`,
+        ctaLabel: "Download the 20 Pound Truth",
         ctaHref: FREEBIE_20_POUND,
         ctaExternal: true,
         note: "Free PDF · no signup, no upsell.",
       };
-    case "COLD":
+    case "APP":
       return {
         tag: "Your next step",
-        copy: `${firstName}, start here. The Soul Food Cheat Sheet shows the cultural foods Black women 35+ can eat AND lose weight on. No app, no purchase — just the moves.`,
-        ctaLabel: "Get the free cheat sheet",
-        ctaHref: FREEBIE_SOUL_FOOD,
-        ctaExternal: true,
-        note: "Free download · save it to your phone today.",
+        copy: `${firstName}, you asked for an app with daily structure. RIVEN is exactly that — voice meal logging, daily targets, Sean's coaching voice. Start your 7-day trial and see it from the inside.`,
+        ctaLabel: "Start the 7-day trial",
+        ctaHref: "/sign-up",
+        note: "Card held during the trial. Charged $50 on day 8. Cancel before then and pay nothing.",
+      };
+    case "COACH":
+      return {
+        tag: "Your next step",
+        copy: `${firstName}, 1:1 coaching opens when seats free up — and Sean reads every active client's data before he picks the next round. Start the app trial so you're inside the system when the next seats open.`,
+        ctaLabel: "Start the app trial",
+        ctaHref: "/sign-up",
+        note: "$50/mo · 7-day free trial · app first, coaching opens quarterly.",
+      };
+    case "DONE_FOR_YOU":
+      return {
+        tag: "Your next step",
+        copy: `${firstName}, the private tier (meal plans + 1:1) is invite-only. Sean evaluates every active client each quarter for the next intake — the app trial is how you get on the shortlist.`,
+        ctaLabel: "Start the app trial",
+        ctaHref: "/sign-up",
+        note: "$50/mo · 7-day free trial · private tier evaluated quarterly.",
       };
   }
 }

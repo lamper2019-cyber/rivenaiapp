@@ -247,6 +247,50 @@ export default function QuizLandingPage() {
         </div>
       </section>
 
+      {/* ─────── Lead magnet — Soul Food Cheat Sheet ──────
+          For visitors who aren't ready to take the assessment yet.
+          A quiet, secondary path that still captures interest by
+          dropping immediate value (no email required). */}
+      <section className="pb-16 md:pb-20">
+        <div className="max-w-3xl mx-auto px-container-mobile md:px-container-desktop">
+          <a
+            href="/downloads/freebie.png"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-2xl bg-surface-container-lowest border border-outline-variant/60 px-gutter py-5 shadow-elevation-1 hover:shadow-elevation-2 hover:border-gold/50 transition-all"
+          >
+            <div className="flex items-center gap-4">
+              <span
+                className="shrink-0 w-12 h-12 rounded-xl bg-tertiary-container/50 flex items-center justify-center text-charcoal"
+                aria-hidden
+              >
+                <span className="material-symbols-outlined text-[24px]">
+                  restaurant_menu
+                </span>
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="font-body text-label-sm tracking-widest uppercase text-gold">
+                  Not ready yet? Quick win first
+                </p>
+                <p className="font-display text-headline-sm text-charcoal leading-tight mt-1">
+                  The RIVEN Soul Food Cheat Sheet
+                </p>
+                <p className="font-body text-body-md text-on-surface-variant mt-1">
+                  Cultural foods Black women 35+ can eat AND lose weight on.
+                  Free download, no signup.
+                </p>
+              </div>
+              <span
+                className="material-symbols-outlined text-charcoal/50 shrink-0 self-center"
+                aria-hidden
+              >
+                download
+              </span>
+            </div>
+          </a>
+        </div>
+      </section>
+
       {/* ───────────── Footer ───────────── */}
       <footer className="border-t border-outline-variant/40 py-8">
         <div className="max-w-5xl mx-auto px-container-mobile md:px-container-desktop flex flex-col sm:flex-row justify-between items-center gap-3">
