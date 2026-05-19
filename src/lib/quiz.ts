@@ -446,22 +446,26 @@ const FREEBIE_20_POUND = "/downloads/20-pound-truth.pdf";
 export const FREEBIE_SOUL_FOOD = "/downloads/freebie.png";
 
 /**
- * Result-page CTA routing, driven by HER STATED PREFERENCE in Q14. She
- * asked for a specific kind of support — we honor it. The 0–100 score
- * still drives the bucket headline + insights so she sees readiness
- * context, but the CTA destination matches what she picked:
+ * Result-page CTA routing — Q14 picks the lane, score picks the on-ramp.
  *
- *   "PDF guide"    → 20 Pound Truth book preview
- *   "App"          → /sign-up (existing $50/mo, 7-day trial)
- *   "Coach"        → /sign-up — coaching opens when seats free up
- *   "Done-for-you" → /sign-up — Sean reviews active clients quarterly
+ *   PDF guide          →  20 Pound Truth book preview (always)
+ *   App + score ≥ 75   →  /sign-up direct (HOT app picker — high intent
+ *                          AND strong behavior, no warm-up needed)
+ *   App + score < 75   →  /quiz/vsl → then /sign-up (warm app picker
+ *                          watches the breakdown first)
+ *   Coach (any)        →  /quiz/vsl → then /sign-up (sell the
+ *                          "app is the bridge" path)
+ *   Done-for-you (any) →  /quiz/vsl → then /sign-up (same bridge)
  *
- * The Temperature enum (HOT/WARM/COOL/COLD) is kept around for the
- * score headline + leads dashboard; it no longer gates the CTA. The
- * VSL is offered as a secondary link on every results page for anyone
- * who wants the breakdown before signing up.
+ * The 0–100 score also still drives the bucket headline + insights at
+ * the top of /quiz/results so she sees readiness context. Temperature
+ * stays exported for /coach/leads but no longer gates the funnel.
  */
-export function nextStepFor(tier: BudgetTier, firstName: string): NextStep {
+export function nextStepFor(
+  tier: BudgetTier,
+  score: number,
+  firstName: string,
+): NextStep {
   switch (tier) {
     case "FREE":
       return {
@@ -473,28 +477,39 @@ export function nextStepFor(tier: BudgetTier, firstName: string): NextStep {
         note: "Free PDF · no signup, no upsell.",
       };
     case "APP":
+      // App pickers who score HOT (75+) on readiness skip the VSL gate —
+      // they know what they want AND they're already running the practices.
+      if (score >= 75) {
+        return {
+          tag: "Your next step",
+          copy: `${firstName}, you're ready. The work is the work — start your 7-day trial and see RIVEN from the inside today.`,
+          ctaLabel: "Start the 7-day trial",
+          ctaHref: "/sign-up",
+          note: "Card held during the trial. Charged $50 on day 8. Cancel before then and pay nothing.",
+        };
+      }
       return {
         tag: "Your next step",
-        copy: `${firstName}, you asked for an app with daily structure. RIVEN is exactly that — voice meal logging, daily targets, Sean's coaching voice. Start your 7-day trial and see it from the inside.`,
-        ctaLabel: "Start the 7-day trial",
-        ctaHref: "/sign-up",
-        note: "Card held during the trial. Charged $50 on day 8. Cancel before then and pay nothing.",
+        copy: `${firstName}, you asked for an app with daily structure. Before you start the trial, watch the 7-minute breakdown — it's the clearest explanation of how RIVEN actually works for women 35+.`,
+        ctaLabel: "Watch the breakdown",
+        ctaHref: "/quiz/vsl",
+        note: "Free · then signup at the end of the video.",
       };
     case "COACH":
       return {
         tag: "Your next step",
-        copy: `${firstName}, 1:1 coaching opens when seats free up — and Sean reads every active client's data before he picks the next round. Start the app trial so you're inside the system when the next seats open.`,
-        ctaLabel: "Start the app trial",
-        ctaHref: "/sign-up",
-        note: "$50/mo · 7-day free trial · app first, coaching opens quarterly.",
+        copy: `${firstName}, 1:1 coaching opens when seats free up — Sean reads every active client's data before he picks the next round. Watch the 7-minute breakdown to see how the app trial gets you in line for the next intake.`,
+        ctaLabel: "Watch the breakdown",
+        ctaHref: "/quiz/vsl",
+        note: "Free · then start the app trial at the end of the video.",
       };
     case "DONE_FOR_YOU":
       return {
         tag: "Your next step",
-        copy: `${firstName}, the private tier (meal plans + 1:1) is invite-only. Sean evaluates every active client each quarter for the next intake — the app trial is how you get on the shortlist.`,
-        ctaLabel: "Start the app trial",
-        ctaHref: "/sign-up",
-        note: "$50/mo · 7-day free trial · private tier evaluated quarterly.",
+        copy: `${firstName}, the private tier (meal plans + 1:1) is invite-only. Sean evaluates every active client each quarter for the next intake — watch the 7-minute breakdown to see how the app trial puts you on the shortlist.`,
+        ctaLabel: "Watch the breakdown",
+        ctaHref: "/quiz/vsl",
+        note: "Free · then start the app trial at the end of the video.",
       };
   }
 }
