@@ -65,14 +65,22 @@ export default async function QuizResultsPage({
         </Link>
       </header>
 
-      {/* The big reveal */}
+      {/* The big reveal — animated entrance. Cells fill left-to-right
+          (riven-cell-fill, staggered), the score number pops just as the
+          cells finish, then the headline + body rise in below. */}
       <section className="space-y-5 text-center">
-        <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+        <p
+          className="font-body text-label-md tracking-widest uppercase text-on-surface-variant riven-rise-in"
+          style={{ animationDelay: "100ms" }}
+        >
           {lead.firstName}&apos;s RIVEN readiness
         </p>
 
-        <div className="space-y-3">
-          <p className="font-display text-display-xl md:text-display-2xl text-charcoal leading-none">
+        <div className="space-y-4">
+          <p
+            className="font-display text-display-xl md:text-display-2xl text-charcoal leading-none riven-score-pop"
+            style={{ animationDelay: "700ms" }}
+          >
             {lead.score}
             <span className="font-display text-display-md text-on-surface-variant/60">
               {" "}
@@ -86,27 +94,39 @@ export default async function QuizResultsPage({
             {scoreCells.map((on, i) => (
               <span
                 key={i}
-                className={`inline-block w-3 h-3 rounded-sm ${
-                  on ? "bg-sage" : "bg-outline-variant/40"
+                style={on ? { animationDelay: `${100 + i * 60}ms` } : undefined}
+                className={`inline-block w-3.5 h-3.5 rounded-sm ${
+                  on
+                    ? "bg-sage riven-cell-fill"
+                    : "bg-outline-variant/40 opacity-60"
                 }`}
               />
             ))}
           </div>
         </div>
 
-        <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal text-balance">
+        <h1
+          className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal text-balance riven-rise-in"
+          style={{ animationDelay: "1000ms" }}
+        >
           {bucket.headline}
         </h1>
-        <p className="font-body text-body-lg text-on-surface-variant max-w-xl mx-auto leading-relaxed">
+        <p
+          className="font-body text-body-lg text-on-surface-variant max-w-xl mx-auto leading-relaxed riven-rise-in"
+          style={{ animationDelay: "1180ms" }}
+        >
           {bucket.body}
         </p>
       </section>
 
       <div className="border-t border-outline-variant/40" />
 
-      {/* Three insights */}
+      {/* Three insights — cascade in after the big reveal lands. */}
       <section className="space-y-5">
-        <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+        <p
+          className="font-body text-label-md tracking-widest uppercase text-on-surface-variant riven-rise-in"
+          style={{ animationDelay: "1400ms" }}
+        >
           Three things your answers tell me
         </p>
         {insights.length === 0 ? (
@@ -117,7 +137,11 @@ export default async function QuizResultsPage({
         ) : (
           <ol className="space-y-4">
             {insights.map((text, i) => (
-              <li key={i} className="flex items-start gap-4">
+              <li
+                key={i}
+                className="flex items-start gap-4 riven-rise-in"
+                style={{ animationDelay: `${1550 + i * 180}ms` }}
+              >
                 <span className="shrink-0 w-7 h-7 rounded-full bg-secondary-container/50 border border-gold/40 flex items-center justify-center font-display text-label-md text-charcoal">
                   {i + 1}
                 </span>
@@ -132,8 +156,11 @@ export default async function QuizResultsPage({
 
       <div className="border-t border-outline-variant/40" />
 
-      {/* Next step — routed by budget tier */}
-      <section className="space-y-4 rounded-md bg-secondary-container/30 border border-gold/40 p-gutter md:p-8 shadow-elevation-1">
+      {/* Next step — routed by budget tier. Last to land. */}
+      <section
+        className="space-y-4 rounded-md bg-secondary-container/30 border border-gold/40 p-gutter md:p-8 shadow-elevation-1 riven-rise-in"
+        style={{ animationDelay: "2200ms" }}
+      >
         <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
           {nextStep.tag}
         </p>

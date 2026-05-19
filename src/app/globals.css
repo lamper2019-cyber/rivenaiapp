@@ -149,6 +149,71 @@ body {
   }
 }
 
+/* Results-page reveal animations. The score meter "loads up" left-to-right,
+   then the insights cascade in. Pure CSS so the server component stays a
+   server component — no useState dance to trigger animations on mount. */
+@keyframes riven-cell-fill {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.riven-cell-fill {
+  animation: riven-cell-fill 360ms ease-out both;
+}
+
+@keyframes riven-rise-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.riven-rise-in {
+  animation: riven-rise-in 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Score number pops in with a slight overshoot — feels like the meter
+   "landing" at the final value after the cells finish filling. */
+@keyframes riven-score-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.riven-score-pop {
+  animation: riven-score-pop 680ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .riven-cell-fill,
+  .riven-rise-in,
+  .riven-score-pop {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Brand-styled native range slider used by the onboarding step flow.
    Charcoal track with a gold thumb — bigger thumb on touch so it's
    thumb-sized, not mouse-sized. The webkit and moz prefixes have to be

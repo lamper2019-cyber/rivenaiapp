@@ -137,10 +137,10 @@ export const Q14: ChoiceQuestion = {
   phase: "qualifying",
   text: "Which kind of support would suit you best?",
   options: [
-    { value: "free_guide", label: "A free guide I can read on my own", sub: "$0" },
-    { value: "app", label: "An app with daily structure", sub: "$30–60/mo" },
-    { value: "coach", label: "A coach who texts me and checks in weekly", sub: "$100–200/mo" },
-    { value: "done_for_you", label: "Done-for-you meal plans + 1:1 coaching", sub: "$500+/mo" },
+    { value: "free_guide", label: "A PDF guide I can read on my own time" },
+    { value: "app", label: "An app with daily structure" },
+    { value: "coach", label: "A coach who texts me and checks in weekly" },
+    { value: "done_for_you", label: "Done-for-you meal plans + 1:1 coaching" },
   ],
 };
 
