@@ -60,21 +60,12 @@ export default function QuizLandingPage() {
               about it. Built for Black women 35–55 doing real body
               recomposition.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start pt-2">
+            <div className="pt-2">
               <Link
                 href="/quiz/start"
-                className="inline-block bg-charcoal text-cream py-4 px-8 rounded-full font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-95 hover:opacity-90 transition-all"
+                className="block w-full sm:inline-block sm:w-auto sm:min-w-[20rem] text-center bg-charcoal text-cream py-4 px-10 rounded-full font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-95 hover:opacity-90 transition-all"
               >
                 Start the assessment
-              </Link>
-              <Link
-                href="#how-it-works"
-                className="inline-flex items-center justify-center gap-2 border border-charcoal/60 text-charcoal py-4 px-8 rounded-full font-body text-label-md tracking-widest uppercase hover:bg-charcoal/5 transition-all"
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  expand_more
-                </span>
-                How it works
               </Link>
             </div>
             <p className="font-body text-label-sm text-on-surface-variant/70 pt-1">
@@ -191,17 +182,10 @@ export default function QuizLandingPage() {
               plans stop working — and why &ldquo;eat less, move more&rdquo;
               keeps failing you. RIVEN is built around the levers that actually
               move the needle when your hormones, your sleep, and your life
-              don&apos;t look like a 25-year-old&apos;s anymore.
+              doesn&apos;t look like a 25-year-old&apos;s anymore.
             </p>
           </div>
 
-          {/* Stat strip — placeholder numbers; Sean swap with real ones */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 pt-2 border-t border-outline-variant/40">
-            <Stat number="8" label="Founding members" />
-            <Stat number="12 wk" label="To visible change" />
-            <Stat number="0.8g/lb" label="Protein floor" />
-            <Stat number="100%" label="Sean reads every log" />
-          </div>
         </div>
       </section>
 
@@ -235,10 +219,6 @@ export default function QuizLandingPage() {
             />
           </div>
 
-          <p className="font-body text-label-sm text-cream/50 text-center mt-8">
-            {/* SEAN: swap these for real client quotes when you have consent. */}
-            Sample placeholders — swap with real quotes once approved.
-          </p>
         </div>
       </section>
 
@@ -319,19 +299,6 @@ function Pillar({
       <p className="font-display text-headline-sm text-charcoal">{title}</p>
       <p className="font-body text-body-md text-on-surface-variant leading-relaxed">
         {body}
-      </p>
-    </div>
-  );
-}
-
-function Stat({ number, label }: { number: string; label: string }) {
-  return (
-    <div>
-      <p className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal leading-none">
-        {number}
-      </p>
-      <p className="font-body text-label-sm tracking-wide text-on-surface-variant mt-2">
-        {label}
       </p>
     </div>
   );
