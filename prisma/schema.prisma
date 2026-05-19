@@ -255,3 +255,41 @@ model PushSubscription {
 
   @@index([userId])
 }
+
+// Lead from the /quiz funnel. Captured before sign-up — we hold the
+// answers + computed score + Q14 budget tier so the results page can
+// route to the right CTA and Sean can email/segment leads later.
+// convertedToUserId is loosely linked (no FK relation) so deleting a
+// User doesn't cascade and lose marketing history.
+model Lead {
+  id                String   @id @default(cuid())
+
+  // Captured on the contact step before questions start.
+  firstName         String
+  email             String
+  phone             String?
+
+  // Auto-captured at submit time.
+  ipAddress         String?
+  country           String?
+
+  // Full answer set. Shape: Record<string, string | string[] | boolean>
+  // Keyed by question id (q1..q15). q1–q10 are "yes"/"no", q11–q14 are
+  // option keys, q15 is free text. Schema enforced by zod at the API edge.
+  answers           Json
+
+  // Derived once at submit. Stored so the results page doesn't recompute
+  // and Sean can sort/filter the dashboard later without re-scoring.
+  score             Int      // 0–10, count of "yes" in q1–q10
+  budgetTier        String   // FREE | APP | COACH | DONE_FOR_YOU — from q14
+
+  // If she later signs up, we stamp her User.id here so Sean can see
+  // who converted. Plain String (no FK) on purpose — see model comment.
+  convertedToUserId String?
+
+  createdAt         DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+  @@index([budgetTier, score])
+}
