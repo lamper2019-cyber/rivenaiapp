@@ -440,41 +440,35 @@ export type NextStep = {
   note?: string; // small footnote under the button
 };
 
-/** PDFs in /public/downloads. COLD currently routes to the 20-pound-truth
- *  preview too — swap to the 35+ Black women freebie once Sean drops it. */
+/** Freebie assets live in /public/downloads/ and are served directly
+ *  (middleware matcher excludes .pdf and .png from Clerk's path). */
 const FREEBIE_20_POUND = "/downloads/20-pound-truth.pdf";
-const FREEBIE_35_PLUS_FALLBACK = FREEBIE_20_POUND;
+const FREEBIE_SOUL_FOOD = "/downloads/freebie.png";
 
 /**
  * Result-page CTA routing, driven by the 0-100 temperature bucket:
  *
- *   HOT  → $47 founding-member offer via STRIPE_FOUNDING_CHECKOUT_URL
- *           (falls back to /sign-up if env var isn't set yet)
+ *   HOT  → /sign-up — direct to the existing $50/mo, 7-day trial flow
  *   WARM → /quiz/vsl — watch the breakdown, then sign up
  *   COOL → 20 Pound Truth book preview PDF
- *   COLD → 35+ Black women freebie PDF (TODO: Sean drops it; using
- *           20-pound-truth preview as fallback until then)
+ *   COLD → Soul Food cheat-sheet PNG
+ *
+ * Every tier eventually lands on the same Stripe checkout via /sign-up;
+ * the routing changes the *path* to it, not the price.
  */
 export function nextStepFor(
   temperature: Temperature,
   firstName: string,
 ): NextStep {
   switch (temperature) {
-    case "HOT": {
-      // Stripe Payment Link for the $47 founding-member offer. Set via
-      // STRIPE_FOUNDING_CHECKOUT_URL env var on Railway; until then we
-      // soft-fail to the existing trial signup so HOT leads still convert.
-      const stripeUrl = process.env.STRIPE_FOUNDING_CHECKOUT_URL;
-      const isStripe = !!stripeUrl;
+    case "HOT":
       return {
         tag: "Your next step",
-        copy: `${firstName}, you're ready. The founding-member rate is open right now — $47/mo locked in for life, no markup later. The window closes when the founding cohort fills.`,
-        ctaLabel: "Claim my $47 founding spot",
-        ctaHref: stripeUrl ?? "/sign-up",
-        ctaExternal: isStripe,
-        note: "7-day trial · cancel before day 8 and pay nothing · $47/mo for life after.",
+        copy: `${firstName}, you're ready. The work is the work — start your 7-day trial and see RIVEN from the inside today.`,
+        ctaLabel: "Start the 7-day trial",
+        ctaHref: "/sign-up",
+        note: "Card held during the trial. Charged $50 on day 8. Cancel before then and pay nothing.",
       };
-    }
     case "WARM":
       return {
         tag: "Your next step",
@@ -490,16 +484,16 @@ export function nextStepFor(
         ctaLabel: "Download the free chapters",
         ctaHref: FREEBIE_20_POUND,
         ctaExternal: true,
-        note: "Free PDF · 20 pages · no signup, no upsell.",
+        note: "Free PDF · no signup, no upsell.",
       };
     case "COLD":
       return {
         tag: "Your next step",
-        copy: `${firstName}, start here. This guide breaks down why the rules change after 35 — and what works instead. No app, no purchase, just the truth.`,
-        ctaLabel: "Get the free guide",
-        ctaHref: FREEBIE_35_PLUS_FALLBACK,
+        copy: `${firstName}, start here. The Soul Food Cheat Sheet shows the cultural foods Black women 35+ can eat AND lose weight on. No app, no purchase — just the moves.`,
+        ctaLabel: "Get the free cheat sheet",
+        ctaHref: FREEBIE_SOUL_FOOD,
         ctaExternal: true,
-        note: "Free PDF · read it on your phone today.",
+        note: "Free download · save it to your phone today.",
       };
   }
 }
