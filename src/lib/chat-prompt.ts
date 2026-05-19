@@ -94,10 +94,18 @@ Caribbean:
 When she logs "Sunday dinner" or "mom's mac and cheese" or "fried chicken" — calculate accurately using the above. These are foods of her culture. Help her fit them into her day. No moralizing. No "healthier swap" unless she asks for one.
 
 WHEN SHE LOGS A MEAL IN CHAT (not the structured /log flow):
-- Confirm with the overestimated calorie figure.
-- Tell her where that puts her for the day vs her target.
+
+You have a tool called log_meal. When she tells you she ate something — anything from "had a chicken caesar" to "just downed two slices of pizza, I think like 450 cal" — CALL THE TOOL. Do not estimate macros yourself in your reply; the tool does the analysis using the same +35% buffer and trust-explicit-numbers rules as the /log page.
+
+After the tool returns with the macros + saved meal, weave them into a natural Sean-voice reply:
+- Confirm with the (overestimated) calorie figure the tool returned.
+- Tell her where that puts her for the day vs her target — use the TODAY SO FAR numbers in your context.
 - If she's still under: tell her she has room.
 - If she's over: don't shame. Give the play for tomorrow.
+
+Pass the full meal description she gave you (including any stated calorie numbers — "she said 450 cal") into the tool's "description" field. The downstream pipeline honors stated numbers when she gives them. NEVER reply with macros before the tool has run; that path leads to double-counting if she logs the same meal on /log too.
+
+When she's NOT logging a meal (asking how she's doing, asking what to eat, asking about her week), don't call the tool. Just answer using the context above.
 
 TIGHTEN GUIDANCE — incremental, never radical
 When you suggest a sharpener after a meal, ONE small swap or downgrade in the SAME food category. Never tell her to eat a different food entirely. Never moralize. Small changes stack — give her ONE thing she'd actually do tomorrow.
@@ -119,6 +127,79 @@ Keep it concise. The advice should be ONE sentence, two at most. Not a paragraph
 
 OUTPUT
 Plain prose only. No markdown, no asterisks, no bullet lists, no headers. Write the way Sean would actually text a client.`;
+
+export type ChatContextMeal = {
+  shortName: string | null;
+  description: string;
+  calories: number;
+  protein: number;
+  createdAt: Date;
+  processedFlag: boolean;
+};
+
+export type ChatContextCheckIn = {
+  weekStart: Date;
+  weight: number;
+  waist: number;
+};
+
+/**
+ * Expanded live context for the chat stream. RIVEN AI gets the full picture
+ * each turn — profile, today's totals, recent meals, latest weekly check-in,
+ * current streak. Refreshed every message so the AI always reads from live
+ * data, never stale snapshots inside the message history.
+ */
+export function buildLiveContext(args: {
+  profile: Profile;
+  todayTotals: { calories: number; protein: number } | null;
+  recentMeals: ChatContextMeal[];
+  latestCheckIn: ChatContextCheckIn | null;
+  streakDays: number;
+}): string {
+  const baseContext = buildClientContext(args.profile, args.todayTotals);
+  const extra: string[] = [];
+
+  if (args.recentMeals.length > 0) {
+    extra.push(
+      ``,
+      `RECENT MEALS (most recent first, last ~24h)`,
+    );
+    for (const m of args.recentMeals) {
+      const time = m.createdAt.toLocaleString("en-US", {
+        timeZone: "America/Chicago",
+        weekday: "short",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      const label = m.shortName ?? m.description.slice(0, 60);
+      const flag = m.processedFlag ? " ⚠ flagged" : "";
+      extra.push(`- ${time} · ${label} · ${m.calories} cal · ${m.protein}g protein${flag}`);
+    }
+  }
+
+  if (args.latestCheckIn) {
+    const ds = args.latestCheckIn.weekStart.toLocaleDateString("en-US", {
+      timeZone: "America/Chicago",
+      month: "short",
+      day: "numeric",
+    });
+    extra.push(
+      ``,
+      `LATEST CHECK-IN (week of ${ds})`,
+      `- Weight: ${args.latestCheckIn.weight} lbs`,
+      `- Waist: ${args.latestCheckIn.waist}″`,
+    );
+  }
+
+  if (args.streakDays > 0) {
+    extra.push(
+      ``,
+      `CURRENT LOG STREAK: ${args.streakDays} consecutive days ending yesterday.`,
+    );
+  }
+
+  return baseContext + "\n" + extra.join("\n");
+}
 
 export function buildClientContext(profile: Profile, todayTotals: {
   calories: number;

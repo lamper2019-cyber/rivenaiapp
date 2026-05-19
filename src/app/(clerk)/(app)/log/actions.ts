@@ -2,44 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { startOfCentralDay } from "@/lib/dates";
+import { isAnthropicConfigured } from "@/lib/anthropic";
 import {
-  getAnthropicClient,
-  isAnthropicConfigured,
-  MEAL_LOGGING_MODEL,
-  RIVEN_SYSTEM_PROMPT,
-} from "@/lib/anthropic";
+  analyzeMeal,
+  persistMealLog,
+  type MealAnalysis,
+} from "@/lib/meal-pipeline";
 
 const MEAL_DESCRIPTION_MAX = 500;
-
-const MealItemSchema = z.object({
-  name: z.string().min(1).max(60),
-  calories: z.number().int().min(0).max(3000),
-  protein: z.number().int().min(0).max(200),
-  fat: z.number().int().min(0).max(300),
-  carbs: z.number().int().min(0).max(800),
-});
-export type MealItem = z.infer<typeof MealItemSchema>;
-
-const MealAnalysisSchema = z.object({
-  calories: z.number().int().min(0).max(5000),
-  protein: z.number().int().min(0).max(500),
-  fat: z.number().int().min(0).max(500),
-  carbs: z.number().int().min(0).max(2000),
-  shortName: z.string().min(1).max(80),
-  // Per-item breakdown — at least one item, max 12. Single-component meals
-  // get a one-element array. Sum should ~match the top-level totals (Claude
-  // is reminded in the prompt; small rounding drift is acceptable).
-  items: z.array(MealItemSchema).min(1).max(12),
-  processedFlag: z.boolean(),
-  flagReason: z.string().max(400),
-  coaching: z.string().min(1).max(1000),
-});
-
-export type MealAnalysis = z.infer<typeof MealAnalysisSchema>;
 
 export type LogMealResult =
   | {
@@ -117,117 +90,28 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
     carbs: todayTotals?.totalCarbs ?? 0,
   };
 
-  const userMessage = buildUserMessage({
-    profile: {
-      name: profile.name,
-      cutCalories: profile.cutCalories,
-      proteinFloor: profile.proteinFloor,
-    },
-    todayTotals: currentTotals,
-    description,
-  });
-
-  // Call Claude with structured output. messages.parse() validates against the
-  // Zod schema and returns parsed_output as a typed object.
+  // Analyze + persist via the shared pipeline (also used by the RIVEN AI
+  // chat tool — both paths land in the same MealLog + DailyTotals state).
   let analysis: MealAnalysis;
   try {
-    const client = getAnthropicClient();
-    const response = await client.messages.parse({
-      model: MEAL_LOGGING_MODEL,
-      max_tokens: 1024,
-      system: [
-        {
-          type: "text",
-          text: RIVEN_SYSTEM_PROMPT,
-          // Cacheable on prompts ≥ 2048 tokens (Sonnet 4.6 threshold). Below that
-          // it silently no-ops, which is fine — no cost penalty.
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [{ role: "user", content: userMessage }],
-      // Anthropic deprecated the top-level `output_format` parameter — must use
-      // `output_config.format` with the Zod helper now.
-      output_config: { format: zodOutputFormat(MealAnalysisSchema) },
+    analysis = await analyzeMeal({
+      profile: {
+        name: profile.name,
+        cutCalories: profile.cutCalories,
+        proteinFloor: profile.proteinFloor,
+      },
+      todayTotals: currentTotals,
+      description,
     });
-    if (!response.parsed_output) {
-      return {
-        ok: false,
-        error: "Claude returned an unparseable response. Try rephrasing your meal description.",
-      };
-    }
-    analysis = response.parsed_output;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return { ok: false, error: `Claude API error: ${msg}` };
   }
 
-  // Date range for "today" in Central time — used to scope the sum-recompute
-  // below. Same bounds the undo flow uses, so writes and reads always agree.
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  // Use an interactive transaction so we can: (1) create the meal log,
-  // (2) re-sum ALL of today's meal logs (including the one just created),
-  // (3) upsert DailyTotals with that authoritative sum. This is more robust
-  // than increment/decrement math — past bugs (e.g. the recent TZ-fix
-  // migration that left some users with mis-bucketed DailyTotals rows)
-  // self-heal on the next log/undo because we're always recomputing from
-  // source-of-truth MealLog rows, never blindly adding deltas to a row
-  // that may already be drifted.
-  const txResult = await prisma.$transaction(async (tx) => {
-    const created = await tx.mealLog.create({
-      data: {
-        userId: user.id,
-        description,
-        shortName: analysis.shortName,
-        calories: analysis.calories,
-        protein: analysis.protein,
-        fat: analysis.fat,
-        carbs: analysis.carbs,
-        aiResponse: analysis.coaching,
-        // Persist per-item breakdown as JSON. Used by the UI to render
-        // individual food pills inside the meal card on /log.
-        items: analysis.items,
-        processedFlag: analysis.processedFlag,
-        flagReason: analysis.flagReason || null,
-      },
-    });
-    const todayMeals = await tx.mealLog.findMany({
-      where: {
-        userId: user.id,
-        createdAt: { gte: today, lt: tomorrow },
-      },
-      select: { calories: true, protein: true, fat: true, carbs: true },
-    });
-    const sums = todayMeals.reduce(
-      (acc, m) => ({
-        calories: acc.calories + m.calories,
-        protein: acc.protein + m.protein,
-        fat: acc.fat + m.fat,
-        carbs: acc.carbs + m.carbs,
-      }),
-      { calories: 0, protein: 0, fat: 0, carbs: 0 },
-    );
-    await tx.dailyTotals.upsert({
-      where: { userId_date: { userId: user.id, date: today } },
-      // Preserve totalSteps when overwriting macro totals. Steps are managed
-      // by a separate action and aren't part of this recompute.
-      update: {
-        totalCalories: sums.calories,
-        totalProtein: sums.protein,
-        totalFat: sums.fat,
-        totalCarbs: sums.carbs,
-      },
-      create: {
-        userId: user.id,
-        date: today,
-        totalCalories: sums.calories,
-        totalProtein: sums.protein,
-        totalFat: sums.fat,
-        totalCarbs: sums.carbs,
-      },
-    });
-    return { mealLog: created, sums };
+  const { mealLogId, sums } = await persistMealLog({
+    userId: user.id,
+    description,
+    analysis,
   });
 
   revalidatePath("/log");
@@ -236,8 +120,8 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
   return {
     ok: true,
     analysis,
-    totals: txResult.sums,
-    mealLogId: txResult.mealLog.id,
+    totals: sums,
+    mealLogId,
   };
 }
 
@@ -541,30 +425,5 @@ export async function getTodayTotals() {
   } catch {
     return null;
   }
-}
-
-function buildUserMessage(args: {
-  profile: { name: string; cutCalories: number; proteinFloor: number };
-  todayTotals: { calories: number; protein: number; fat: number; carbs: number };
-  description: string;
-}): string {
-  const { profile, todayTotals, description } = args;
-  const caloriesRemaining = profile.cutCalories - todayTotals.calories;
-  const proteinRemaining = profile.proteinFloor - todayTotals.protein;
-
-  return `CLIENT: ${profile.name}
-
-DAILY TARGETS
-- Calories (cut): ${profile.cutCalories}
-- Protein floor: ${profile.proteinFloor}g
-
-TODAY SO FAR
-- Calories: ${todayTotals.calories} / ${profile.cutCalories} (${caloriesRemaining > 0 ? `${caloriesRemaining} remaining` : `${Math.abs(caloriesRemaining)} over`})
-- Protein: ${todayTotals.protein}g / ${profile.proteinFloor}g (${proteinRemaining > 0 ? `${proteinRemaining}g still to hit floor` : `floor met`})
-- Fat: ${todayTotals.fat}g
-- Carbs: ${todayTotals.carbs}g
-
-MEAL TO ANALYZE
-"${description}"`;
 }
 
