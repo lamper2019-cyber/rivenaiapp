@@ -155,6 +155,21 @@ export const QUALIFYING_QUESTIONS: Question[] = [Q11, Q12, Q13, Q14, Q15];
 
 export const ALL_QUESTIONS: Question[] = [...PRACTICE_QUESTIONS, ...QUALIFYING_QUESTIONS];
 
+/** Translate a stored choice value (e.g. "tried_many") to its human label.
+ *  Used by the coach leads dashboard to render Q11–Q14 answers readably. */
+export function labelForChoiceAnswer(
+  qid: "q11" | "q12" | "q13" | "q14",
+  value: string,
+): string {
+  const map: Record<string, ChoiceQuestion> = {
+    q11: Q11,
+    q12: Q12,
+    q13: Q13,
+    q14: Q14,
+  };
+  return map[qid]?.options.find((o) => o.value === value)?.label ?? value;
+}
+
 // ──────────────────────────── Zod schemas ────────────────────────────
 
 export const ContactSchema = z.object({
