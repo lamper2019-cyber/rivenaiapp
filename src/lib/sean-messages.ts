@@ -36,6 +36,14 @@ import {
   PROGRESS_STREAK_5_VARIANTS,
   PROGRESS_STREAK_7_TITLES,
   PROGRESS_STREAK_7_VARIANTS,
+  PROGRESS_STREAK_14_TITLES,
+  PROGRESS_STREAK_14_VARIANTS,
+  PROGRESS_STREAK_30_TITLES,
+  PROGRESS_STREAK_30_VARIANTS,
+  PROGRESS_STREAK_60_TITLES,
+  PROGRESS_STREAK_60_VARIANTS,
+  PROGRESS_STREAK_90_TITLES,
+  PROGRESS_STREAK_90_VARIANTS,
   RHYTHM_FRI_PM_TITLES,
   RHYTHM_FRI_PM_VARIANTS,
   RHYTHM_WED_PM_TITLES,
@@ -56,7 +64,11 @@ type Category =
   | "behavioral_72h"
   | "progress_streak_3"
   | "progress_streak_5"
-  | "progress_streak_7";
+  | "progress_streak_7"
+  | "progress_streak_14"
+  | "progress_streak_30"
+  | "progress_streak_60"
+  | "progress_streak_90";
 
 /** Pool of message bodies per category — picked at send time, deduplicated
  *  against the client's last 365 days of received messages. */
@@ -68,6 +80,10 @@ const VARIANT_BANKS: Record<Category, string[]> = {
   progress_streak_3: PROGRESS_STREAK_3_VARIANTS,
   progress_streak_5: PROGRESS_STREAK_5_VARIANTS,
   progress_streak_7: PROGRESS_STREAK_7_VARIANTS,
+  progress_streak_14: PROGRESS_STREAK_14_VARIANTS,
+  progress_streak_30: PROGRESS_STREAK_30_VARIANTS,
+  progress_streak_60: PROGRESS_STREAK_60_VARIANTS,
+  progress_streak_90: PROGRESS_STREAK_90_VARIANTS,
 };
 
 /** Pool of push-notification titles per category — picked random per send,
@@ -80,6 +96,10 @@ const TITLE_POOLS: Record<Category, string[]> = {
   progress_streak_3: PROGRESS_STREAK_3_TITLES,
   progress_streak_5: PROGRESS_STREAK_5_TITLES,
   progress_streak_7: PROGRESS_STREAK_7_TITLES,
+  progress_streak_14: PROGRESS_STREAK_14_TITLES,
+  progress_streak_30: PROGRESS_STREAK_30_TITLES,
+  progress_streak_60: PROGRESS_STREAK_60_TITLES,
+  progress_streak_90: PROGRESS_STREAK_90_TITLES,
 };
 
 /**
@@ -231,7 +251,14 @@ async function evaluateClient(
   // variant from the bank).
   if (central.hour === 7) {
     const streak = await computeStreakEndingYesterday(userId);
-    if (streak >= 7) eligible.push("progress_streak_7");
+    // Pick the HIGHEST applicable milestone — she gets ONE celebration per
+    // day, not three stacked. Day 30 fires the 30-day variant, not also
+    // re-firing 7 and 14 (those have their own cooldowns).
+    if (streak >= 90) eligible.push("progress_streak_90");
+    else if (streak >= 60) eligible.push("progress_streak_60");
+    else if (streak >= 30) eligible.push("progress_streak_30");
+    else if (streak >= 14) eligible.push("progress_streak_14");
+    else if (streak >= 7) eligible.push("progress_streak_7");
     else if (streak >= 5) eligible.push("progress_streak_5");
     else if (streak >= 3) eligible.push("progress_streak_3");
   }
@@ -250,8 +277,11 @@ async function evaluateClient(
  * milestone we care about, and small enough to be cheap per check.
  */
 async function computeStreakEndingYesterday(userId: string): Promise<number> {
+  // 100-day window gives the 90-day milestone room plus a small buffer.
+  // Bump alongside the bounded loop below if longer milestones are added.
+  const STREAK_WINDOW_DAYS = 100;
   const windowStart = new Date();
-  windowStart.setDate(windowStart.getDate() - 30);
+  windowStart.setDate(windowStart.getDate() - STREAK_WINDOW_DAYS);
 
   const meals = await prisma.mealLog.findMany({
     where: { userId, createdAt: { gte: windowStart } },
@@ -268,8 +298,7 @@ async function computeStreakEndingYesterday(userId: string): Promise<number> {
   const cursor = new Date();
   cursor.setDate(cursor.getDate() - 1);
   let streak = 0;
-  // Bounded loop — never run more than 30 iterations (the data we pulled).
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < STREAK_WINDOW_DAYS; i++) {
     const key = centralDayKey(cursor);
     if (!loggedDays.has(key)) break;
     streak++;

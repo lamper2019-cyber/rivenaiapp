@@ -114,6 +114,14 @@ model Profile {
   // this column existed don't get marched through the tutorial; new
   // profile rows from onboarding/actions.ts explicitly set tutorialStep: 0.
   tutorialStep        Int           @default(5)
+
+  // Duolingo-style streak protection. Each client starts with one freeze;
+  // when she misses a day mid-streak the engine can spend a freeze to keep
+  // the streak alive instead of resetting it to zero. v1 of this feature
+  // ships the foundation (column + UI visibility); the auto-spend logic
+  // in sean-messages lands in a follow-up so the behavior can be tested
+  // in isolation before going live on the cron path.
+  streakFreezesAvailable Int        @default(1)
 }
 
 model MealLog {

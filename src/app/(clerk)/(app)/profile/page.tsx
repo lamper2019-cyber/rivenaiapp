@@ -168,6 +168,46 @@ export default async function ProfilePage() {
         </section>
       )}
 
+      {profile && (
+        <section className="space-y-3">
+          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+            Streak protection
+          </h2>
+          <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-4 shadow-elevation-1">
+            <div className="flex items-start gap-4">
+              <div className="shrink-0 flex items-center gap-1">
+                {Array.from({ length: Math.max(1, profile.streakFreezesAvailable) }).map(
+                  (_, i) => (
+                    <span
+                      key={i}
+                      className={`inline-block w-3.5 h-3.5 rounded-sm ${
+                        i < profile.streakFreezesAvailable
+                          ? "bg-gold"
+                          : "bg-outline-variant/40"
+                      }`}
+                      aria-hidden
+                    />
+                  ),
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-display text-headline-sm text-charcoal">
+                  {profile.streakFreezesAvailable === 0
+                    ? "No streak freezes left"
+                    : `${profile.streakFreezesAvailable} streak freeze${
+                        profile.streakFreezesAvailable === 1 ? "" : "s"
+                      } available`}
+                </p>
+                <p className="font-body text-body-md text-on-surface-variant mt-1 leading-relaxed">
+                  If you miss a day mid-streak, a freeze keeps the run alive
+                  instead of resetting you to zero. One day, one freeze.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="space-y-3">
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
           Weekly

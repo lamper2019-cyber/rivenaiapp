@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createProfile, type ProfileFormState } from "./actions";
 import { calculateTargets } from "@/lib/calculations";
+import type { QuizLeadSummary } from "./page";
 
 /**
  * Step-by-step onboarding with Sean's voice on every prompt. One question
@@ -54,25 +55,36 @@ const CYCLE_OPTIONS = [
   { value: "NA", label: "Doesn't apply", hint: "Skip the hormonal tuning" },
 ] as const;
 
-export function OnboardingFlow() {
+export function OnboardingFlow({
+  quizLead = null,
+}: {
+  quizLead?: QuizLeadSummary | null;
+}) {
   const [state, setState] = useState<State>(DEFAULT_STATE);
   const [hydrated, setHydrated] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Resume from localStorage if the user closed the tab mid-flow.
+  // Resume from localStorage if the user closed the tab mid-flow. If she
+  // came in fresh from the quiz, prefill her first name so step 0 isn't
+  // asking her something we already know.
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<State>;
         setState((s) => ({ ...s, ...parsed }));
+        setHydrated(true);
+        return;
       }
     } catch {
       /* ignore corrupt storage */
     }
+    if (quizLead?.firstName) {
+      setState((s) => ({ ...s, name: quizLead.firstName }));
+    }
     setHydrated(true);
-  }, []);
+  }, [quizLead]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -156,6 +168,43 @@ export function OnboardingFlow() {
       <Header step={state.step} onBack={back} />
 
       <div className="flex-grow flex flex-col justify-center py-8">
+        {/* Quiz-handoff banner — shown only on step 0 when we have her
+            assessment data, so she lands knowing Sean already knows the
+            shape of where she's coming from. */}
+        {state.step === 0 && quizLead && (
+          <div className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-4 shadow-elevation-1 mb-6">
+            <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+              Welcome back, {quizLead.firstName}
+            </p>
+            <p className="font-body text-body-md text-charcoal mt-2 leading-relaxed">
+              From your quiz I already know:
+            </p>
+            <ul className="font-body text-body-md text-charcoal mt-1 space-y-1">
+              <li>
+                <span className="text-on-surface-variant/80">
+                  Readiness score:
+                </span>{" "}
+                {quizLead.score} / 10
+              </li>
+              <li>
+                <span className="text-on-surface-variant/80">
+                  Biggest obstacle:
+                </span>{" "}
+                {quizLead.obstacle}
+              </li>
+              <li>
+                <span className="text-on-surface-variant/80">
+                  90-day goal:
+                </span>{" "}
+                {quizLead.goal}
+              </li>
+            </ul>
+            <p className="font-body text-body-md text-charcoal mt-3 leading-relaxed">
+              Let&apos;s plug in the rest of your numbers.
+            </p>
+          </div>
+        )}
+
         {state.step === 0 && (
           <NameStep
             value={state.name}

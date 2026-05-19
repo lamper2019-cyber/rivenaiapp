@@ -108,6 +108,46 @@ export const PROGRESS_STREAK_7_TITLES: string[] = [
   "Sean: full week",
 ];
 
+export const PROGRESS_STREAK_14_TITLES: string[] = [
+  "14 days locked in",
+  "Sean: two-week streak",
+  "Two full weeks",
+  "14 days",
+  "Sean noticed: two weeks",
+  "14-day streak",
+  "Two weeks in",
+];
+
+export const PROGRESS_STREAK_30_TITLES: string[] = [
+  "30 days. A full month.",
+  "Sean: one-month streak",
+  "One full month",
+  "30 days locked in",
+  "Sean noticed: 30 days",
+  "30-day streak",
+  "A month in",
+];
+
+export const PROGRESS_STREAK_60_TITLES: string[] = [
+  "60 days. Two months.",
+  "Sean: two-month streak",
+  "Two months locked in",
+  "60 days",
+  "Sean noticed: 60 days",
+  "60-day streak",
+  "Two months in",
+];
+
+export const PROGRESS_STREAK_90_TITLES: string[] = [
+  "90 days. Three months.",
+  "Sean: three-month streak",
+  "Three months locked",
+  "90 days",
+  "Sean noticed: 90 days",
+  "90-day streak",
+  "A full quarter",
+];
+
 /* ────────────────────────────────────────────────────────────── *
  * RHYTHM — WEDNESDAY 7 PM
  * Midweek reflection / honest check-in.
@@ -660,4 +700,91 @@ export const PROGRESS_STREAK_7_VARIANTS: string[] = [
   `7 days, full week, every meal in. Different woman than the one who started logging.`,
   `Seven straight days of meal logs. Two weeks would be next-level.`,
   `A full week of logging. The work was the show-up. You did it.`,
+];
+
+/* ────────────────────────────────────────────────────────────── *
+ * PROGRESS — 14-DAY LOG STREAK
+ * Two full weeks. The wall most women hit.
+ * ────────────────────────────────────────────────────────────── */
+
+export const PROGRESS_STREAK_14_VARIANTS: string[] = [
+  `Two full weeks of logs in a row. The "two-week wall" most women hit? You walked through it.`,
+  `14 days of logging straight. The data set is real now — patterns are showing.`,
+  `Two weeks of meal logs without a miss. That's when the work starts compounding.`,
+  `14 days. A whole pay period of tracking. The discipline's becoming who you are.`,
+  `Two solid weeks of every-meal-logged. Most people quit before they get here.`,
+  `14-day log streak. Real talk: this is when most quit. You didn't.`,
+  `Two weeks of tracking. The first one was effort. The second one was conviction.`,
+  `14 days, every meal in. Stack another two weeks — that's a month.`,
+  `Two weeks of logs. The body's getting honest data for the first time, maybe ever.`,
+  `14 days in a row of logging. Don't let this week be the one that breaks it.`,
+  `Two full weeks of meal logs. That's the work, that right there.`,
+  `14 days locked in. The next milestone is 30. Most never see it.`,
+  `Two weeks of tracking without missing. The habit's wired now.`,
+  `14 days of logs. The shape of your day-to-day is finally clear.`,
+  `Two weeks straight. The data tells the truth — and you've been telling it.`,
+  `14-day log streak. The "I'll start Monday" loop just got broken for good.`,
+  `Two weeks of every-meal-tracked. Tighten one thing this week — protein, water, steps. Pick one.`,
+  `14 days of logging. The pattern's not luck anymore. It's identity.`,
+  `Two solid weeks. The accountability's been with you, even on the hard days.`,
+  `14 days, no breaks. Lock it in.`,
+];
+
+/* ────────────────────────────────────────────────────────────── *
+ * PROGRESS — 30-DAY LOG STREAK
+ * A full month. Identity-level change.
+ * ────────────────────────────────────────────────────────────── */
+
+export const PROGRESS_STREAK_30_VARIANTS: string[] = [
+  `30 days of logging in a row. A full month of tracking. That changes who you are.`,
+  `One month of meal logs. Look at the data — that's a month of your real life on the page.`,
+  `30 days. A whole month without missing. Most never see this number.`,
+  `Thirty straight days of logging. The discipline's not a phase anymore.`,
+  `One full month of every-meal-tracked. Different woman than the one who started.`,
+  `30-day log streak. Real talk: this is the bar most coaches never get their clients to.`,
+  `A month of logs. The body's working with honest data now — that's why the changes are real.`,
+  `30 days, every meal in. You logged through PMS, through bad days, through the days you wanted to quit. That's the work.`,
+  `Thirty days locked in. The pattern is identity now.`,
+  `30 days of tracking. Two weeks felt hard. A month feels normal. That's the shift.`,
+  `One month of consistent logging. The accountability is doing its job in the background now.`,
+  `30 days. A full calendar month. That's the work nobody sees.`,
+  `Thirty straight days of meal logs. The next milestone is 60. Fewer than 1 in 10 get there.`,
+  `30 days, no breaks. Lock it in. The next one is just stacking another month.`,
+  `A month of logs in a row. The "I always quit by week 2" story isn't yours anymore.`,
+];
+
+/* ────────────────────────────────────────────────────────────── *
+ * PROGRESS — 60-DAY LOG STREAK
+ * Two months. The bar.
+ * ────────────────────────────────────────────────────────────── */
+
+export const PROGRESS_STREAK_60_VARIANTS: string[] = [
+  `60 days of logging without a miss. Two months. That's the bar.`,
+  `Two months of consistent tracking. The body's been getting honest data for nine weeks straight.`,
+  `60-day log streak. Most women never see this number — and most coaches never get their clients here.`,
+  `Two months, every meal in. The discipline isn't even discipline anymore. It's just how you live.`,
+  `60 straight days of logs. The data's a body of work now.`,
+  `Two months of tracking. You logged through a holiday, through a hard week, through the day you didn't want to.`,
+  `60 days. That's the kind of streak that actually changes scale weight in a meaningful way.`,
+  `Two solid months of every-meal-tracked. Real talk: this is elite.`,
+  `60 days of logs in a row. The next milestone is 90 — a full quarter.`,
+  `Two months, no breaks. Don't let your guard down now — finish the quarter.`,
+];
+
+/* ────────────────────────────────────────────────────────────── *
+ * PROGRESS — 90-DAY LOG STREAK
+ * Three months. A full quarter. Near-elite.
+ * ────────────────────────────────────────────────────────────── */
+
+export const PROGRESS_STREAK_90_VARIANTS: string[] = [
+  `90 days of logging in a row. A full quarter. That's the work that compounds for the rest of your life.`,
+  `Three months of every-meal-tracked. The body you have now is different from the one that started.`,
+  `90-day log streak. Three months without missing a day. Real talk: almost nobody does this.`,
+  `A full quarter of consistent logging. The data tells the whole story now.`,
+  `90 days straight. The relationship with food, with tracking, with your own honesty — different.`,
+  `Three months of logs in a row. The pattern is locked into your week, your month, your life.`,
+  `90 days, no breaks. That's the bar most fitness coaches don't believe is possible.`,
+  `Three months of meal logs. You're a different woman than the one who took the quiz.`,
+  `90 days of tracking. The next year is just stacking quarters.`,
+  `A full quarter of every-meal-logged. Don't let the foot off the gas — this is when most slip.`,
 ];
