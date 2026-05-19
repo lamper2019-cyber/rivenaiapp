@@ -6,7 +6,7 @@ import {
   generateInsights,
   nextStepFor,
   scoreBucket,
-  type BudgetTier,
+  temperatureFromScore,
 } from "@/lib/quiz";
 
 export const metadata = {
@@ -43,10 +43,14 @@ export default async function QuizResultsPage({
   const insights: string[] = parsed.success ? generateInsights(parsed.data) : [];
 
   const bucket = scoreBucket(lead.score);
-  const nextStep = nextStepFor(lead.budgetTier as BudgetTier, lead.firstName);
+  const temperature = temperatureFromScore(lead.score);
+  const nextStep = nextStepFor(temperature, lead.firstName);
 
-  // Score bar — visual fill 0-100% of cells (10 cells, one per yes).
-  const scoreCells = Array.from({ length: 10 }, (_, i) => i < lead.score);
+  // 10-cell meter — each cell is worth 10 points. Score 76 fills 8 cells
+  // (ceil), score 24 fills 3. Easier to read than 100 dots, and keeps the
+  // existing left-to-right fill animation.
+  const filledCells = Math.min(10, Math.max(0, Math.ceil(lead.score / 10)));
+  const scoreCells = Array.from({ length: 10 }, (_, i) => i < filledCells);
 
   return (
     <main className="relative min-h-screen flex flex-col px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-10 md:py-14 space-y-section-gap">
@@ -84,12 +88,12 @@ export default async function QuizResultsPage({
             {lead.score}
             <span className="font-display text-display-md text-on-surface-variant/60">
               {" "}
-              / 10
+              / 100
             </span>
           </p>
           <div
             className="flex justify-center gap-1.5"
-            aria-label={`Score: ${lead.score} out of 10`}
+            aria-label={`Score: ${lead.score} out of 100`}
           >
             {scoreCells.map((on, i) => (
               <span
@@ -156,7 +160,9 @@ export default async function QuizResultsPage({
 
       <div className="border-t border-outline-variant/40" />
 
-      {/* Next step — routed by budget tier. Last to land. */}
+      {/* Next step — routed by score temperature (HOT/WARM/COOL/COLD).
+          Last to land. External CTAs (Stripe Payment Link, PDF downloads)
+          open in a new tab so the results page stays around for re-reading. */}
       <section
         className="space-y-4 rounded-md bg-secondary-container/30 border border-gold/40 p-gutter md:p-8 shadow-elevation-1 riven-rise-in"
         style={{ animationDelay: "2200ms" }}
@@ -168,12 +174,23 @@ export default async function QuizResultsPage({
           {nextStep.copy}
         </p>
         <div className="pt-1">
-          <Link
-            href={nextStep.ctaHref}
-            className="block w-full text-center bg-charcoal text-cream py-4 rounded-full font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-95 hover:opacity-90 transition-all"
-          >
-            {nextStep.ctaLabel}
-          </Link>
+          {nextStep.ctaExternal ? (
+            <a
+              href={nextStep.ctaHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full text-center bg-charcoal text-cream py-4 rounded-full font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-95 hover:opacity-90 transition-all"
+            >
+              {nextStep.ctaLabel}
+            </a>
+          ) : (
+            <Link
+              href={nextStep.ctaHref}
+              className="block w-full text-center bg-charcoal text-cream py-4 rounded-full font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-95 hover:opacity-90 transition-all"
+            >
+              {nextStep.ctaLabel}
+            </Link>
+          )}
           {nextStep.note && (
             <p className="font-body text-label-sm text-on-surface-variant/80 text-center mt-3">
               {nextStep.note}

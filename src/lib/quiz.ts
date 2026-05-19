@@ -206,9 +206,43 @@ export const AnswersSchema = z.object({
 });
 export type Answers = z.infer<typeof AnswersSchema>;
 
-// ──────────────────────────── Scoring ────────────────────────────
+// ──────────────────────────── Scoring (0–100) ────────────────────────────
+
+/**
+ * 100-point readiness score. Mixes behavioral fitness (q1–q10) and investment
+ * intent (q14) so the same number drives downstream routing:
+ *
+ *   practices  10 yes/no × 7 pts each   →  0–70  pts
+ *   intent     q14 budget tier          →  0–30  pts
+ *                                        ────────
+ *                                          0–100
+ *
+ * The intent weighting means a behaviorally-ready person who only wants a
+ * free guide doesn't get pitched the founding offer (correctly cooler), and
+ * a behaviorally-light person who wants done-for-you still warms up enough
+ * to route past the free PDF. Both signals matter.
+ */
+export const PRACTICE_POINTS = 7;
+export const INTENT_POINTS: Record<BudgetTier, number> = {
+  FREE: 0,
+  APP: 10,
+  COACH: 20,
+  DONE_FOR_YOU: 30,
+};
 
 export function scoreFromAnswers(answers: Answers): number {
+  let yes = 0;
+  for (let i = 1; i <= 10; i++) {
+    const key = `q${i}` as keyof Answers;
+    if (answers[key] === "yes") yes++;
+  }
+  const intent = INTENT_POINTS[budgetTierFromAnswers(answers)];
+  return yes * PRACTICE_POINTS + intent;
+}
+
+/** Count of yes answers in q1–q10. Used by /coach/leads for at-a-glance
+ *  behavioral fitness, separate from the composite score above. */
+export function practiceYesCount(answers: Answers): number {
   let yes = 0;
   for (let i = 1; i <= 10; i++) {
     const key = `q${i}` as keyof Answers;
@@ -228,6 +262,23 @@ export function budgetTierFromAnswers(answers: Answers): BudgetTier {
     case "done_for_you":
       return "DONE_FOR_YOU";
   }
+}
+
+// ──────────────────────────── Temperature buckets ────────────────────────────
+
+export type Temperature = "HOT" | "WARM" | "COOL" | "COLD";
+
+/**
+ *   HOT   ≥ 75   — ready + invested  → founding-member offer
+ *   WARM  50–74  — partial fit       → VSL gate, then signup
+ *   COOL  25–49  — needs education   → free chapters (20 Pound Truth)
+ *   COLD  < 25   — far from ready    → free starter guide
+ */
+export function temperatureFromScore(score: number): Temperature {
+  if (score >= 75) return "HOT";
+  if (score >= 50) return "WARM";
+  if (score >= 25) return "COOL";
+  return "COLD";
 }
 
 // ──────────────────────────── Insights ────────────────────────────
@@ -350,72 +401,105 @@ export type ScoreBucket = {
   body: string;
 };
 
+/**
+ * 0-100 score → bucket headline + framing copy. Tracks the same temperature
+ * thresholds the router uses so the framing matches the CTA.
+ */
 export function scoreBucket(score: number): ScoreBucket {
-  if (score <= 3) {
+  const t = temperatureFromScore(score);
+  if (t === "HOT") {
     return {
-      headline: "Plenty of room to build",
-      body: "You're at the start. The good news: every change you make moves the needle. You haven't been failing — you've been missing the system.",
+      headline: "You're ready. This is the moment.",
+      body: "Strong practices, real commitment, no hesitation. This is where peaceful discipline starts paying compound returns. You don't need rebuilding — you need a system that holds you to your own standard.",
     };
   }
-  if (score <= 6) {
+  if (t === "WARM") {
     return {
-      headline: "Solid foundation, big gaps",
-      body: "You've got pieces in place — but the gaps are where the work is. With the right plan, the next 12 weeks deliver real visible change.",
+      headline: "Close. Solid foundation, real gaps.",
+      body: "You've got pieces in place — but the gaps are where the work is. With the right plan, the next 12 weeks deliver real visible change. The next step is seeing exactly how this works for women your age.",
+    };
+  }
+  if (t === "COOL") {
+    return {
+      headline: "Plenty of room to build.",
+      body: "You're at the start. The good news: every change you make moves the needle. You haven't been failing — you've been missing the system. Get the framework first, then we can talk about the next level.",
     };
   }
   return {
-    headline: "Strong execution, refine and go",
-    body: "You're already doing the foundations. You don't need rebuilding — you need refinement, accountability, and someone keeping you honest week to week.",
+    headline: "Start where you are.",
+    body: "No shame, no rush. The system that worked at 25 isn't going to work at 45 — that's not a personal failure, it's a math problem. Read this first. When you're ready to do the work, RIVEN will be here.",
   };
 }
 
 export type NextStep = {
-  tag: string;        // tiny eyebrow label above the CTA
-  copy: string;       // 1–2 sentence framing
-  ctaLabel: string;   // button text
-  ctaHref: string;    // link target
-  note?: string;      // small footnote under the button
+  tag: string; // tiny eyebrow label above the CTA
+  copy: string; // 1–2 sentence framing
+  ctaLabel: string; // button text
+  ctaHref: string; // link target
+  ctaExternal?: boolean; // external link (open in new tab)
+  note?: string; // small footnote under the button
 };
 
+/** PDFs in /public/downloads. COLD currently routes to the 20-pound-truth
+ *  preview too — swap to the 35+ Black women freebie once Sean drops it. */
+const FREEBIE_20_POUND = "/downloads/20-pound-truth.pdf";
+const FREEBIE_35_PLUS_FALLBACK = FREEBIE_20_POUND;
+
 /**
- * Routes the results-page CTA off Q14. Every tier currently funnels to the
- * $50/mo app trial — that's the only offer that exists today. The framing
- * changes so the right person sees the right pitch. When 1:1 coaching opens,
- * the COACH / DONE_FOR_YOU branches get their own routes.
+ * Result-page CTA routing, driven by the 0-100 temperature bucket:
+ *
+ *   HOT  → $47 founding-member offer via STRIPE_FOUNDING_CHECKOUT_URL
+ *           (falls back to /sign-up if env var isn't set yet)
+ *   WARM → /quiz/vsl — watch the breakdown, then sign up
+ *   COOL → 20 Pound Truth book preview PDF
+ *   COLD → 35+ Black women freebie PDF (TODO: Sean drops it; using
+ *           20-pound-truth preview as fallback until then)
  */
-export function nextStepFor(tier: BudgetTier, firstName: string): NextStep {
-  switch (tier) {
-    case "FREE":
+export function nextStepFor(
+  temperature: Temperature,
+  firstName: string,
+): NextStep {
+  switch (temperature) {
+    case "HOT": {
+      // Stripe Payment Link for the $47 founding-member offer. Set via
+      // STRIPE_FOUNDING_CHECKOUT_URL env var on Railway; until then we
+      // soft-fail to the existing trial signup so HOT leads still convert.
+      const stripeUrl = process.env.STRIPE_FOUNDING_CHECKOUT_URL;
+      const isStripe = !!stripeUrl;
       return {
         tag: "Your next step",
-        copy: `Start with the 7-day RIVEN trial, ${firstName}. No card charged today. See the system from the inside, then decide.`,
-        ctaLabel: "Start the free trial",
-        ctaHref: "/sign-up",
-        note: "Card held on day 8 to continue. Cancel any time before then and pay nothing.",
+        copy: `${firstName}, you're ready. The founding-member rate is open right now — $47/mo locked in for life, no markup later. The window closes when the founding cohort fills.`,
+        ctaLabel: "Claim my $47 founding spot",
+        ctaHref: stripeUrl ?? "/sign-up",
+        ctaExternal: isStripe,
+        note: "7-day trial · cancel before day 8 and pay nothing · $47/mo for life after.",
       };
-    case "APP":
+    }
+    case "WARM":
       return {
         tag: "Your next step",
-        copy: `RIVEN is exactly what you described, ${firstName}. Daily structure, weekly check-ins, your numbers in your pocket. $50/mo with a 7-day trial.`,
-        ctaLabel: "Start your 7-day trial",
-        ctaHref: "/sign-up",
-        note: "Card held on day 8 to continue. Cancel any time before then and pay nothing.",
+        copy: `${firstName}, before you decide — watch the 7-minute breakdown. It shows exactly how peaceful discipline turns into pounds-off for women 35+. Then choose.`,
+        ctaLabel: "Watch the breakdown",
+        ctaHref: "/quiz/vsl",
+        note: "Free · no signup needed to watch.",
       };
-    case "COACH":
+    case "COOL":
       return {
         tag: "Your next step",
-        copy: `${firstName}, 1:1 coaching slots open quarterly. Start the app trial first — Sean reads every active client's data before opening new coaching seats.`,
-        ctaLabel: "Start the app trial first",
-        ctaHref: "/sign-up",
-        note: "Coaching tier opens next quarter. App trial puts you on the shortlist.",
+        copy: `${firstName}, the framework matters before the app does. Read the first three chapters of The 20 Pound Truth — it's the foundation of everything RIVEN does.`,
+        ctaLabel: "Download the free chapters",
+        ctaHref: FREEBIE_20_POUND,
+        ctaExternal: true,
+        note: "Free PDF · 20 pages · no signup, no upsell.",
       };
-    case "DONE_FOR_YOU":
+    case "COLD":
       return {
         tag: "Your next step",
-        copy: `Private RIVEN (meal plans + 1:1) is invite-only, ${firstName}. The app trial is how Sean evaluates fit — start there.`,
-        ctaLabel: "Start the app trial",
-        ctaHref: "/sign-up",
-        note: "Sean reviews every active client for the private tier each quarter.",
+        copy: `${firstName}, start here. This guide breaks down why the rules change after 35 — and what works instead. No app, no purchase, just the truth.`,
+        ctaLabel: "Get the free guide",
+        ctaHref: FREEBIE_35_PLUS_FALLBACK,
+        ctaExternal: true,
+        note: "Free PDF · read it on your phone today.",
       };
   }
 }
