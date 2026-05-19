@@ -4,6 +4,8 @@ This file tells Claude how to work on RIVEN. Read it first.
 
 The full background (tech stack, routes, schema, infra) is in [HANDOFF.md](./HANDOFF.md). This file is the **design and voice rules** only.
 
+The emotional core — what every copy line, screen, and feature must feel like — is in [BRAND.md](./BRAND.md). Read it before writing for RIVEN. The test for every decision: **"Does this feel like peaceful discipline?"** The tagline that compresses it: **"Steady wins."**
+
 ---
 
 ## What RIVEN is
