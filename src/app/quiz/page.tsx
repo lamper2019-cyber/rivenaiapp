@@ -20,9 +20,20 @@ export default function QuizLandingPage() {
         <div className="max-w-5xl mx-auto px-container-mobile md:px-container-desktop h-16 flex items-center justify-between">
           <Link
             href="/"
-            className="font-display text-headline-md tracking-[0.2em] text-charcoal"
+            className="flex items-center gap-2.5 text-charcoal"
+            aria-label="RIVEN home"
           >
-            RIVEN
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/riven-logo.png"
+              alt=""
+              width={500}
+              height={500}
+              className="w-8 h-8 object-contain"
+            />
+            <span className="font-display text-headline-md tracking-[0.2em]">
+              RIVEN
+            </span>
           </Link>
           <div className="flex items-center gap-4">
             <Link
