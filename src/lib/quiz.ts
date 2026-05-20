@@ -318,7 +318,7 @@ const INSIGHT_BANK: Record<
   q4: {
     priority: 7,
     corrective:
-      "Without honest data, you're guessing. Thirty days of consistent tracking teaches you more about your body than any diet book ever has.",
+      "Two weeks of honest tracking shows you which days are killing you. Without it, every plan is a guess.",
     affirming:
       "You're tracking. That's the difference between people who stay stuck and people who actually figure it out.",
   },
@@ -416,7 +416,7 @@ export function scoreBucket(score: number): ScoreBucket {
   if (t === "WARM") {
     return {
       headline: "Close. Solid foundation, real gaps.",
-      body: "You've got pieces in place — but the gaps are where the work is. With the right plan, the next 12 weeks deliver real visible change. The next step is seeing exactly how this works for women your age.",
+      body: "You've got pieces in place — but the gaps are where the work is. With the right plan, the next 12 weeks deliver real visible change.",
     };
   }
   if (t === "COOL") {
@@ -490,7 +490,7 @@ export function nextStepFor(
       }
       return {
         tag: "Your next step",
-        copy: `${firstName}, you asked for an app with daily structure. Before you start the trial, watch the 7-minute breakdown — it's the clearest explanation of how RIVEN actually works for women 35+.`,
+        copy: `${firstName}, you asked for an app — watch the 7-minute breakdown first, then start the trial at the end of the video.`,
         ctaLabel: "Watch the breakdown",
         ctaHref: "/quiz/vsl",
         note: "Free · then signup at the end of the video.",
