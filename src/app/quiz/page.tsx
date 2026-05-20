@@ -41,82 +41,46 @@ export default function QuizLandingPage() {
         </div>
       </nav>
 
-      {/* ───────────── Hero ───────────── */}
+      {/* ───────────── Hero (text-only — portrait moved to Mission) ─────── */}
       <section className="relative overflow-hidden pt-12 md:pt-20 pb-16 md:pb-24">
-        <div className="max-w-5xl mx-auto px-container-mobile md:px-container-desktop grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          {/* Hook side */}
-          <div className="text-center lg:text-left space-y-6 order-2 lg:order-1">
-            <span className="inline-block bg-tertiary-container/40 border border-sage/30 text-charcoal px-4 py-1.5 rounded-full font-body text-label-sm tracking-widest uppercase">
-              The RIVEN Readiness Assessment
-            </span>
-            <h1 className="font-display text-display-md md:text-display-lg text-charcoal tracking-tight text-balance leading-[1.05]">
-              Frustrated your body isn&apos;t responding the way it used to
-              <span className="text-on-surface-variant"> — </span>
-              <span className="italic font-display">even though</span>{" "}
-              you&apos;re doing everything you&apos;re &ldquo;supposed&rdquo; to?
-            </h1>
-            <p className="font-body text-body-lg text-on-surface-variant max-w-xl mx-auto lg:mx-0">
-              Answer 15 questions and find out exactly why — and what to do
-              about it. Built for Black women 35–55 doing real body
-              recomposition.
-            </p>
-            <div className="pt-2">
-              <Link
-                href="/quiz/start"
-                className="block w-full sm:inline-block sm:w-auto sm:min-w-[20rem] text-center bg-charcoal text-cream py-4 px-10 rounded-full font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-95 hover:opacity-90 transition-all"
-              >
-                Start the assessment
-              </Link>
-            </div>
-            <p className="font-body text-label-sm text-on-surface-variant/70 pt-1">
-              3 minutes · free · instant breakdown
-            </p>
+        <div className="max-w-3xl mx-auto px-container-mobile md:px-container-desktop text-center space-y-6">
+          <span className="inline-block bg-tertiary-container/40 border border-sage/30 text-charcoal px-4 py-1.5 rounded-full font-body text-label-sm tracking-widest uppercase">
+            The RIVEN Readiness Assessment
+          </span>
+          <h1 className="font-display text-display-md md:text-display-lg text-charcoal tracking-tight text-balance leading-[1.05]">
+            Frustrated your body isn&apos;t responding the way it used to
+            <span className="text-on-surface-variant"> — </span>
+            <span className="italic font-display">even though</span>{" "}
+            you&apos;re doing everything you&apos;re &ldquo;supposed&rdquo; to?
+          </h1>
+          <p className="font-body text-body-lg text-on-surface-variant max-w-xl mx-auto">
+            Answer 15 questions and find out exactly why — and what to do
+            about it. Built for Black women 35–55 doing real body
+            recomposition.
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/quiz/start"
+              className="block w-full sm:inline-block sm:w-auto sm:min-w-[20rem] text-center bg-charcoal text-cream py-4 px-10 rounded-full font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-95 hover:opacity-90 transition-all"
+            >
+              Start the assessment
+            </Link>
           </div>
-
-          {/* Portrait side */}
-          <div className="relative order-1 lg:order-2">
-            {/* Decorative blurs behind the photo */}
-            <div
-              className="absolute -top-8 -right-8 w-60 h-60 bg-gold/15 rounded-full blur-3xl pointer-events-none"
-              aria-hidden
-            />
-            <div
-              className="absolute -bottom-10 -left-10 w-72 h-72 bg-sage/15 rounded-full blur-3xl pointer-events-none"
-              aria-hidden
-            />
-
-            <div className="relative rounded-[2rem] overflow-hidden border-[10px] border-cream shadow-elevation-3 bg-charcoal/10">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/sean-portrait.jpg"
-                alt="Sean Williams, coach and creator of RIVEN"
-                width={948}
-                height={1117}
-                className="w-full aspect-[4/5] object-cover"
-              />
-
-              {/* Glass caption */}
-              <div className="absolute bottom-5 left-5 right-5 bg-cream/70 backdrop-blur-xl border border-cream/60 rounded-2xl px-4 py-3 shadow-elevation-2">
-                <div className="flex items-center gap-3">
-                  <span
-                    className="shrink-0 w-9 h-9 rounded-full bg-charcoal text-gold flex items-center justify-center font-display text-headline-sm leading-none"
-                    aria-hidden
-                  >
-                    S
-                  </span>
-                  <div className="min-w-0">
-                    <p className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant leading-tight">
-                      Your coach
-                    </p>
-                    <p className="font-display text-headline-sm text-charcoal leading-tight truncate">
-                      Sean Williams
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <p className="font-body text-label-sm text-on-surface-variant/70 pt-1">
+            3 minutes · free · instant breakdown
+          </p>
         </div>
+
+        {/* Decorative blurs — moved out from behind the portrait so the
+            hero still has the same warm/sage ambient feel. */}
+        <div
+          className="absolute top-12 right-[-8%] w-72 h-72 bg-gold/15 rounded-full blur-3xl pointer-events-none -z-10"
+          aria-hidden
+        />
+        <div
+          className="absolute bottom-0 left-[-8%] w-80 h-80 bg-sage/15 rounded-full blur-3xl pointer-events-none -z-10"
+          aria-hidden
+        />
       </section>
 
       {/* ───────────── 3 pillars ───────────── */}
@@ -160,32 +124,59 @@ export default function QuizLandingPage() {
         </div>
       </section>
 
-      {/* ───────────── Mission + stats ───────────── */}
+      {/* ───────────── Mission — portrait + bio ───────────── */}
       <section className="py-16 md:py-24">
-        <div className="max-w-5xl mx-auto px-container-mobile md:px-container-desktop space-y-10">
-          <div className="space-y-4 max-w-2xl">
-            <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-              Our approach
-            </p>
-            <h2 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal text-balance">
-              Built for the women every other program forgot
-            </h2>
-            <p className="font-body text-body-lg text-on-surface-variant leading-relaxed">
-              I built RIVEN for the women I&apos;ve been coaching for years —
-              Black women 35–55 who&apos;d done every program twice and still
-              felt stuck. The body you had at 25 isn&apos;t the body you have
-              at 45, and the program has to match.
-            </p>
-            <p className="font-body text-body-lg text-on-surface-variant leading-relaxed">
-              Most women your age lose 3–5% of their muscle per decade if they
-              don&apos;t actively train for it. That&apos;s why weight-loss-only
-              plans stop working — and why &ldquo;eat less, move more&rdquo;
-              keeps failing you. RIVEN is built around the levers that actually
-              move the needle when your hormones, your sleep, and your life
-              doesn&apos;t look like a 25-year-old&apos;s anymore.
-            </p>
-          </div>
+        <div className="max-w-5xl mx-auto px-container-mobile md:px-container-desktop">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+            {/* Portrait — left column on lg+, top on mobile. */}
+            <div className="relative">
+              <div
+                className="absolute -top-8 -right-8 w-60 h-60 bg-gold/15 rounded-full blur-3xl pointer-events-none"
+                aria-hidden
+              />
+              <div
+                className="absolute -bottom-10 -left-10 w-72 h-72 bg-sage/15 rounded-full blur-3xl pointer-events-none"
+                aria-hidden
+              />
+              <div className="relative rounded-[2rem] overflow-hidden border-[10px] border-cream shadow-elevation-3 bg-charcoal/10">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/sean-portrait.jpg"
+                  alt="Sean Williams, coach and creator of RIVEN"
+                  width={948}
+                  height={1117}
+                  className="w-full aspect-[4/5] object-cover"
+                />
+              </div>
+            </div>
 
+            {/* Bio — right column on lg+, below photo on mobile. */}
+            <div className="space-y-4">
+              <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+                Our approach
+              </p>
+              <h2 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal text-balance">
+                Built for the women every other program forgot
+              </h2>
+              <p className="font-body text-body-lg text-on-surface-variant leading-relaxed">
+                I built RIVEN for the women I&apos;ve been coaching for years —
+                Black women 35–55 who&apos;d done every program twice and still
+                felt stuck. The body you had at 25 isn&apos;t the body you have
+                at 45, and the program has to match.
+              </p>
+              <p className="font-body text-body-lg text-on-surface-variant leading-relaxed">
+                Most women your age lose 3–5% of their muscle per decade if they
+                don&apos;t actively train for it. That&apos;s why weight-loss-only
+                plans stop working — and why &ldquo;eat less, move more&rdquo;
+                keeps failing you. RIVEN is built around the levers that actually
+                move the needle when your hormones, your sleep, and your life
+                doesn&apos;t look like a 25-year-old&apos;s anymore.
+              </p>
+              <p className="font-body text-label-md tracking-wide text-charcoal pt-2">
+                — Sean Williams, RIVEN
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
