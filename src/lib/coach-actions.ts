@@ -516,3 +516,130 @@ export async function setClientCalorieSchedule(
   revalidatePath("/dashboard");
   return { ok: true, cleared: false };
 }
+
+// ─────────────────────── Comp management (per-client + bulk) ───────────────────────
+
+const SetClientCompSchema = z.object({
+  clientUserId: z.string().min(1),
+  // "on" sets subscriptionStatus="comped" (paywall bypass, Stripe webhook
+  // explicitly won't overwrite it). "off" clears the status to null so she
+  // gets routed through the regular paywall on her next page load.
+  comp: z.enum(["on", "off"]),
+});
+
+export type SetClientCompResult =
+  | { ok: true; comp: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Flip a single client between comped (free forever, paywall bypass) and
+ * not-comped (cleared status → hits /pricing on next visit). Coach-only.
+ */
+export async function setClientComp(
+  formData: FormData,
+): Promise<SetClientCompResult> {
+  const { userId } = auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: isClerkConfigured ? "Not signed in." : "Add Clerk keys to .env.local.",
+    };
+  }
+
+  const parsed = SetClientCompSchema.safeParse({
+    clientUserId: formData.get("clientUserId"),
+    comp: formData.get("comp"),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  let coach;
+  try {
+    coach = await prisma.user.findUnique({ where: { clerkId: userId } });
+  } catch {
+    return { ok: false, error: "Database not connected." };
+  }
+  if (!coach) return { ok: false, error: "Coach record not found." };
+  if (coach.role !== "COACH") {
+    return { ok: false, error: "Only coaches can change comp status." };
+  }
+
+  const client = await prisma.user.findUnique({
+    where: { id: parsed.data.clientUserId },
+    select: { id: true, role: true },
+  });
+  if (!client) return { ok: false, error: "Client not found." };
+  if (client.role !== "CLIENT") {
+    return { ok: false, error: "Recipient must be a client." };
+  }
+
+  const turningOn = parsed.data.comp === "on";
+  await prisma.user.update({
+    where: { id: client.id },
+    data: { subscriptionStatus: turningOn ? "comped" : null },
+  });
+
+  revalidatePath(`/coach/clients/${client.id}`);
+  revalidatePath("/coach/clients");
+  revalidatePath("/dashboard");
+  return { ok: true, comp: turningOn };
+}
+
+export type CompAllClientsResult =
+  | { ok: true; comped: number; total: number; alreadyComped: number }
+  | { ok: false; error: string };
+
+/**
+ * Bulk-comp every existing CLIENT user — Sean's "grandfather them all in
+ * for now" button. Skips anyone already on `comped` so the report counts
+ * are honest. Safe to run multiple times; idempotent. Future signups still
+ * go through the normal /pricing + Stripe flow.
+ */
+export async function compAllExistingClients(): Promise<CompAllClientsResult> {
+  const { userId } = auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: isClerkConfigured ? "Not signed in." : "Add Clerk keys to .env.local.",
+    };
+  }
+
+  let coach;
+  try {
+    coach = await prisma.user.findUnique({ where: { clerkId: userId } });
+  } catch {
+    return { ok: false, error: "Database not connected." };
+  }
+  if (!coach) return { ok: false, error: "Coach record not found." };
+  if (coach.role !== "COACH") {
+    return { ok: false, error: "Only coaches can bulk-comp clients." };
+  }
+
+  const allClients = await prisma.user.count({ where: { role: "CLIENT" } });
+  const alreadyComped = await prisma.user.count({
+    where: { role: "CLIENT", subscriptionStatus: "comped" },
+  });
+
+  const { count } = await prisma.user.updateMany({
+    where: {
+      role: "CLIENT",
+      OR: [
+        { subscriptionStatus: { not: "comped" } },
+        { subscriptionStatus: null },
+      ],
+    },
+    data: { subscriptionStatus: "comped" },
+  });
+
+  revalidatePath("/coach/clients");
+  revalidatePath("/coach/profile");
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    comped: count,
+    total: allClients,
+    alreadyComped,
+  };
+}

@@ -16,6 +16,7 @@ import { LogHeatmap } from "@/components/log-heatmap";
 import { SendMessageForm } from "./send-message-form";
 import { EditTargetsForm } from "./edit-targets-form";
 import { CalorieScheduleForm } from "./calorie-schedule-form";
+import { CompToggle } from "./comp-toggle";
 import { parseSchedule } from "@/lib/calorie-schedule";
 
 const PHASE_LABEL: Record<string, string> = {
@@ -58,6 +59,7 @@ export default async function CoachClientDetailPage({
       email: true,
       role: true,
       createdAt: true,
+      subscriptionStatus: true,
       profile: true,
       weeklyCheckIns: {
         orderBy: { weekStart: "desc" },
@@ -242,6 +244,10 @@ export default async function CoachClientDetailPage({
             clientUserId={client.id}
             defaultCalories={profile.cutCalories}
             initialSchedule={parseSchedule(profile.dailyCalorieSchedule)}
+          />
+          <CompToggle
+            clientUserId={client.id}
+            initialStatus={client.subscriptionStatus}
           />
         </section>
       )}

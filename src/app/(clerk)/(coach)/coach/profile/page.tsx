@@ -3,6 +3,7 @@ import { SignOutButton } from "@clerk/nextjs";
 import { auth, currentUser, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TriggerMondayCheckinsButton } from "./trigger-monday-checkins-button";
+import { CompAllClientsButton } from "./comp-all-clients-button";
 
 /**
  * Coach profile page. Lives under (coach) so the layout already gates by
@@ -87,11 +88,14 @@ export default async function CoachProfilePage() {
       </section>
 
       {/* Coaching tools — manual triggers Sean reaches for periodically. */}
-      <section className="space-y-3">
+      <section className="space-y-6">
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
           Coaching tools
         </h2>
         <TriggerMondayCheckinsButton />
+        <div className="border-t border-outline-variant/40 pt-6">
+          <CompAllClientsButton />
+        </div>
       </section>
 
       {/* Account actions */}
