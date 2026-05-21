@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SignOutButton } from "@clerk/nextjs";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/stripe";
@@ -28,14 +29,24 @@ export default async function PricingPage({
 
   let signedIn = false;
   let alreadySubscribed = false;
+  let signedInEmail: string | null = null;
+  let signedInRole: string | null = null;
+  let signedInStatus: string | null = null;
 
   if (userId) {
     signedIn = true;
     try {
       const user = await prisma.user.findUnique({
         where: { clerkId: userId },
-        select: { subscriptionStatus: true, role: true },
+        select: {
+          email: true,
+          role: true,
+          subscriptionStatus: true,
+        },
       });
+      signedInEmail = user?.email ?? null;
+      signedInRole = user?.role ?? null;
+      signedInStatus = user?.subscriptionStatus ?? null;
       if (user?.role === "COACH" || hasActiveSubscription(user?.subscriptionStatus)) {
         alreadySubscribed = true;
       }
@@ -46,11 +57,28 @@ export default async function PricingPage({
 
   return (
     <main className="relative min-h-screen flex flex-col px-container-mobile md:px-container-desktop max-w-3xl mx-auto py-12">
-      <header className="flex justify-between items-center mb-12">
+      <header className="flex justify-between items-center mb-12 gap-3 flex-wrap">
         <Link href="/" className="font-display text-headline-md tracking-[0.2em] text-charcoal">
           RIVEN
         </Link>
-        {!signedIn && (
+        {signedIn ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            {signedInEmail && (
+              <span className="font-body text-label-sm text-on-surface-variant">
+                Signed in as{" "}
+                <span className="text-charcoal">{signedInEmail}</span>
+              </span>
+            )}
+            <SignOutButton redirectUrl="/">
+              <button
+                type="button"
+                className="font-body text-label-md tracking-wide text-charcoal underline underline-offset-4 hover:opacity-70 transition-opacity"
+              >
+                Sign out
+              </button>
+            </SignOutButton>
+          </div>
+        ) : (
           <Link
             href="/sign-in"
             className="font-body text-label-md tracking-wide text-charcoal underline underline-offset-4"
@@ -76,6 +104,29 @@ export default async function PricingPage({
           <div className="rounded-md bg-soft-red/10 border border-soft-red/40 px-gutter py-3 max-w-md">
             <p className="font-body text-body-md text-charcoal">
               Trial sign-up was canceled. No charge happened. Try again when you&apos;re ready.
+            </p>
+          </div>
+        )}
+
+        {/* Signed-in-but-not-subscribed explainer. Trips when the (app)
+            paywall bounces a client here from /dashboard — most often
+            because her sub lapsed, she never finished onboarding payment,
+            or she was supposed to be comped and wasn't. Surfacing the
+            current status helps Sean (and any client) understand why
+            they landed here instead of dashboard. */}
+        {signedIn && !alreadySubscribed && (
+          <div className="rounded-md bg-secondary-container/30 border border-gold/40 px-gutter py-3 max-w-md text-left space-y-1">
+            <p className="font-body text-body-md text-charcoal">
+              You&apos;re signed in but don&apos;t have an active subscription
+              yet — start your trial below, or sign out to switch accounts.
+            </p>
+            <p className="font-body text-label-sm text-on-surface-variant/80">
+              Current state ·{" "}
+              <span className="text-charcoal">role: {signedInRole ?? "—"}</span>
+              {" · "}
+              <span className="text-charcoal">
+                status: {signedInStatus ?? "none"}
+              </span>
             </p>
           </div>
         )}
