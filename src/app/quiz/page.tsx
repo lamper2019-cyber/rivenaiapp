@@ -17,10 +17,10 @@ export default function QuizLandingPage() {
     <main className="relative min-h-screen flex flex-col">
       {/* ───────────── Top nav ───────────── */}
       <nav className="sticky top-0 z-40 bg-cream/80 backdrop-blur-xl border-b border-outline-variant/30">
-        <div className="max-w-5xl mx-auto px-container-mobile md:px-container-desktop h-16 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-container-mobile md:px-container-desktop h-20 flex items-center justify-between">
           <Link
             href="/"
-            className="flex items-center gap-2.5 text-charcoal"
+            className="flex items-center text-charcoal"
             aria-label="RIVEN home"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -29,11 +29,8 @@ export default function QuizLandingPage() {
               alt=""
               width={500}
               height={500}
-              className="w-8 h-8 object-contain"
+              className="h-16 w-auto object-contain"
             />
-            <span className="font-display text-headline-md tracking-[0.2em]">
-              RIVEN
-            </span>
           </Link>
           <div className="flex items-center gap-4">
             <Link
