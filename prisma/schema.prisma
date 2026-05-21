@@ -122,6 +122,14 @@ model Profile {
   // in sean-messages lands in a follow-up so the behavior can be tested
   // in isolation before going live on the cron path.
   streakFreezesAvailable Int        @default(1)
+
+  // Per-day-of-week calorie schedule. NULL = use the flat cutCalories
+  // for every day (default behavior for almost every client). When set,
+  // shape is { Sun, Mon, Tue, Wed, Thu, Fri, Sat → number }, keyed by
+  // Central-time day-of-week label. Used for calorie-cycling protocols
+  // (rest / lift / refeed days) on advanced clients like Rora. The
+  // helper in src/lib/calorie-schedule.ts handles parse + fallback.
+  dailyCalorieSchedule   Json?
 }
 
 model MealLog {

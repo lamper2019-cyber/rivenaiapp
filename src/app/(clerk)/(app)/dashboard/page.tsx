@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
+import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
 import { pickQuoteForDate } from "@/lib/daily-quotes";
 import { ASK_RIVEN_PROMPTS } from "@/lib/ask-riven-prompts";
 import { RotatingText } from "@/components/rotating-text";
@@ -68,7 +69,11 @@ export default async function DashboardPage() {
     recentCoachMessages,
   } = data;
 
-  const calorieRemaining = profile.cutCalories - todayTotals.calories;
+  // Honors per-day calorie cycling (Rora et al.); falls back to flat
+  // cutCalories when no schedule is set, so every other client sees the
+  // same number they always have.
+  const calorieTarget = getTodayCalorieTarget(profile);
+  const calorieRemaining = calorieTarget - todayTotals.calories;
   const proteinRemaining = profile.proteinFloor - todayTotals.protein;
   const stepRemaining = STEP_GOAL - todayTotals.steps;
 
@@ -124,7 +129,7 @@ export default async function DashboardPage() {
           <ProgressCard
             label="Calories"
             value={todayTotals.calories}
-            target={profile.cutCalories}
+            target={calorieTarget}
             unit=""
             remainingLabel={
               calorieRemaining > 0

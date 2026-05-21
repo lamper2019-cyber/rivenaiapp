@@ -5,6 +5,7 @@
  */
 
 import type { Profile } from "@prisma/client";
+import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
 
 export const CHAT_PERSONA_PROMPT = `You are RIVEN, the AI coach inside a premium body-recomposition program for Black women aged 35-55. You speak in Sean's voice: direct, honest, no-BS, never preachy, never performative.
 
@@ -205,6 +206,10 @@ export function buildClientContext(profile: Profile, todayTotals: {
   calories: number;
   protein: number;
 } | null): string {
+  // Today's target — pulls from per-day schedule when set, falls back to
+  // flat cutCalories. So calorie-cycling clients see the right number
+  // here without changing every consumer in the function body.
+  const todayCalorieTarget = getTodayCalorieTarget(profile);
   const lostSinceStart = profile.startWeight - profile.currentWeight;
   const remainingToGoal = profile.currentWeight - profile.goalWeight;
 
@@ -240,7 +245,11 @@ export function buildClientContext(profile: Profile, todayTotals: {
     ``,
     `Daily targets:`,
     `- Maintenance calories: ${profile.maintenanceCalories}`,
-    `- Cut calories: ${profile.cutCalories}`,
+    `- Cut calories (today): ${todayCalorieTarget}${
+      todayCalorieTarget !== profile.cutCalories
+        ? ` (cycled — base ${profile.cutCalories})`
+        : ""
+    }`,
     `- Protein floor: ${profile.proteinFloor}g`,
     `- Weekly calorie budget: ${profile.weeklyBudget}`,
     ``,
@@ -252,7 +261,7 @@ export function buildClientContext(profile: Profile, todayTotals: {
     lines.push(
       ``,
       `TODAY SO FAR`,
-      `- Calories logged: ${todayTotals.calories} / ${profile.cutCalories}`,
+      `- Calories logged: ${todayTotals.calories} / ${todayCalorieTarget}`,
       `- Protein logged: ${todayTotals.protein}g / ${profile.proteinFloor}g`,
     );
   }

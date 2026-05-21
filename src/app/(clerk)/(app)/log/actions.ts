@@ -11,6 +11,7 @@ import {
   persistMealLog,
   type MealAnalysis,
 } from "@/lib/meal-pipeline";
+import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
 
 const MEAL_DESCRIPTION_MAX = 500;
 
@@ -97,7 +98,9 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
     analysis = await analyzeMeal({
       profile: {
         name: profile.name,
-        cutCalories: profile.cutCalories,
+        // Today's target — honors per-day calorie cycling when the
+        // client has a schedule set; falls back to flat cutCalories.
+        cutCalories: getTodayCalorieTarget(profile),
         proteinFloor: profile.proteinFloor,
       },
       todayTotals: currentTotals,

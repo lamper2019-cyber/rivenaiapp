@@ -12,6 +12,7 @@ import {
   type ChatContextCheckIn,
 } from "@/lib/chat-prompt";
 import { analyzeMeal, persistMealLog } from "@/lib/meal-pipeline";
+import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
 import type { ChatRole } from "@prisma/client";
 import type Anthropic from "@anthropic-ai/sdk";
 
@@ -367,7 +368,12 @@ async function runChatTool(args: {
   name: string;
   input: unknown;
   userId: string;
-  profile: { name: string; cutCalories: number; proteinFloor: number };
+  profile: {
+    name: string;
+    cutCalories: number;
+    proteinFloor: number;
+    dailyCalorieSchedule: unknown;
+  };
   todayTotals: { calories: number; protein: number } | null;
 }) {
   if (args.name !== "log_meal") {
@@ -394,7 +400,12 @@ async function runChatTool(args: {
   };
 
   const analysis = await analyzeMeal({
-    profile: args.profile,
+    profile: {
+      name: args.profile.name,
+      // Honors per-day calorie cycling when set; flat cutCalories otherwise.
+      cutCalories: getTodayCalorieTarget(args.profile),
+      proteinFloor: args.profile.proteinFloor,
+    },
     todayTotals: todayBuckets,
     description,
   });
