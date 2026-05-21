@@ -17,7 +17,7 @@ export default function QuizLandingPage() {
     <main className="relative min-h-screen flex flex-col">
       {/* ───────────── Top nav ───────────── */}
       <nav className="sticky top-0 z-40 bg-cream/80 backdrop-blur-xl border-b border-outline-variant/30">
-        <div className="max-w-5xl mx-auto px-container-mobile md:px-container-desktop h-20 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-container-mobile md:px-container-desktop h-24 flex items-center justify-between">
           <Link
             href="/"
             className="flex items-center text-charcoal"
@@ -29,7 +29,7 @@ export default function QuizLandingPage() {
               alt=""
               width={500}
               height={500}
-              className="h-16 w-auto object-contain"
+              className="h-20 w-auto object-contain"
             />
           </Link>
           <div className="flex items-center gap-4">
@@ -52,9 +52,6 @@ export default function QuizLandingPage() {
       {/* ───────────── Hero (text-only — portrait moved to Mission) ─────── */}
       <section className="relative overflow-hidden pt-12 md:pt-20 pb-16 md:pb-24">
         <div className="max-w-3xl mx-auto px-container-mobile md:px-container-desktop text-center space-y-6">
-          <span className="inline-block bg-tertiary-container/40 border border-sage/30 text-charcoal px-4 py-1.5 rounded-full font-body text-label-sm tracking-widest uppercase">
-            The RIVEN Readiness Assessment
-          </span>
           <h1 className="font-display text-display-md md:text-display-lg text-charcoal tracking-tight text-balance leading-[1.05]">
             Frustrated your body isn&apos;t responding the way it used to
             <span className="text-on-surface-variant"> — </span>

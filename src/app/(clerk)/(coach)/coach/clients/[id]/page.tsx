@@ -15,6 +15,8 @@ import { MealCalendar } from "@/components/meal-calendar";
 import { LogHeatmap } from "@/components/log-heatmap";
 import { SendMessageForm } from "./send-message-form";
 import { EditTargetsForm } from "./edit-targets-form";
+import { CalorieScheduleForm } from "./calorie-schedule-form";
+import { parseSchedule } from "@/lib/calorie-schedule";
 
 const PHASE_LABEL: Record<string, string> = {
   PHASE_1: "Phase 1",
@@ -235,6 +237,11 @@ export default async function CoachClientDetailPage({
             clientUserId={client.id}
             initialCutCalories={profile.cutCalories}
             initialProteinFloor={profile.proteinFloor}
+          />
+          <CalorieScheduleForm
+            clientUserId={client.id}
+            defaultCalories={profile.cutCalories}
+            initialSchedule={parseSchedule(profile.dailyCalorieSchedule)}
           />
         </section>
       )}

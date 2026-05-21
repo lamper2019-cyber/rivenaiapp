@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
@@ -10,6 +11,7 @@ import {
   runMondayCheckinBatch,
   type MondayCheckinBatchResult,
 } from "@/lib/monday-checkin";
+import { DAY_KEYS, type DayKey } from "@/lib/calorie-schedule";
 
 const SendSchema = z.object({
   clientUserId: z.string().min(1),
@@ -397,4 +399,120 @@ export async function triggerMondayCheckinBatch(): Promise<TriggerMondayCheckins
   revalidatePath("/coach/clients");
 
   return { ok: true, ...result };
+}
+
+// ─────────────────────── Calorie cycling (per-client) ───────────────────────
+
+const ScheduleDaysSchema = z.object({
+  Sun: z.coerce.number().int().min(800).max(5000),
+  Mon: z.coerce.number().int().min(800).max(5000),
+  Tue: z.coerce.number().int().min(800).max(5000),
+  Wed: z.coerce.number().int().min(800).max(5000),
+  Thu: z.coerce.number().int().min(800).max(5000),
+  Fri: z.coerce.number().int().min(800).max(5000),
+  Sat: z.coerce.number().int().min(800).max(5000),
+});
+
+const SetCalorieScheduleSchema = z.object({
+  clientUserId: z.string().min(1),
+  action: z.enum(["set", "clear"]),
+});
+
+export type SetClientCalorieScheduleResult =
+  | { ok: true; cleared: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Coach sets (or clears) a per-day-of-week calorie cycle on one client's
+ * Profile. The downstream helper getTodayCalorieTarget() in calorie-schedule.ts
+ * resolves whichever value applies to today's Central-time day; clearing
+ * reverts the client to the flat cutCalories on her Profile.
+ *
+ * No chat-announcement side effect (unlike updateClientTargets) — calorie
+ * cycling is something Sean configures in advance, often without telling
+ * the client up front. He can announce manually via /coach if he wants.
+ */
+export async function setClientCalorieSchedule(
+  formData: FormData,
+): Promise<SetClientCalorieScheduleResult> {
+  const { userId } = auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: isClerkConfigured ? "Not signed in." : "Add Clerk keys to .env.local.",
+    };
+  }
+
+  const parsed = SetCalorieScheduleSchema.safeParse({
+    clientUserId: formData.get("clientUserId"),
+    action: formData.get("action"),
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid input",
+    };
+  }
+
+  let coach;
+  try {
+    coach = await prisma.user.findUnique({ where: { clerkId: userId } });
+  } catch {
+    return { ok: false, error: "Database not connected." };
+  }
+  if (!coach) return { ok: false, error: "Coach record not found." };
+  if (coach.role !== "COACH") {
+    return { ok: false, error: "Only coaches can edit calorie schedules." };
+  }
+
+  const client = await prisma.user.findUnique({
+    where: { id: parsed.data.clientUserId },
+    select: { id: true, role: true, profile: { select: { id: true } } },
+  });
+  if (!client) return { ok: false, error: "Client not found." };
+  if (client.role !== "CLIENT") {
+    return { ok: false, error: "Recipient must be a client." };
+  }
+  if (!client.profile) {
+    return { ok: false, error: "Client hasn't finished onboarding yet." };
+  }
+
+  if (parsed.data.action === "clear") {
+    await prisma.profile.update({
+      where: { id: client.profile.id },
+      // Prisma JSON nullability gotcha: passing JS `null` won't clear the
+      // column — Prisma.DbNull explicitly sets the cell to SQL NULL.
+      data: { dailyCalorieSchedule: Prisma.DbNull },
+    });
+    revalidatePath(`/coach/clients/${client.id}`);
+    revalidatePath("/dashboard");
+    return { ok: true, cleared: true };
+  }
+
+  // action === "set"
+  const daysRaw: Record<string, FormDataEntryValue | null> = {};
+  for (const k of DAY_KEYS) daysRaw[k] = formData.get(k);
+  const daysParsed = ScheduleDaysSchema.safeParse(daysRaw);
+  if (!daysParsed.success) {
+    return {
+      ok: false,
+      error:
+        daysParsed.error.issues[0]?.message ??
+        "All seven days need a calorie number between 800 and 5000.",
+    };
+  }
+
+  // Re-key in canonical DAY_KEYS order so the JSONB row reads cleanly.
+  const normalized = Object.fromEntries(
+    DAY_KEYS.map((k: DayKey) => [k, daysParsed.data[k]]),
+  );
+
+  await prisma.profile.update({
+    where: { id: client.profile.id },
+    data: { dailyCalorieSchedule: normalized },
+  });
+
+  revalidatePath(`/coach/clients/${client.id}`);
+  revalidatePath("/dashboard");
+  return { ok: true, cleared: false };
 }
