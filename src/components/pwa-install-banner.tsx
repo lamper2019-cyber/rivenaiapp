@@ -10,27 +10,38 @@ type DeferredPromptEvent = Event & {
 };
 
 const DISMISS_KEY = "riven-pwa-banner-dismissed-v1";
+const FIRST_SEEN_KEY = "riven-pwa-first-seen-at";
+/** After this many days uninstalled, the banner stops accepting dismiss
+ *  and pins itself to the top of the dashboard. Installing the PWA is
+ *  the difference between push notifications working or not on iPhone,
+ *  so we escalate gently after a reasonable trial period. */
+const ESCALATION_DAYS = 3;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
- * Welcomes the client to "install" RIVEN to their home screen the way a real
- * app feels. Detects the platform and shows the right instructions:
- *   - iOS Safari: walks her through Share → Add to Home Screen (required for
- *     web push to work on iPhone).
+ * Welcomes the client to install RIVEN to her home screen the way a real
+ * app feels. Detects the platform and shows the right install path:
+ *   - iOS Safari: plays the iPhone install video (Safari Share → Add to
+ *     Home Screen). Required for web push to work on iPhone.
  *   - Android Chrome: triggers the native install prompt when available;
- *     otherwise points at the browser menu.
- *   - Desktop Chrome/Edge: triggers the address-bar install icon.
+ *     otherwise plays the Android install video.
+ *   - Desktop Chrome/Edge: triggers the address-bar install icon (text
+ *     steps; no video for desktop).
  *   - In-app browsers (Google App, Facebook, Instagram, TikTok, generic
  *     WebView): tells her to bounce out to a real browser first.
  *
  * Hides itself when running as an installed PWA (display-mode: standalone).
- * Dismissable — won't nag again unless the user clears localStorage. The
- * in-app variant is NOT dismissable since install is literally impossible
- * until she leaves the embedded browser.
+ *
+ * Escalation: dismissable for the first ESCALATION_DAYS. After that, if
+ * she's still on a browser (not installed), the banner pins to the top
+ * of the dashboard with a stronger CTA and the dismiss button is gone —
+ * installing is the one thing that has to happen for the app to work the
+ * way it should on iPhone.
  */
 export function PwaInstallBanner() {
   const [platform, setPlatform] = useState<Platform>("unknown");
   const [dismissed, setDismissed] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [escalated, setEscalated] = useState(false);
   const [deferred, setDeferred] = useState<DeferredPromptEvent | null>(null);
 
   useEffect(() => {
@@ -56,7 +67,31 @@ export function PwaInstallBanner() {
       return;
     }
 
-    if (typeof localStorage !== "undefined" && localStorage.getItem(DISMISS_KEY) === "1") {
+    // Record the first time she saw this banner, so we know when to escalate.
+    let firstSeen: number | null = null;
+    if (typeof localStorage !== "undefined") {
+      const raw = localStorage.getItem(FIRST_SEEN_KEY);
+      const parsed = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(parsed)) {
+        firstSeen = parsed;
+      } else {
+        firstSeen = Date.now();
+        localStorage.setItem(FIRST_SEEN_KEY, String(firstSeen));
+      }
+    }
+    const daysSinceFirstSeen = firstSeen
+      ? (Date.now() - firstSeen) / MS_PER_DAY
+      : 0;
+    const shouldEscalate = daysSinceFirstSeen >= ESCALATION_DAYS;
+    setEscalated(shouldEscalate);
+
+    // Respect the dismiss flag until escalation kicks in — once we hit the
+    // threshold the banner has to be visible no matter what.
+    if (
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem(DISMISS_KEY) === "1" &&
+      !shouldEscalate
+    ) {
       setDismissed(true);
       return;
     }
@@ -78,6 +113,7 @@ export function PwaInstallBanner() {
   }, []);
 
   function dismiss() {
+    if (escalated) return; // can't dismiss after escalation
     setDismissed(true);
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(DISMISS_KEY, "1");
@@ -101,76 +137,28 @@ export function PwaInstallBanner() {
   if (platform === "in-app") return <InAppBrowserBanner />;
 
   // Native prompt ready → take over the banner with a big, single-purpose
-  // CTA. No "Show me how" distraction.
+  // CTA. No video distraction needed.
   if (deferred && (platform === "android" || platform === "desktop")) {
     return (
       <InflatedInstallBanner
         platform={platform}
         onInstall={triggerNativePrompt}
         onDismiss={dismiss}
+        escalated={escalated}
       />
     );
   }
 
-  const titleByPlatform: Record<"ios" | "android" | "desktop", string> = {
-    ios: "Install RIVEN on your iPhone",
-    android: "Install RIVEN on your phone",
-    desktop: "Install RIVEN on your computer",
-  };
-
   return (
-    <section
-      className="relative rounded-md bg-gradient-to-br from-secondary-container/40 via-cream to-tertiary-container/20 border border-gold/40 shadow-elevation-1 px-gutter py-4"
-      aria-labelledby="pwa-banner-title"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 flex-1">
-          <span className="material-symbols-outlined text-gold text-[28px] shrink-0">
-            install_mobile
-          </span>
-          <div className="flex-1 min-w-0">
-            <h3
-              id="pwa-banner-title"
-              className="font-display text-headline-md text-charcoal"
-            >
-              {titleByPlatform[platform]}
-            </h3>
-            <p className="font-body text-body-md text-on-surface-variant mt-1">
-              Get a real app icon on your home screen. Needed for Sunday push
-              reminders on iPhone.
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label="Dismiss install banner"
-          className="shrink-0 text-on-surface-variant/60 hover:text-charcoal transition-colors"
-        >
-          <span className="material-symbols-outlined text-[20px]">close</span>
-        </button>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="font-body text-label-md tracking-widest uppercase text-charcoal underline underline-offset-4 hover:opacity-80"
-        >
-          {expanded ? "Hide steps" : "Show me how"}
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="mt-4 pt-4 border-t border-outline-variant/40 space-y-3">
-          {platform === "ios" && <IosInstructions />}
-          {platform === "android" && <AndroidInstructions hasNativePrompt={false} />}
-          {platform === "desktop" && <DesktopInstructions hasNativePrompt={false} />}
-        </div>
-      )}
-    </section>
+    <VideoInstallBanner
+      platform={platform}
+      escalated={escalated}
+      onDismiss={dismiss}
+    />
   );
 }
+
+// ─────────────────────── platform detection ───────────────────────
 
 /**
  * Detect embedded browsers that can't install PWAs. Order matters — check
@@ -187,6 +175,99 @@ function detectInAppBrowser(ua: string): boolean {
   // Generic Android WebView — UA contains "; wv)" specifically
   if (/Android.*; wv\)/i.test(ua)) return true;
   return false;
+}
+
+// ─────────────────────── banner variants ───────────────────────
+
+function VideoInstallBanner({
+  platform,
+  escalated,
+  onDismiss,
+}: {
+  platform: "ios" | "android" | "desktop";
+  escalated: boolean;
+  onDismiss: () => void;
+}) {
+  // Video is only available for the two phone paths Sean recorded.
+  // Desktop falls through to text steps.
+  const videoSrc =
+    platform === "ios"
+      ? "/videos/install-iphone.mp4"
+      : platform === "android"
+      ? "/videos/install-android.mp4"
+      : null;
+
+  const titleByPlatform: Record<"ios" | "android" | "desktop", string> = {
+    ios: "Install RIVEN on your iPhone",
+    android: "Install RIVEN on your phone",
+    desktop: "Install RIVEN on your computer",
+  };
+
+  // When escalated, pin to the top of the dashboard so the install task
+  // doesn't get scrolled past. The dashboard is the standard scroll
+  // surface, so position:sticky + top-0 keeps the banner glued there.
+  const wrapperClass = escalated
+    ? "sticky top-0 z-30 rounded-md bg-gradient-to-br from-gold/30 via-cream to-secondary-container/40 border border-gold shadow-elevation-2 px-gutter py-4"
+    : "relative rounded-md bg-gradient-to-br from-secondary-container/40 via-cream to-tertiary-container/20 border border-gold/40 shadow-elevation-1 px-gutter py-4";
+
+  return (
+    <section className={wrapperClass} aria-labelledby="pwa-banner-title">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 flex-1">
+          <span className="material-symbols-outlined text-gold text-[28px] shrink-0">
+            install_mobile
+          </span>
+          <div className="flex-1 min-w-0">
+            <h3
+              id="pwa-banner-title"
+              className="font-display text-headline-md text-charcoal"
+            >
+              {titleByPlatform[platform]}
+            </h3>
+            <p className="font-body text-body-md text-on-surface-variant mt-1">
+              {escalated
+                ? "This step has to happen for the app to work the way it should — push reminders only work after you install."
+                : "Get a real app icon on your home screen. Needed for Sunday push reminders on iPhone."}
+            </p>
+          </div>
+        </div>
+        {!escalated && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label="Dismiss install banner"
+            className="shrink-0 text-on-surface-variant/60 hover:text-charcoal transition-colors"
+          >
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        )}
+      </div>
+
+      {videoSrc ? (
+        <div className="mt-4">
+          <p className="font-body text-label-md tracking-widest uppercase text-charcoal mb-2">
+            Watch the video to install
+          </p>
+          {/* preload="metadata" so the video tag only fetches the first
+              few KB until she hits play — important for the iPhone clip
+              which is ~12 MB. playsInline is REQUIRED on iOS Safari or
+              video will go fullscreen on play. */}
+          <video
+            src={videoSrc}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full rounded-md bg-charcoal/5 border border-outline-variant/40"
+          />
+        </div>
+      ) : (
+        // Desktop fallback — keeps the existing text steps.
+        <div className="mt-4 pt-4 border-t border-outline-variant/40">
+          <DesktopInstructions />
+        </div>
+      )}
+    </section>
+  );
 }
 
 function InAppBrowserBanner() {
@@ -261,26 +342,32 @@ function InflatedInstallBanner({
   platform,
   onInstall,
   onDismiss,
+  escalated,
 }: {
   platform: "android" | "desktop";
   onInstall: () => void;
   onDismiss: () => void;
+  escalated: boolean;
 }) {
   const headline =
     platform === "android" ? "Install RIVEN on your phone" : "Install RIVEN on your computer";
+
+  const wrapperClass = escalated
+    ? "sticky top-0 z-30 rounded-md bg-gradient-to-br from-gold/40 via-cream to-secondary-container/40 border border-gold shadow-elevation-2 px-gutter py-5"
+    : "relative rounded-md bg-gradient-to-br from-gold/30 via-cream to-secondary-container/40 border border-gold shadow-elevation-2 px-gutter py-5";
+
   return (
-    <section
-      className="relative rounded-md bg-gradient-to-br from-gold/30 via-cream to-secondary-container/40 border border-gold shadow-elevation-2 px-gutter py-5"
-      aria-labelledby="pwa-banner-title"
-    >
-      <button
-        type="button"
-        onClick={onDismiss}
-        aria-label="Dismiss install banner"
-        className="absolute top-3 right-3 text-on-surface-variant/60 hover:text-charcoal transition-colors"
-      >
-        <span className="material-symbols-outlined text-[20px]">close</span>
-      </button>
+    <section className={wrapperClass} aria-labelledby="pwa-banner-title">
+      {!escalated && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss install banner"
+          className="absolute top-3 right-3 text-on-surface-variant/60 hover:text-charcoal transition-colors"
+        >
+          <span className="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      )}
       <div className="flex items-center gap-3">
         <span className="material-symbols-outlined text-gold text-[32px] shrink-0">
           install_mobile
@@ -308,126 +395,37 @@ function InflatedInstallBanner({
   );
 }
 
-function StepList({ items }: { items: { num: string; text: React.ReactNode }[] }) {
+// ─────────────────────── text fallbacks (desktop only) ───────────────────────
+
+function DesktopInstructions() {
   return (
     <ol className="space-y-2">
-      {items.map((s) => (
-        <li key={s.num} className="flex items-start gap-3">
-          <span className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-charcoal text-cream font-body text-label-sm">
-            {s.num}
-          </span>
-          <span className="font-body text-body-md text-charcoal leading-relaxed">
-            {s.text}
-          </span>
-        </li>
-      ))}
+      <li className="flex items-start gap-3">
+        <span className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-charcoal text-cream font-body text-label-sm">
+          1
+        </span>
+        <span className="font-body text-body-md text-charcoal leading-relaxed">
+          Look for the <strong>install icon</strong> in Chrome or Edge&apos;s
+          address bar — a small monitor or downward-arrow icon on the right.
+        </span>
+      </li>
+      <li className="flex items-start gap-3">
+        <span className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-charcoal text-cream font-body text-label-sm">
+          2
+        </span>
+        <span className="font-body text-body-md text-charcoal leading-relaxed">
+          If you don&apos;t see it, click the three-dot menu and choose{" "}
+          <strong>Install RIVEN…</strong>
+        </span>
+      </li>
+      <li className="flex items-start gap-3">
+        <span className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-charcoal text-cream font-body text-label-sm">
+          3
+        </span>
+        <span className="font-body text-body-md text-charcoal leading-relaxed">
+          Click <strong>Install</strong>.
+        </span>
+      </li>
     </ol>
-  );
-}
-
-function IosInstructions() {
-  return (
-    <>
-      <StepList
-        items={[
-          { num: "1", text: <>Make sure you&apos;re in <strong>Safari</strong> (not Chrome or in-app browser).</> },
-          {
-            num: "2",
-            text: (
-              <>
-                Tap the <strong>Share</strong> button at the bottom of Safari — the square
-                with an arrow pointing up.
-              </>
-            ),
-          },
-          {
-            num: "3",
-            text: (
-              <>
-                Scroll the menu and tap <strong>Add to Home Screen</strong>.
-              </>
-            ),
-          },
-          { num: "4", text: <>Tap <strong>Add</strong> in the top right.</> },
-          {
-            num: "5",
-            text: (
-              <>
-                Close Safari and open the new <strong>RIVEN</strong> icon from your home
-                screen. From now on, open the app from there.
-              </>
-            ),
-          },
-        ]}
-      />
-      <p className="font-body text-label-sm text-on-surface-variant/80 mt-3 italic">
-        iPhone only lets installed apps send push notifications. This is the one-time setup
-        that unlocks Sunday reminders.
-      </p>
-    </>
-  );
-}
-
-function AndroidInstructions({ hasNativePrompt }: { hasNativePrompt: boolean }) {
-  return (
-    <>
-      {hasNativePrompt ? (
-        <p className="font-body text-body-md text-charcoal">
-          Tap <strong>Install now</strong> above and approve the prompt.
-        </p>
-      ) : (
-        <StepList
-          items={[
-            { num: "1", text: <>In <strong>Chrome</strong>, tap the three-dot menu (top right).</> },
-            { num: "2", text: <>Tap <strong>Install app</strong> (or <strong>Add to Home screen</strong>).</> },
-            { num: "3", text: <>Tap <strong>Install</strong>.</> },
-            {
-              num: "4",
-              text: (
-                <>
-                  Open the new <strong>RIVEN</strong> icon from your home screen / app drawer.
-                </>
-              ),
-            },
-          ]}
-        />
-      )}
-    </>
-  );
-}
-
-function DesktopInstructions({ hasNativePrompt }: { hasNativePrompt: boolean }) {
-  return (
-    <>
-      {hasNativePrompt ? (
-        <p className="font-body text-body-md text-charcoal">
-          Tap <strong>Install RIVEN</strong> above to add a desktop app icon.
-        </p>
-      ) : (
-        <StepList
-          items={[
-            {
-              num: "1",
-              text: (
-                <>
-                  Look for the <strong>install icon</strong> in Chrome or Edge&apos;s address
-                  bar — a small monitor or downward-arrow icon on the right.
-                </>
-              ),
-            },
-            {
-              num: "2",
-              text: (
-                <>
-                  If you don&apos;t see it, click the three-dot menu and choose{" "}
-                  <strong>Install RIVEN…</strong>
-                </>
-              ),
-            },
-            { num: "3", text: <>Click <strong>Install</strong>.</> },
-          ]}
-        />
-      )}
-    </>
   );
 }
