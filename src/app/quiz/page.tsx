@@ -255,23 +255,35 @@ export default function QuizLandingPage() {
                   Built for the women every other program forgot
                 </h2>
 
-                {/* G — drop cap on the first paragraph. Tailwind's
-                    first-letter: utilities pull the I out as a 4-line
-                    display-serif initial. */}
-                <p className="font-body text-body-lg text-on-surface-variant leading-relaxed first-letter:font-display first-letter:text-[5rem] first-letter:leading-[0.8] first-letter:float-left first-letter:mr-3 first-letter:mt-1 first-letter:text-charcoal">
-                  I built RIVEN for the women I&apos;ve been coaching for years —
-                  Black women 35–55 who&apos;d done every program twice and still
-                  felt stuck. The body you had at 25 isn&apos;t the body you have
-                  at 45, and the program has to match.
-                </p>
-                <p className="font-body text-body-lg text-on-surface-variant leading-relaxed">
-                  Most women your age lose 3–5% of their muscle per decade if they
-                  don&apos;t actively train for it. That&apos;s why weight-loss-only
-                  plans stop working — and why &ldquo;eat less, move more&rdquo;
-                  keeps failing you. RIVEN is built around the levers that actually
-                  move the needle when your hormones, your sleep, and your life
-                  doesn&apos;t look like a 25-year-old&apos;s anymore.
-                </p>
+                {/* Per Sean: break the wall of text into texting-style
+                    thoughts — one beat per paragraph, more breath between
+                    them. The drop cap rides the first paragraph; size
+                    reduced to 4rem so it doesn't overshoot the now-shorter
+                    first beat. */}
+                <div className="space-y-6">
+                  <p className="font-body text-body-lg text-on-surface-variant leading-relaxed first-letter:font-display first-letter:text-[4rem] first-letter:leading-[0.8] first-letter:float-left first-letter:mr-3 first-letter:mt-1 first-letter:text-charcoal">
+                    I built RIVEN for the women I&apos;ve been coaching for years —
+                    Black women 35–55 who&apos;d done every program twice and still
+                    felt stuck.
+                  </p>
+                  <p className="font-body text-body-lg text-on-surface-variant leading-relaxed">
+                    The body you had at 25 isn&apos;t the body you have at 45,
+                    and the program has to match.
+                  </p>
+                  <p className="font-body text-body-lg text-on-surface-variant leading-relaxed">
+                    Most women your age lose 3–5% of their muscle per decade if
+                    they don&apos;t actively train for it.
+                  </p>
+                  <p className="font-body text-body-lg text-on-surface-variant leading-relaxed">
+                    That&apos;s why weight-loss-only plans stop working — and
+                    why &ldquo;eat less, move more&rdquo; keeps failing you.
+                  </p>
+                  <p className="font-body text-body-lg text-on-surface-variant leading-relaxed">
+                    RIVEN is built around the levers that actually move the
+                    needle when your hormones, your sleep, and your life
+                    doesn&apos;t look like a 25-year-old&apos;s anymore.
+                  </p>
+                </div>
                 <p className="font-body text-label-md tracking-wide text-charcoal pt-2">
                   — Sean Williams, RIVEN
                 </p>
