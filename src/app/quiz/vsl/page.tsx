@@ -3,7 +3,7 @@ import Link from "next/link";
 export const metadata = {
   title: "Watch the breakdown — RIVEN",
   description:
-    "A 7-minute breakdown of how RIVEN turns peaceful discipline into pounds-off for Black women 35+. Watch, then decide.",
+    "A 12-minute breakdown of how RIVEN turns peaceful discipline into pounds-off for Black women 35+. Watch, then decide.",
 };
 
 /**
@@ -14,9 +14,13 @@ export const metadata = {
  * (existing $50/mo, 7-day trial) — WARM doesn't get the founding rate.
  */
 
-// SEAN: swap this to the real video embed URL when the VSL is recorded.
-// Accepts YouTube, Vimeo, or self-hosted MP4 — see render below.
-const VSL_EMBED_URL: string | null = null;
+// YouTube unlisted upload — embed param notes:
+//   rel=0           — keep "more videos" at the end inside the channel
+//   modestbranding=1 — drop the YouTube watermark
+//   playsinline=1   — iOS plays inline instead of forcing fullscreen
+//   color=white     — neutral progress bar (red default clashes with cream)
+const VSL_EMBED_URL: string | null =
+  "https://www.youtube.com/embed/RAh9NfU3o5Y?rel=0&modestbranding=1&playsinline=1&color=white";
 
 export default function VslPage() {
   return (
@@ -38,7 +42,7 @@ export default function VslPage() {
 
       <section className="space-y-5 text-center">
         <span className="inline-block bg-tertiary-container/40 border border-sage/30 text-charcoal px-4 py-1.5 rounded-full font-body text-label-sm tracking-widest uppercase">
-          The 7-minute breakdown
+          The 12-minute breakdown
         </span>
         <h1 className="font-display text-display-sm md:text-display-md text-charcoal text-balance leading-[1.1]">
           How peaceful discipline turns into pounds-off

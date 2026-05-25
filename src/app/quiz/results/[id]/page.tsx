@@ -221,7 +221,7 @@ export default async function QuizResultsPage({
             href="/quiz/vsl"
             className="font-body text-label-md text-charcoal/70 hover:text-charcoal underline underline-offset-4 transition-colors"
           >
-            Want to see how it works first? Watch the 7-min breakdown →
+            Want to see how it works first? Watch the 12-min breakdown →
           </Link>
         </section>
       )}

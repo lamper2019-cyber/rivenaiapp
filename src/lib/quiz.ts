@@ -490,7 +490,7 @@ export function nextStepFor(
       }
       return {
         tag: "Your next step",
-        copy: `${firstName}, you asked for an app — watch the 7-minute breakdown first, then start the trial at the end of the video.`,
+        copy: `${firstName}, you asked for an app — watch the 12-minute breakdown first, then start the trial at the end of the video.`,
         ctaLabel: "Watch the breakdown",
         ctaHref: "/quiz/vsl",
         note: "Free · then signup at the end of the video.",
@@ -498,7 +498,7 @@ export function nextStepFor(
     case "COACH":
       return {
         tag: "Your next step",
-        copy: `${firstName}, 1:1 coaching opens when seats free up — Sean reads every active client's data before he picks the next round. Watch the 7-minute breakdown to see how the app trial gets you in line for the next intake.`,
+        copy: `${firstName}, 1:1 coaching opens when seats free up — Sean reads every active client's data before he picks the next round. Watch the 12-minute breakdown to see how the app trial gets you in line for the next intake.`,
         ctaLabel: "Watch the breakdown",
         ctaHref: "/quiz/vsl",
         note: "Free · then start the app trial at the end of the video.",
@@ -506,7 +506,7 @@ export function nextStepFor(
     case "DONE_FOR_YOU":
       return {
         tag: "Your next step",
-        copy: `${firstName}, the private tier (meal plans + 1:1) is invite-only. Sean evaluates every active client each quarter for the next intake — watch the 7-minute breakdown to see how the app trial puts you on the shortlist.`,
+        copy: `${firstName}, the private tier (meal plans + 1:1) is invite-only. Sean evaluates every active client each quarter for the next intake — watch the 12-minute breakdown to see how the app trial puts you on the shortlist.`,
         ctaLabel: "Watch the breakdown",
         ctaHref: "/quiz/vsl",
         note: "Free · then start the app trial at the end of the video.",
