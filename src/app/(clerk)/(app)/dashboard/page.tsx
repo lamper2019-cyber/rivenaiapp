@@ -13,6 +13,12 @@ import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
 import { getMealPacing, type MealPacingTier } from "@/lib/meal-pacing";
 import { LogStepsForm } from "./log-steps-form";
 import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
+import { getRecentPulseEvents } from "@/lib/pulse";
+import { getCollectiveStats } from "@/lib/collective-counter";
+import { getCheerCandidates } from "@/lib/cheer";
+import { PulseStrip } from "@/components/pulse-strip";
+import { CollectiveCounter } from "@/components/collective-counter";
+import { CheerPrompts } from "@/components/cheer-prompts";
 
 // Force a fresh server render on every request. The page reads `auth()` so
 // it's already implicitly dynamic, but pinning it explicitly is belt-and-
@@ -60,6 +66,7 @@ export default async function DashboardPage() {
   }
 
   const {
+    userId: clientUserId,
     profile,
     todayTotals,
     weekCheckIn,
@@ -68,6 +75,16 @@ export default async function DashboardPage() {
     dayName,
     recentCoachMessages,
   } = data;
+
+  // Ambient community trio — pulse feed, collective stats, cheer candidates.
+  // Best-effort: each Promise resolves to a safe fallback so a slow query
+  // or empty result never blocks the rest of the dashboard. Run in parallel
+  // because none of them depend on each other.
+  const [pulseEvents, collectiveStats, cheerCandidates] = await Promise.all([
+    getRecentPulseEvents(clientUserId).catch(() => []),
+    getCollectiveStats().catch(() => null),
+    getCheerCandidates(clientUserId).catch(() => []),
+  ]);
 
   // Honors per-day calorie cycling (Rora et al.); falls back to flat
   // cutCalories when no schedule is set, so every other client sees the
@@ -119,6 +136,15 @@ export default async function DashboardPage() {
       />
 
       {pacing?.isBehind && <MealReminderCard tier={pacing.tier} />}
+
+      {/* Ambient community trio — pulse / collective / cheer. Each one
+          self-hides on empty data, so on a quiet morning none of them
+          render and the dashboard reads exactly as it used to. */}
+      {cheerCandidates.length > 0 && (
+        <CheerPrompts candidates={cheerCandidates} />
+      )}
+      <PulseStrip events={pulseEvents} />
+      {collectiveStats && <CollectiveCounter stats={collectiveStats} />}
 
       {/* Today's targets — three progress cards */}
       <section className="space-y-3">

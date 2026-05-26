@@ -52,6 +52,7 @@ export async function loadDashboardData(clerkId: string) {
   const isCheckInDay = ["Sunday", "Monday"].includes(dayName);
 
   return {
+    userId: user.id,
     profile: user.profile,
     todayTotals: {
       calories: todayTotals?.totalCalories ?? 0,
