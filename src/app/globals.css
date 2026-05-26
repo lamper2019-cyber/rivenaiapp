@@ -204,10 +204,36 @@ body {
   animation: riven-score-pop 680ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
+/* Float-up & fade: a clone of the tapped emoji rises ~72px and dissolves.
+   Used on the daily-mood ribbon so picking a mood feels rewarded without
+   any confetti chaos. Quiet, premium, brand-appropriate. */
+@keyframes riven-float-up {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: translateY(-30px) scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-72px) scale(0.85);
+    opacity: 0;
+  }
+}
+.riven-float-up {
+  animation: riven-float-up 900ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  /* Pointer-events off so the floating clone never blocks subsequent taps
+     while it's mid-animation. */
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .riven-cell-fill,
   .riven-rise-in,
-  .riven-score-pop {
+  .riven-score-pop,
+  .riven-float-up {
     animation: none;
     opacity: 1;
     transform: none;

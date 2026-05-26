@@ -57,8 +57,6 @@ export async function getRecentPulseEvents(
       select: {
         id: true,
         createdAt: true,
-        shortName: true,
-        description: true,
         userId: true,
         user: { select: { profile: { select: { name: true } } } },
       },
@@ -105,13 +103,14 @@ export async function getRecentPulseEvents(
   for (const m of meals) {
     const first = firstNameFor(m.user.profile?.name);
     if (!first) continue;
-    const time = mealTimeOfDay(m.createdAt);
-    const label = m.shortName ?? truncate(m.description, 36);
+    // Sean explicitly asked to strip the meal time-of-day + the food name
+    // off the pulse feed — "late meal" framing felt judgey, and surfacing
+    // what someone ate to other clients adds zero value. Neutral copy now.
     events.push({
       id: `meal-${m.id}`,
       kind: "MEAL_LOGGED",
       firstName: first,
-      copy: `${first} just logged ${time} · ${label}`,
+      copy: `${first} just logged a meal`,
       at: m.createdAt,
     });
   }
@@ -193,26 +192,6 @@ function firstNameFor(name: string | null | undefined): string | null {
   const trimmed = name.trim();
   if (!trimmed) return null;
   return trimmed.split(/\s+/)[0];
-}
-
-function mealTimeOfDay(d: Date): string {
-  const hour = parseInt(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Chicago",
-      hour: "2-digit",
-      hour12: false,
-    }).format(d),
-    10,
-  );
-  if (hour < 11) return "breakfast";
-  if (hour < 15) return "lunch";
-  if (hour < 19) return "dinner";
-  return "a late meal";
-}
-
-function truncate(s: string, max: number): string {
-  if (s.length <= max) return s;
-  return s.slice(0, max - 1).trimEnd() + "…";
 }
 
 function centralDayKey(d: Date): string {

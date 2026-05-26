@@ -1,25 +1,28 @@
 import { prisma } from "@/lib/prisma";
-import { startOfCentralDay } from "@/lib/dates";
 import { startOfIsoWeek } from "@/lib/week";
 
 /**
- * Aggregate "RIVEN women, together" stats for the dashboard.
+ * "Together · this week" — collective stats for the dashboard.
  *
- * Reframes a small community as a powerful collective:
- *   "1,247 meals logged this week"
- *   "47 protein goals hit today"
- *   "312 lbs lost combined"
+ * Four process-oriented metrics, none of them scale-based. The whole point
+ * is that a small community (~8 clients today) can still hit BIG numbers
+ * on cumulative process metrics, which feels good without leaning on
+ * before/after comparisons.
  *
- * Single pass: all four stats batched in one Promise.all. Limited to
- * CLIENT users with active/trialing/comped status so canceled accounts
- * don't pad the totals.
+ *   - proteinGramsThisWeek   — sum of DailyTotals.totalProtein, Mon→now
+ *   - streakDaysCombined     — sum of each active client's current logging streak
+ *   - rosesSentThisWeek      — count of CheerReaction rows, Mon→now
+ *   - stepsThisWeek          — sum of DailyTotals.totalSteps, Mon→now
+ *
+ * Restricted to CLIENT users with trialing / active / comped status so
+ * canceled accounts don't pad the totals.
  */
 
 export type CollectiveStats = {
-  mealsThisWeek: number;
-  proteinGoalsToday: number;
-  poundsLostCombined: number;
-  monthlyStepsK: number; // shown as "X.Xk" — thousands
+  proteinGramsThisWeek: number;
+  streakDaysCombined: number;
+  rosesSentThisWeek: number;
+  stepsThisWeek: number;
 };
 
 const ACTIVE_STATUSES = ["trialing", "active", "comped"];
@@ -28,76 +31,117 @@ const ACTIVE_FILTER = {
   subscriptionStatus: { in: ACTIVE_STATUSES },
 };
 
+// How far back we look when computing each client's logging streak.
+// 100 days covers anything we'd want to celebrate; anything older is too
+// stale to matter for the "today" feeling.
+const STREAK_WINDOW_DAYS = 100;
+
 export async function getCollectiveStats(): Promise<CollectiveStats> {
   const weekStart = startOfIsoWeek(new Date());
-  const today = startOfCentralDay();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const monthAgo = new Date(today);
-  monthAgo.setDate(monthAgo.getDate() - 30);
 
   const [
-    mealsThisWeek,
-    proteinHitToday,
-    profilesForLoss,
-    stepsLast30Days,
+    proteinAgg,
+    stepsAgg,
+    rosesSent,
+    streakDaysCombined,
   ] = await Promise.all([
-    prisma.mealLog.count({
+    prisma.dailyTotals.aggregate({
       where: {
-        createdAt: { gte: weekStart },
+        date: { gte: weekStart },
         user: ACTIVE_FILTER,
       },
-    }),
-    // Clients whose total protein today is at or above their floor.
-    // Two queries: pull today's totals joined with active profile, count
-    // where totalProtein >= profile.proteinFloor.
-    prisma.dailyTotals.findMany({
-      where: {
-        date: today,
-        user: { ...ACTIVE_FILTER, profile: { isNot: null } },
-      },
-      select: {
-        totalProtein: true,
-        user: { select: { profile: { select: { proteinFloor: true } } } },
-      },
-    }),
-    prisma.profile.findMany({
-      where: {
-        user: ACTIVE_FILTER,
-      },
-      select: {
-        startWeight: true,
-        currentWeight: true,
-      },
+      _sum: { totalProtein: true },
     }),
     prisma.dailyTotals.aggregate({
       where: {
-        date: { gte: monthAgo, lt: tomorrow },
+        date: { gte: weekStart },
         user: ACTIVE_FILTER,
       },
       _sum: { totalSteps: true },
     }),
+    prisma.cheerReaction.count({
+      where: {
+        createdAt: { gte: weekStart },
+        // Both ends must be active so we don't count cheers TO canceled
+        // accounts (they wouldn't see them anyway) or cheers FROM canceled
+        // accounts (shouldn't be possible, but defense in depth).
+        recipient: ACTIVE_FILTER,
+        sender: ACTIVE_FILTER,
+      },
+    }),
+    computeStreakDaysCombined(),
   ]);
 
-  const proteinGoalsToday = proteinHitToday.filter((row) => {
-    const floor = row.user.profile?.proteinFloor ?? 0;
-    return floor > 0 && row.totalProtein >= floor;
-  }).length;
-
-  const poundsLostCombined = profilesForLoss.reduce((acc, p) => {
-    const delta = p.startWeight - p.currentWeight;
-    return delta > 0 ? acc + delta : acc;
-  }, 0);
-
-  const totalSteps = stepsLast30Days._sum.totalSteps ?? 0;
-  const monthlyStepsK = totalSteps / 1000;
-
   return {
-    mealsThisWeek,
-    proteinGoalsToday,
-    // Round to whole lbs — half-pound precision reads weird in a "combined"
-    // total.
-    poundsLostCombined: Math.round(poundsLostCombined),
-    monthlyStepsK: Math.round(monthlyStepsK * 10) / 10,
+    proteinGramsThisWeek: proteinAgg._sum.totalProtein ?? 0,
+    stepsThisWeek: stepsAgg._sum.totalSteps ?? 0,
+    rosesSentThisWeek: rosesSent,
+    streakDaysCombined,
   };
+}
+
+/**
+ * Sum every active client's current consecutive-day meal-logging streak.
+ *
+ * Strategy: one batched query pulling 100 days of meal logs for every
+ * active client (date column only — we don't need food data), then walk
+ * each client's day-set backward from today/yesterday to find their streak.
+ *
+ * "Streak ends today" is allowed if she's already logged today. Otherwise
+ * we walk back from yesterday — same convention as src/lib/sean-messages.ts
+ * so we don't punish someone for not having logged at 7 AM yet.
+ */
+async function computeStreakDaysCombined(): Promise<number> {
+  const windowStart = new Date();
+  windowStart.setDate(windowStart.getDate() - STREAK_WINDOW_DAYS);
+
+  const rows = await prisma.mealLog.findMany({
+    where: {
+      createdAt: { gte: windowStart },
+      user: ACTIVE_FILTER,
+    },
+    select: { userId: true, createdAt: true },
+  });
+
+  // Group by user → set of Central-day keys.
+  const byUser = new Map<string, Set<string>>();
+  for (const r of rows) {
+    let set = byUser.get(r.userId);
+    if (!set) {
+      set = new Set<string>();
+      byUser.set(r.userId, set);
+    }
+    set.add(centralDayKey(r.createdAt));
+  }
+
+  const todayKey = centralDayKey(new Date());
+  // Walk back day-by-day for each client. The seed cursor is "today" if
+  // she's already logged today, otherwise "yesterday" (so we don't break
+  // her streak just because she hasn't logged before this query ran).
+  let combined = 0;
+  for (const set of Array.from(byUser.values())) {
+    const startedToday = set.has(todayKey);
+    const cursor = new Date();
+    if (!startedToday) {
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    let streak = 0;
+    for (let i = 0; i < STREAK_WINDOW_DAYS; i++) {
+      const key = centralDayKey(cursor);
+      if (!set.has(key)) break;
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    combined += streak;
+  }
+  return combined;
+}
+
+function centralDayKey(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }

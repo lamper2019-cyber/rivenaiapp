@@ -11,13 +11,15 @@ import {
 import { setMyMood } from "@/app/(clerk)/(app)/dashboard/mood-action";
 
 /**
- * One-tap-a-day community pulse. Before she taps: four emoji buttons.
- * After she taps: her pick highlights, the other counts dim into context.
- * One-line aggregate sentence underneath ("23 women logged 🔥 today")
- * makes the community visible without a separate counter screen.
+ * One-tap-a-day community pulse. Tap an emoji → her pick highlights,
+ * a clone of that emoji floats up and fades (the little reward moment),
+ * and the aggregate sentence updates with her vote folded in.
  *
  * Optimistic update: tap → state flips immediately → server action fires
  * in a transition. Re-tapping a different mood updates instead of stacking.
+ *
+ * Animation: `riven-float-up` keyframe in globals.css. Reduced-motion users
+ * get the same state transition with no float — the keyframe is overridden.
  */
 export function DailyMoodRibbon({
   snapshot,
@@ -27,10 +29,14 @@ export function DailyMoodRibbon({
   const [myMood, setLocal] = useState<MoodKind | null>(snapshot.myMood);
   const [counts, setCounts] = useState<Record<MoodKind, number>>(snapshot.counts);
   const [, startTransition] = useTransition();
+  // Each tap fires a float-up animation with a fresh React key so even
+  // re-taps (same mood) re-trigger. Cleared via setTimeout after the
+  // animation duration so the DOM stays light.
+  const [floats, setFloats] = useState<
+    Array<{ id: number; mood: MoodKind; col: number }>
+  >([]);
 
-  function handleTap(mood: MoodKind) {
-    // Optimistic: shift the counts. If she's switching moods, decrement
-    // the old bucket; otherwise just bump the new one (first-tap of day).
+  function handleTap(mood: MoodKind, columnIndex: number) {
     const previous = myMood;
     setLocal(mood);
     setCounts((c) => {
@@ -43,6 +49,16 @@ export function DailyMoodRibbon({
       }
       return next;
     });
+
+    // Spawn a floating clone. ID is just monotonically increasing — uses
+    // Date.now so two taps in the same frame still get unique keys.
+    const floatId = Date.now() + Math.random();
+    setFloats((prev) => [...prev, { id: floatId, mood, col: columnIndex }]);
+    // Clean up after the animation finishes (matches the 900ms in CSS,
+    // with a tiny buffer).
+    window.setTimeout(() => {
+      setFloats((prev) => prev.filter((f) => f.id !== floatId));
+    }, 1000);
 
     startTransition(async () => {
       const r = await setMyMood({ mood });
@@ -81,20 +97,22 @@ export function DailyMoodRibbon({
       className="rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-4 shadow-elevation-1"
     >
       <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-        How&apos;s today landing?
+        How&apos;s your day going?
       </p>
 
-      <div className="mt-3 grid grid-cols-4 gap-2">
-        {MOOD_KINDS.map((kind) => {
+      {/* Relative wrapper so the floating clones can absolute-position
+          relative to each column. */}
+      <div className="mt-3 grid grid-cols-4 gap-2 relative">
+        {MOOD_KINDS.map((kind, idx) => {
           const isMine = myMood === kind;
           return (
             <button
               key={kind}
               type="button"
-              onClick={() => handleTap(kind)}
+              onClick={() => handleTap(kind, idx)}
               aria-pressed={isMine}
               aria-label={MOOD_LABEL[kind]}
-              className={`flex flex-col items-center gap-1 py-3 rounded-md border transition-all active:scale-95 ${
+              className={`relative flex flex-col items-center gap-1 py-3 rounded-md border transition-all active:scale-95 ${
                 isMine
                   ? "bg-secondary-container/60 border-gold/60 shadow-elevation-1"
                   : "bg-transparent border-outline-variant/40 hover:bg-surface-container/40"
@@ -110,6 +128,22 @@ export function DailyMoodRibbon({
               >
                 {MOOD_LABEL[kind]}
               </span>
+
+              {/* Float-up clones for this column. Absolute-positioned so
+                  they don't shift layout while floating up. Each clone
+                  unmounts itself after the keyframe via the parent's
+                  setTimeout cleanup. */}
+              {floats
+                .filter((f) => f.col === idx)
+                .map((f) => (
+                  <span
+                    key={f.id}
+                    aria-hidden
+                    className="riven-float-up absolute left-1/2 top-3 -translate-x-1/2 text-[28px] leading-none"
+                  >
+                    {MOOD_EMOJI[f.mood]}
+                  </span>
+                ))}
             </button>
           );
         })}
