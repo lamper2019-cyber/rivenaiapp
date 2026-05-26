@@ -4,14 +4,11 @@ import { auth, isClerkConfigured } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
 import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
 import { pickQuoteForDate } from "@/lib/daily-quotes";
-import { ASK_RIVEN_PROMPTS } from "@/lib/ask-riven-prompts";
-import { RotatingText } from "@/components/rotating-text";
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import { NotificationOptIn } from "@/components/notification-opt-in";
 import { CoachMessageBadge } from "@/components/coach-message-badge";
 import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
 import { getMealPacing, type MealPacingTier } from "@/lib/meal-pacing";
-import { LogStepsForm } from "./log-steps-form";
 import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
 import { getRecentPulseEvents } from "@/lib/pulse";
 import { getCollectiveStats } from "@/lib/collective-counter";
@@ -73,9 +70,6 @@ export default async function DashboardPage() {
     userId: clientUserId,
     profile,
     todayTotals,
-    weekCheckIn,
-    weekContent,
-    prompt,
     dayName,
     recentCoachMessages,
   } = data;
@@ -118,7 +112,6 @@ export default async function DashboardPage() {
 
   const greeting = pickGreeting(profile.name);
   const dailyQuote = pickQuoteForDate(new Date());
-  const isSunday = dayName === "Sunday";
 
   // Meal-pacing — drives the reminder card AND tints the sticky log pill
   // when she's behind. Best-effort; if it fails we still render the page.
@@ -224,92 +217,14 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* Quick actions */}
-      <section className="space-y-3">
-        <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-          Quick actions
-        </h2>
-        {/* Ask RIVEN — hero quick action, bigger and visually distinct */}
-        <Link
-          href="/chat"
-          className="group relative block rounded-md bg-gradient-to-br from-secondary-container/70 via-cream to-tertiary-container/30 border border-gold/50 text-charcoal px-4 py-5 sm:px-gutter sm:py-6 hover:shadow-elevation-2 hover:border-gold transition-all shadow-elevation-1 overflow-hidden"
-        >
-          <div className="flex items-center gap-3 sm:gap-4">
-            {/* Animated icon with soft pulsing aura */}
-            <div className="relative shrink-0 flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14">
-              <span className="absolute inset-0 rounded-full bg-gold/30 riven-glow" aria-hidden />
-              <span className="absolute inset-1 rounded-full bg-cream shadow-elevation-1" aria-hidden />
-              <span className="material-symbols-outlined relative text-gold text-[28px] sm:text-[32px] filled">
-                auto_awesome
-              </span>
-            </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className="font-body text-label-sm sm:text-label-md tracking-widest uppercase text-on-secondary-container">
-                Ask RIVEN
-              </span>
-              <RotatingText
-                lines={ASK_RIVEN_PROMPTS}
-                intervalMs={5600}
-                transitionMs={1000}
-                maxLines={2}
-                className="font-display text-body-md sm:text-headline-md text-charcoal mt-0.5 sm:mt-1 leading-snug"
-              />
-            </div>
-            <span className="material-symbols-outlined text-charcoal/60 shrink-0 group-hover:translate-x-1 transition-transform">
-              arrow_forward
-            </span>
-          </div>
-        </Link>
-
-        <LogStepsForm initial={todayTotals.steps} />
-      </section>
-
-      {/* Sunday check-in card — always visible, locked except Sunday */}
-      {weekCheckIn ? (
-        <div className="rounded-md bg-tertiary-container/40 border border-sage/40 px-gutter py-4">
-          <p className="font-body text-label-md tracking-widest uppercase text-sage">
-            Checked in this week
-          </p>
-          <p className="font-body text-body-md text-charcoal mt-2">
-            Weight {weekCheckIn.weight} lbs · Waist {weekCheckIn.waist}″
-          </p>
-        </div>
-      ) : isSunday ? (
-        <PromptCard
-          eyebrow="It's Sunday — check-in is open"
-          title="The week, on the record."
-          body="Eight questions, two photos, ten minutes. This is how Sean sees the trend."
-          ctaLabel="Open the check-in"
-          ctaHref="/check-in"
-          tone="sage"
-        />
-      ) : (
-        <SundayLockedCard dayName={dayName} />
-      )}
-
-      {/* Content prompt card — single-sentence prompt only; the hint lives
-          alongside the full prompt on the /content recording page. */}
-      {!weekContent ? (
-        <PromptCard
-          eyebrow="This week's prompt"
-          title={prompt.prompt}
-          ctaLabel="Record my answer"
-          ctaHref="/content"
-          tone="gold"
-        />
-      ) : (
-        <div className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-4">
-          <p className="font-body text-label-md tracking-widest uppercase text-on-secondary-container">
-            Submitted this week · {prompt.title}
-          </p>
-          <Link
-            href="/content"
-            className="font-body text-body-md text-charcoal underline underline-offset-4 mt-2 inline-block"
-          >
-            Re-record →
-          </Link>
-        </div>
-      )}
+      {/* Removed per Sean — wasn't earning the screen real estate:
+            - Ask RIVEN hero (the bottom-nav Chat tab covers this)
+            - LogStepsForm (steps progress still renders in Today below)
+            - Sunday check-in card (path remains via /check-in + push)
+            - This Week's Prompt content card (path remains via /content)
+          Sunday ritual lives at the top of the dashboard now; that's the
+          weekly community moment, and /check-in itself is being redesigned
+          to be easier on its own page. */}
 
       <div className="fixed top-[10%] right-[-10%] w-[35%] h-[35%] bg-gold/5 blur-[120px] rounded-full pointer-events-none -z-10" />
 
@@ -370,139 +285,6 @@ function ProgressCard({
           className={`h-full rounded-full transition-all ${fillColor}`}
           style={{ width: `${Math.min(pct, 100)}%` }}
         />
-      </div>
-    </div>
-  );
-}
-
-function PromptCard({
-  eyebrow,
-  title,
-  body,
-  subBody,
-  ctaLabel,
-  ctaHref,
-  tone,
-}: {
-  eyebrow: string;
-  title: string;
-  body?: string;
-  subBody?: string;
-  ctaLabel: string;
-  ctaHref: string;
-  tone: "sage" | "gold";
-}) {
-  const toneClasses =
-    tone === "sage"
-      ? "bg-tertiary-container/40 border-sage/40"
-      : "bg-secondary-container/40 border-gold/40";
-
-  return (
-    <Link
-      href={ctaHref}
-      className={`block rounded-md border ${toneClasses} px-gutter py-5 hover:shadow-elevation-2 transition-shadow`}
-    >
-      <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-        {eyebrow}
-      </p>
-      <h3 className="font-display text-headline-md text-charcoal mt-2">
-        {title}
-      </h3>
-      {body && (
-        <p className="font-body text-body-md text-charcoal mt-3 leading-relaxed">
-          {body}
-        </p>
-      )}
-      {subBody && (
-        <p className="font-body text-label-sm text-on-surface-variant/80 mt-2">
-          {subBody}
-        </p>
-      )}
-      <p className="font-body text-label-md tracking-widest uppercase text-charcoal mt-4 inline-flex items-center gap-1">
-        {ctaLabel}
-        <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-      </p>
-    </Link>
-  );
-}
-
-function SundayLockedCard({ dayName }: { dayName: string }) {
-  // Days remaining until next Sunday — Sunday = 0, Monday = 6, …, Saturday = 1.
-  const daysUntilSunday: Record<string, number> = {
-    Sunday: 0,
-    Monday: 6,
-    Tuesday: 5,
-    Wednesday: 4,
-    Thursday: 3,
-    Friday: 2,
-    Saturday: 1,
-  };
-  const days = daysUntilSunday[dayName] ?? 0;
-  const dayLabel = days === 1 ? "Tomorrow" : `In ${days} days`;
-
-  // Urgency ramps over the week:
-  //   Saturday  → gold border + strong pulse + glow
-  //   Friday    → gold-tinted border + soft pulse
-  //   Mon–Thu   → neutral, very subtle pulse
-  const isSaturday = days === 1;
-  const isFriday = days === 2;
-
-  const tone = isSaturday
-    ? "border-gold/70 bg-secondary-container/40 riven-pulse-strong"
-    : isFriday
-    ? "border-gold/40 bg-secondary-container/20 riven-pulse-soft"
-    : "border-outline-variant/60 bg-surface-container/40 riven-pulse-soft";
-
-  const eyebrowColor = isSaturday
-    ? "text-on-secondary-container"
-    : isFriday
-    ? "text-on-secondary-container/80"
-    : "text-on-surface-variant";
-
-  const counterColor = isSaturday
-    ? "text-gold font-semibold"
-    : "text-on-surface-variant/70";
-
-  const titleByDays = isSaturday
-    ? "Sunday check-in opens tomorrow."
-    : isFriday
-    ? "Two days out. Start thinking about your week."
-    : "Sunday check-in is on the calendar.";
-
-  return (
-    <div
-      className={`relative rounded-md border ${tone} px-gutter py-5`}
-      aria-disabled
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <p
-            className={`font-body text-label-md tracking-widest uppercase flex items-center gap-1.5 ${eyebrowColor}`}
-          >
-            <span className="material-symbols-outlined text-[16px]">
-              {isSaturday ? "schedule" : "lock"}
-            </span>
-            Sunday check-in
-          </p>
-          <h3 className="font-display text-headline-md text-charcoal mt-2">
-            {titleByDays}
-          </h3>
-          <p className="font-body text-body-md text-on-surface-variant mt-2">
-            Weight, waist, photos, and how the week actually went. Sean reads every
-            answer.
-          </p>
-          <p className={`font-body text-label-sm mt-3 ${counterColor}`}>
-            {dayLabel}
-            {isSaturday && " · ~9:00 AM CT reminder will ping your phone"}
-          </p>
-        </div>
-        <span
-          className={`material-symbols-outlined mt-1 ${
-            isSaturday ? "text-gold" : "text-on-surface-variant/60"
-          }`}
-        >
-          {isSaturday ? "notifications_active" : "calendar_month"}
-        </span>
       </div>
     </div>
   );
