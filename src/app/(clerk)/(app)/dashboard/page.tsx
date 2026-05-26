@@ -15,11 +15,13 @@ import { getCollectiveStats } from "@/lib/collective-counter";
 import { getCheerCandidates } from "@/lib/cheer";
 import { getCheerReceivedThisWeek } from "@/lib/cheer-received";
 import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
+import { getDailyMoodSnapshot } from "@/lib/daily-mood";
 import { PulseStrip } from "@/components/pulse-strip";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
 import { CheerReceivedCard } from "@/components/cheer-received-card";
 import { SundayRitual } from "@/components/sunday-ritual";
+import { DailyMoodRibbon } from "@/components/daily-mood-ribbon";
 
 // Force a fresh server render on every request. The page reads `auth()` so
 // it's already implicitly dynamic, but pinning it explicitly is belt-and-
@@ -84,12 +86,14 @@ export default async function DashboardPage() {
     cheerCandidates,
     sundaySnapshot,
     cheerReceived,
+    moodSnapshot,
   ] = await Promise.all([
     getRecentPulseEvents(clientUserId).catch(() => []),
     getCollectiveStats().catch(() => null),
     getCheerCandidates(clientUserId).catch(() => []),
     getSundayRitualSnapshot(clientUserId).catch(() => null),
     getCheerReceivedThisWeek(clientUserId).catch(() => null),
+    getDailyMoodSnapshot(clientUserId).catch(() => null),
   ]);
 
   // Only render the Sunday surface when there IS a prompt AND we're
@@ -155,6 +159,10 @@ export default async function DashboardPage() {
       {/* Ambient community surfaces. Each one self-hides on empty data,
           so on a quiet morning none of them render and the dashboard
           reads exactly as it used to. */}
+      {/* Daily mood ribbon — one tap, see how the room is feeling. The
+          lowest-friction community touchpoint we have; sits first because
+          it asks for the least and renders even on a quiet morning. */}
+      {moodSnapshot && <DailyMoodRibbon snapshot={moodSnapshot} />}
       {showSunday && sundaySnapshot?.prompt && (
         <SundayRitual
           promptId={sundaySnapshot.prompt.id}

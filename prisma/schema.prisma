@@ -93,6 +93,7 @@ model User {
   cheersSent       CheerReaction[]    @relation("CheersSent")
   sundayAnswers    SundayPromptAnswer[]
   sundayReactions  SundayPromptReaction[]
+  dailyMoods       DailyMood[]
 }
 
 model Profile {
@@ -387,4 +388,23 @@ model SundayPromptReaction {
 
   @@unique([answerId, userId, kind])
   @@index([answerId])
+}
+
+// Daily mood ribbon — one-tap-a-day community pulse. Each client taps one
+// of four moods (tired / blah / good / fire) and immediately sees how the
+// rest of the room is feeling. Bucketed by Central-time day so the count
+// resets at midnight CT. (userId, centralDate) is unique — re-tapping
+// inside the same day updates her mood instead of stacking rows.
+model DailyMood {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // "tired" 😤 | "blah" 🥱 | "good" 🙂 | "fire" 🔥
+  mood        String
+  centralDate DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, centralDate])
+  @@index([centralDate])
 }
