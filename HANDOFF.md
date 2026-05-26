@@ -16,6 +16,115 @@ This rule does NOT apply when he asks for a build directly (the visual is implie
 
 ---
 
+## Session updates (since c88dfda — through 2026-05-22)
+
+This section captures everything built across the May 2026 build sessions. The schema / route map / architecture sections further down are still mostly accurate as the "base" of the project; this is the delta. Read this FIRST before working on any feature mentioned below — the older sections may not reflect the most current behavior.
+
+### New brand frame: [BRAND.md](./BRAND.md)
+
+The emotional core. *"Peaceful discipline. Steady wins."* Every copy line, screen, and feature should pass the test: **"Does this feel like peaceful discipline?"** No bouncy animations, no fitness-bro energy, no diet-industry hype. Read BRAND.md before writing for RIVEN.
+
+### Working-style rules (updated)
+
+- **UI/UX ideation gets ASCII wireframes, not JSX** (a rule the user explicitly stated; corrected mid-session from an earlier JSX rule). Each option in `┌─┐ │ └─┘` boxes with real labels, real button text.
+- **Label options A / B / C / D.** Sean compares by letter.
+- **Always include a recommendation** when proposing options. Not "you tell me." My pick + the main tradeoff.
+
+### Schema additions
+
+New migrations on top of the existing list (newest at top):
+
+```
+20260522130000_add_sunday_ritual         -- SundayPrompt + Answer + Reaction
+20260522120000_add_cheer_reaction        -- peer-to-peer 🌹
+20260520120000_add_daily_calorie_schedule -- Profile.dailyCalorieSchedule Json?
+20260519130000_add_streak_freezes        -- Profile.streakFreezesAvailable Int @default(1)
+(earlier in session — Lead model for the quiz funnel; check migrations folder for exact name)
+```
+
+New / extended models:
+- **`Lead`** — quiz funnel captures (firstName, email, phone, score 0–100, budgetTier, answers Json, country, createdAt). Used by `/coach/leads`.
+- **`CheerReaction`** — `(recipientUserId, senderUserId, context)` unique. Contexts: `"no_log_24h" | "broke_streak" | "way_over_target" | "manual"`.
+- **`SundayPrompt`** — one per ISO weekStart. **`SundayPromptAnswer`** — one per (prompt, user). **`SundayPromptReaction`** — one per (answer, user, kind). Kinds: `"rose" | "strong" | "leaf"`.
+- **`Profile.streakFreezesAvailable`** (Int, default 1) — Duolingo-style freeze. Schema + UI ship; auto-spend logic is the follow-up.
+- **`Profile.dailyCalorieSchedule`** (Json?) — `{Sun, Mon, Tue, Wed, Thu, Fri, Sat → int}`. When set, `getTodayCalorieTarget(profile)` from `src/lib/calorie-schedule.ts` returns today's value; falls back to flat `cutCalories`. Honored by /dashboard, /log meal pipeline, and /chat live context.
+
+### New routes
+
+Public funnel:
+- **`/quiz`** — editorial landing (hero anchor with gold rules + ◆ ornament, typographic pillar columns, Sean portrait + drop-cap bio, pull-quote testimonials, optional client portrait spread that renders when `/public/icp-portrait.{jpg,png,webp}` exists, Soul Food cheat-sheet card with real thumbnail, Final CTA, freebie lead-magnet, footer)
+- **`/quiz/start`** — 15-question flow
+- **`/quiz/results/[id]`** — animated score (0–100) meter + 3 insights + temperature-aware CTA. Score = (q1–q10 yes × 7) + Q14 weight (0/10/20/30)
+- **`/quiz/vsl`** — YouTube unlisted embed (currently `RAh9NfU3o5Y`). `VSL_EMBED_URL` const in `src/app/quiz/vsl/page.tsx`.
+
+Coach:
+- **`/coach/leads`** — quiz lead dashboard with tier filter chips, expand cards, mailto/sms quick actions, per-lead delete.
+- **`/coach/clients/[id]`** rebuilt with 5 pill tabs (Overview / Meals / Trends / Chat / Weekly). Includes the 28-day color-coded meal calendar with tap-to-expand days and the "probably incomplete" `?` badge on days where she logged 1–2 meals AND total < 60% of target.
+
+### Architecture decisions (new)
+
+**Quiz funnel routing — Q14 picks lane, score picks on-ramp.**
+The result-page CTA in `src/lib/quiz.ts > nextStepFor(tier, score, firstName)`:
+- `FREE` (PDF guide) → `/downloads/20-pound-truth.pdf`
+- `APP` + score ≥ 75 → `/sign-up` direct
+- `APP` + score < 75 → `/quiz/vsl` → then `/sign-up`
+- `COACH` (any score) → `/quiz/vsl` → then `/sign-up`
+- `DONE_FOR_YOU` (any score) → `/quiz/vsl` → then `/sign-up`
+Secondary "Watch the 7-min breakdown" link hidden when the main CTA already routes there.
+
+**Coach roster three-bucket layout.** `/coach/clients` shows: "Today" strip (logged vs quiet, Central-time day), "Needs you" cards, "Doing well" cards, "Everyone else" plain list. Logic in `src/lib/coach-triage.ts`. The bucketed approach is per Sean's explicit preference — replaced an earlier flat triage feed.
+
+**Coach client detail = 5 pill tabs.** Single page, tabs persist in URL search param `?tab=`. Lives in `src/app/(clerk)/(coach)/coach/clients/[id]/page.tsx` + `src/components/coach-client-tabs.tsx`.
+
+**Calorie cycling per client.** When `Profile.dailyCalorieSchedule` is non-null, every consumer of `cutCalories` reads `getTodayCalorieTarget(profile)` instead. Wired into /dashboard, /log meal pipeline, /chat live context. Coach editor lives on `/coach/clients/[id]` Overview tab in the Profile section.
+
+**Per-client comp + bulk comp.** `setClientComp` and `compAllExistingClients` server actions in `src/lib/coach-actions.ts`. UI: `/coach/clients/[id]` per-client toggle, `/coach/profile` bulk button (two-step confirm). Stripe webhook still skips `subscriptionStatus="comped"` on update.
+
+**Ambient community trio on /dashboard.** Three surfaces above "Today", each self-hiding on empty data:
+- **`PulseStrip`** — derived activity feed from MealLog + WeeklyCheckIn + computed streaks. 12h window, max 6 events, viewer's own activity filtered out. First names always.
+- **`CollectiveCounter`** — aggregate stats across active+comped clients (meals this week, protein hits today, steps this month, lbs lost combined). Stat hides when zero.
+- **`CheerPrompts`** — system auto-detects hard-day candidates (no log 24h+, broke 3-day streak, total > target × 1.5 yesterday). One tap creates a `CheerReaction` row + push notification to her.
+Helpers: `src/lib/pulse.ts`, `src/lib/collective-counter.ts`, `src/lib/cheer.ts`. Server action: `src/app/(clerk)/(app)/dashboard/cheer-action.ts`.
+
+**Sunday Daily Ritual.** Fourth community surface, also on /dashboard. Coach writes one weekly question at `/coach/profile`; appears at top of every active client's dashboard on Sunday with composer + others' answers + 🌹/💪/🌿 reactions. "Open" = today's Central day is Sunday; otherwise replay-only (UI disables buttons). Surface lingers on Mon-Sat if anyone participated. Helpers: `src/lib/sunday-ritual.ts`. Server actions: `src/app/(clerk)/(app)/dashboard/sunday-actions.ts` (`submitSundayAnswer`, `toggleSundayReaction`). Coach action: `setSundayPrompt` in `coach-actions.ts`.
+
+**RIVEN AI now reads live data + can write meals.** `/api/chat/stream` injects a fresh client context every turn (today's totals, recent meals, latest check-in, current streak). Claude has a `log_meal` tool — when she types "I had a chicken caesar salad," the tool fires, runs the same `analyzeMeal` pipeline as `/log` (shared in `src/lib/meal-pipeline.ts`), and persists the meal log + updates DailyTotals.
+
+**Streaks 14/30/60/90.** Variant banks added to `sean-message-variants.ts` (45 new lines + 28 new titles). Engine in `sean-messages.ts` picks the HIGHEST applicable milestone; window expanded from 30 → 100 days to support 90-day detection.
+
+**Streak freeze foundation.** Profile column + UI on `/profile`. Auto-spend logic in `sean-messages.ts` is the follow-up — schema/UI ships, behavior lands next.
+
+**Sunday recap push.** New cron route `/api/cron/sunday-recap` — personalized weekly recap push for every active client. Suggested Railway cron: `30 13 * * 0` UTC (Sun 8:30 AM CDT). **Not yet wired up as a Railway service** — duplicate the existing `sunday-reminder` service pattern.
+
+**`/pricing` escape hatch.** Moved into the `(clerk)` route group so it lives inside `ClerkProvider`. Header now shows "Signed in as X" + Clerk `<SignOutButton>` for any signed-in user. When signed in but not subscribed, a diagnostic panel surfaces role + subscriptionStatus so Sean (or any client) sees WHY the paywall fired.
+
+**PwaInstallBanner rebuilt around install videos.** `/public/videos/install-iphone.mp4` + `install-android.mp4`. Banner copy says "watch this video to install" instead of textual steps. 3-day escalation logic.
+
+### Meal logging behavior (current state)
+
+- **Flat 35% overestimation** above any inferred baseline (previously 20-30% range; tightened to a single number).
+- **Explicit calorie numbers trusted as-is.** If she says "the label said 290 cal," log 290 with no buffer.
+- **Implausibility override.** If she claims "Big Mac at 100 cal," AI overrides with the honest number and a one-line "real talk, that's closer to 720."
+- **Incremental tightens only** ("medium fry next time," not "eat a salad"). NEVER cross food categories or use diet-culture moves.
+- **Cultural baselines pre-cushioned** at the +35% level — don't double-apply.
+- **flagReason word caps:** 1 sentence, 60 words max. `coaching`: 2-3 sentences, 75 words max.
+- **Items breakdown** (per-meal items array) — pre-existing, still active.
+
+### Logo + PWA icons
+
+Current `/public/riven-logo.png` is the **Canva RIVEN oval wordmark** (black on transparent — white background chroma-keyed out via sharp pixel-walk). PWA icons (192/512/180) regenerated from logo on cream `#FAF7F2` with ~12% padding.
+
+To swap logos: drop the new file at `/public/riven-logo.png` and re-run the regenerate-PWA-icons sharp snippet (see commits `c9dc10c` for heron version or `cf3bc1f` for Canva for the exact node-e command).
+
+### Things Sean still needs to do manually
+
+- **Set up the Sunday-recap Railway cron service** (duplicate `sunday-reminder`, change endpoint to `/api/cron/sunday-recap`, schedule `30 13 * * 0` UTC).
+- **Drop `/public/icp-portrait.jpg`** to activate the client portrait spread on `/quiz`. Section gracefully hides until it lands.
+- **Write the first Sunday prompt** at `/coach/profile` → Coaching tools → Sunday prompt — otherwise the ritual surface doesn't appear.
+- **YouTube unlisted VSL embed settings:** confirm `Allow embedding` is checked; comments off; like/dislike off (set during upload at YouTube Studio Show-More → Comments and ratings).
+
+---
+
 ## What RIVEN is
 
 Premium mobile-first coaching app for Black women 35–55 in a body-recomposition program. Built around one coach (Sean Williams) and his clients. Brand: luxurious essentialism — cream backgrounds, charcoal text, gold/sage accents, DM Serif Display headlines, Plus Jakarta Sans body. Direct/no-BS voice, never preachy.
