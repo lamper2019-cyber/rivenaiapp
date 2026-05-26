@@ -240,9 +240,9 @@ export default async function DashboardPage() {
             - LogStepsForm (steps progress still renders in Today below)
             - Sunday check-in card (path remains via /check-in + push)
             - This Week's Prompt content card (path remains via /content)
-          Sunday ritual lives at the top of the dashboard now; that's the
-          weekly community moment, and /check-in itself is being redesigned
-          to be easier on its own page. */}
+          The weekly community moments live above (mood ribbon, Sunday
+          ritual, cheer card). The big check-in moved to monthly cadence
+          — fires on the 1st via the renamed sunday-reminder cron. */}
 
       <div className="fixed top-[10%] right-[-10%] w-[35%] h-[35%] bg-gold/5 blur-[120px] rounded-full pointer-events-none -z-10" />
 

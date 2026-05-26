@@ -1,8 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { startOfIsoWeek } from "@/lib/week";
 import { startOfCentralDay } from "@/lib/dates";
-import { getPromptForClientWeek, getClientWeekNumber } from "@/lib/content-prompts";
 
+/**
+ * Dashboard data loader. Only returns what /dashboard actually renders.
+ *
+ * Recent cleanup: this used to fetch the weekly check-in row, the weekly
+ * content prompt, and the daily-quote prompt for the Quick-Actions hero —
+ * none of those surfaces live on the dashboard anymore (mood ribbon +
+ * Sunday ritual + cheer card replaced them). Pruned accordingly so we
+ * don't query four tables for data the UI doesn't read.
+ */
 export async function loadDashboardData(clerkId: string) {
   const user = await prisma.user.findUnique({
     where: { clerkId },
@@ -11,20 +18,10 @@ export async function loadDashboardData(clerkId: string) {
   if (!user || !user.profile) return null;
 
   const today = startOfCentralDay();
-  const weekStart = startOfIsoWeek(new Date());
 
-  const [todayTotals, weekCheckIn, weekContent, recentCoachMessages] = await Promise.all([
+  const [todayTotals, recentCoachMessages] = await Promise.all([
     prisma.dailyTotals.findUnique({
       where: { userId_date: { userId: user.id, date: today } },
-    }),
-    prisma.weeklyCheckIn.findUnique({
-      where: { userId_weekStart: { userId: user.id, weekStart } },
-      select: { id: true, weight: true, waist: true, createdAt: true },
-    }),
-    prisma.contentSubmission.findFirst({
-      where: { userId: user.id, week: weekStart },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, videoUrl: true, photoUrl: true, promptText: true, createdAt: true },
     }),
     // COACH messages from the last 30 days — drives the persistent "Message
     // from Sean" chip on the home screen. The chip stays visible regardless
@@ -42,14 +39,10 @@ export async function loadDashboardData(clerkId: string) {
     })(),
   ]);
 
-  // Per-client week numbering — week 1 starts the day she finishes onboarding.
-  const clientWeek = getClientWeekNumber(user.profile.onboardedAt);
-  const prompt = getPromptForClientWeek(clientWeek);
   const dayName = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     timeZone: "America/Chicago",
   });
-  const isCheckInDay = ["Sunday", "Monday"].includes(dayName);
 
   return {
     userId: user.id,
@@ -61,12 +54,6 @@ export async function loadDashboardData(clerkId: string) {
       carbs: todayTotals?.totalCarbs ?? 0,
       steps: todayTotals?.totalSteps ?? 0,
     },
-    weekCheckIn,
-    weekContent,
-    weekStart,
-    prompt,
-    clientWeek,
-    isCheckInDay,
     dayName,
     recentCoachMessages: recentCoachMessages.map((m) => ({
       id: m.id,
@@ -75,4 +62,3 @@ export async function loadDashboardData(clerkId: string) {
     })),
   };
 }
-

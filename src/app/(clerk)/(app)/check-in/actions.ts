@@ -5,7 +5,14 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { startOfIsoWeek } from "@/lib/week";
+import { startOfCentralMonth } from "@/lib/dates";
+
+/**
+ * Submit (or update) this month's check-in. Keyed by month-start in the
+ * WeeklyCheckIn.weekStart column — kept the column name to dodge a rename
+ * migration. Historical weekly rows coexist with new monthly rows since
+ * they have different dates.
+ */
 
 const CheckInSchema = z.object({
   weight: z.coerce.number().min(70).max(700),
@@ -88,10 +95,13 @@ export async function submitCheckIn(
     return { ok: false, error: "Complete onboarding first." };
   }
 
-  const weekStart = startOfIsoWeek(new Date());
+  // weekStart column now stores month-start. Same upsert shape; the
+  // unique constraint on (userId, weekStart) doubles as a per-month idempotency
+  // key now that the cadence is monthly.
+  const monthStart = startOfCentralMonth();
 
   await prisma.weeklyCheckIn.upsert({
-    where: { userId_weekStart: { userId: user.id, weekStart } },
+    where: { userId_weekStart: { userId: user.id, weekStart: monthStart } },
     update: {
       weight: data.weight,
       waist: data.waist,
@@ -105,7 +115,7 @@ export async function submitCheckIn(
     },
     create: {
       userId: user.id,
-      weekStart,
+      weekStart: monthStart,
       weight: data.weight,
       waist: data.waist,
       photoFrontUrl: data.photoFrontUrl ?? null,

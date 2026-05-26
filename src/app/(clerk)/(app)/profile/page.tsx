@@ -11,6 +11,7 @@ import {
 import { Sparkline } from "@/components/sparkline";
 import { PushSubscribeButton } from "@/components/push-subscribe-button";
 import { startOfIsoWeek } from "@/lib/week";
+import { startOfCentralMonth } from "@/lib/dates";
 import {
   getClientWeekNumber,
   getPromptForClientWeek,
@@ -32,7 +33,11 @@ export default async function ProfilePage() {
   let subscriptionStatus: string | null = null;
   let checkIns: Awaited<ReturnType<typeof prisma.weeklyCheckIn.findMany>> = [];
   let wins: Win[] = [];
-  let weekCheckIn: {
+  // "monthCheckIn" — this month's check-in row, used to swap the
+  // /check-in CTA card for a "✓ checked in this month" state. Reads the
+  // WeeklyCheckIn table by month-start (the column name is historical;
+  // see comment in /check-in/actions.ts).
+  let monthCheckIn: {
     id: string;
     weight: number;
     waist: number;
@@ -45,6 +50,7 @@ export default async function ProfilePage() {
   } | null = null;
 
   const weekStart = startOfIsoWeek(new Date());
+  const monthStart = startOfCentralMonth();
 
   if (userId) {
     try {
@@ -57,14 +63,16 @@ export default async function ProfilePage() {
       subscriptionStatus = user?.subscriptionStatus ?? null;
 
       if (user) {
-        [checkIns, weekCheckIn, weekContent] = await Promise.all([
+        [checkIns, monthCheckIn, weekContent] = await Promise.all([
           prisma.weeklyCheckIn.findMany({
             where: { userId: user.id },
             orderBy: { weekStart: "asc" },
-            take: 26, // last ~6 months of weekly check-ins
+            // Last ~12 entries — was 6mo of weekly rows (26), now 12mo of
+            // monthly rows. Historical weekly rows still show up here.
+            take: 12,
           }),
           prisma.weeklyCheckIn.findUnique({
-            where: { userId_weekStart: { userId: user.id, weekStart } },
+            where: { userId_weekStart: { userId: user.id, weekStart: monthStart } },
             select: { id: true, weight: true, waist: true },
           }),
           prisma.contentSubmission.findFirst({
@@ -210,16 +218,16 @@ export default async function ProfilePage() {
 
       <section className="space-y-3">
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-          Weekly
+          Check-in
         </h2>
 
-        {weekCheckIn ? (
+        {monthCheckIn ? (
           <div className="rounded-md bg-tertiary-container/40 border border-sage/40 px-gutter py-4 shadow-elevation-1">
             <p className="font-body text-label-md tracking-widest uppercase text-sage">
-              Checked in this week
+              Checked in this month
             </p>
             <p className="font-body text-body-md text-charcoal mt-2">
-              Weight {weekCheckIn.weight} lbs · Waist {weekCheckIn.waist}″
+              Weight {monthCheckIn.weight} lbs · Waist {monthCheckIn.waist}″
             </p>
           </div>
         ) : (
@@ -230,10 +238,10 @@ export default async function ProfilePage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="font-display text-headline-md text-charcoal">
-                  Sunday check-in
+                  Monthly check-in
                 </p>
                 <p className="font-body text-body-md text-on-surface-variant mt-1">
-                  Weight, waist, photos, and how the week actually went.
+                  Weight, waist, photos, and how the month actually went.
                 </p>
               </div>
               <span className="material-symbols-outlined text-on-surface-variant">

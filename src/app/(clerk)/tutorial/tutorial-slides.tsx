@@ -33,8 +33,8 @@ const SLIDES: Slide[] = [
   },
   {
     eyebrow: "Step 3 of 4",
-    title: "Sunday check-ins.",
-    body: "Every Sunday, you'll complete a quick check-in — weight, waist, photos, sleep, how the week went. This is how we track real progress and adjust your plan.",
+    title: "Monthly check-in.",
+    body: "On the 1st of each month, you'll complete a quick check-in — weight, waist, photos, sleep, how the month went. Once a month, ten minutes. This is how Sean tracks the real trend and adjusts your plan.",
     icon: "calendar_month",
     ctaLabel: "Next",
   },

@@ -123,7 +123,7 @@ export async function getRecentPulseEvents(
       id: `checkin-${c.id}`,
       kind: "CHECKIN_DONE",
       firstName: first,
-      copy: `${first} just finished her Sunday check-in`,
+      copy: `${first} just finished her monthly check-in`,
       at: c.createdAt,
     });
   }

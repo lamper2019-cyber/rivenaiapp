@@ -96,7 +96,7 @@ export default async function PricingPage({
           The whole protocol, in your pocket.
         </h1>
         <p className="font-body text-body-lg text-on-surface-variant max-w-md mx-auto">
-          Voice meal logging, Sean&apos;s coaching voice, weekly check-ins, Monday morning
+          Voice meal logging, Sean&apos;s coaching voice, monthly check-ins, Monday morning
           accountability. Built for Black women 35-55 doing real recomposition.
         </p>
 
@@ -146,7 +146,7 @@ export default async function PricingPage({
             <Feature>RIVEN AI in Sean&apos;s voice — chat anytime</Feature>
             <Feature>Voice meal logging with cultural food knowledge</Feature>
             <Feature>Personalized daily targets and progress tracking</Feature>
-            <Feature>Sunday weekly check-ins + Monday Sean check-ins</Feature>
+            <Feature>Monthly check-ins + Monday Sean check-ins</Feature>
             <Feature>Weekly content prompts for accountability</Feature>
             <Feature>Cancel anytime through your billing portal</Feature>
           </ul>

@@ -1,22 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPush, isExpiredSubscriptionError, isPushConfigured } from "@/lib/push";
-import { startOfIsoWeek } from "@/lib/week";
+import { startOfCentralMonth } from "@/lib/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Sunday-morning reminder push.
+ * Monthly check-in reminder push.
  *
- * Sends a push to every CLIENT who hasn't yet submitted this week's check-in.
+ * Used to be a weekly Sunday push. The check-in cadence moved to monthly
+ * (1st of each month), so this route now fires once a month: only on the
+ * 1st in Central time. Schedule it to run daily and let the date guard
+ * pick its one valid morning per month.
+ *
+ * Suggested external schedule: daily at 09:00 Central. The route no-ops
+ * on every day except the 1st. (We kept the `sunday-reminder` path name
+ * so the external cron config doesn't need rewiring — the comment above
+ * tells future-you why the path is misleading.)
+ *
  * Protected by CRON_SECRET — pass it as `Authorization: Bearer $CRON_SECRET`.
- *
- * To run weekly: schedule a real cron (Vercel Cron, Railway cron, EasyCron,
- * cron-job.org, etc.) to hit:
- *   POST https://yourdomain.com/api/cron/sunday-reminder
- *   Authorization: Bearer $CRON_SECRET
- * Suggested schedule: Sunday 09:00 in Sean's timezone.
  */
 export async function POST(req: Request) {
   const expected = process.env.CRON_SECRET;
@@ -40,15 +43,31 @@ export async function POST(req: Request) {
     );
   }
 
-  const weekStart = startOfIsoWeek(new Date());
+  // Only fire on day-1 of the Central month. Every other day, no-op.
+  const dayOfMonth = parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      day: "numeric",
+    }).format(new Date()),
+    10,
+  );
+  if (dayOfMonth !== 1) {
+    return NextResponse.json({
+      ok: true,
+      noop: true,
+      reason: `Day ${dayOfMonth} — monthly reminder fires only on the 1st.`,
+    });
+  }
 
-  // Clients who haven't checked in for the current week.
+  const monthStart = startOfCentralMonth();
+
+  // Clients who haven't checked in for this month yet.
   const clients = await prisma.user.findMany({
     where: {
       role: "CLIENT",
       profile: { isNot: null },
       weeklyCheckIns: {
-        none: { weekStart },
+        none: { weekStart: monthStart },
       },
     },
     select: {
@@ -72,10 +91,10 @@ export async function POST(req: Request) {
     for (const sub of client.pushSubscriptions) {
       try {
         await sendPush(sub, {
-          title: "Sunday check-in is open",
-          body: "Eight questions, two photos, ten minutes. Tap to start.",
+          title: "Monthly check-in is open",
+          body: "Weight, waist, two photos, ten minutes. Tap to start.",
           url: "/check-in",
-          tag: `checkin-${weekStart.toISOString().slice(0, 10)}`,
+          tag: `checkin-${monthStart.toISOString().slice(0, 7)}`,
         });
         sent++;
       } catch (err) {
@@ -96,7 +115,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    weekStart: weekStart.toISOString(),
+    monthStart: monthStart.toISOString(),
     clientsTargeted: clients.length,
     sent,
     failed,

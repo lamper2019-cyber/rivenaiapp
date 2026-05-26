@@ -162,7 +162,7 @@ export function NotificationOptIn({
             Turn on notifications
           </h3>
           <p className="font-body text-body-md text-on-surface-variant mt-1">
-            So Sean can reach you — and so you never miss your Sunday check-in
+            So Sean can reach you — and so you never miss your monthly check-in
             reminder.
           </p>
           <button

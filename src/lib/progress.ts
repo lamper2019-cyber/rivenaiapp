@@ -56,13 +56,16 @@ export function computeWins(profile: Profile, checkIns: WeeklyCheckIn[]): Win[] 
     }
   }
 
-  // 3. Weeks consistent: count of consecutive weekly check-ins ending with the latest.
-  const consecutive = countConsecutiveWeeks(checkIns);
+  // 3. Months consistent: count of consecutive monthly check-ins ending
+  // with the latest. (The cadence used to be weekly — historical weekly
+  // rows still get counted by the gap-based detector because the slop
+  // window is generous.)
+  const consecutive = countConsecutiveMonths(checkIns);
   if (consecutive >= 2) {
     wins.push({
-      id: "weeks-consistent",
-      headline: `${consecutive} weeks consistent`,
-      detail: `Sunday check-ins ${consecutive === 2 ? "two" : "in a row"} — the engine is built on this.`,
+      id: "months-consistent",
+      headline: `${consecutive} months consistent`,
+      detail: `Check-ins ${consecutive === 2 ? "two" : "in a row"} — the engine is built on this.`,
       tone: "sage",
     });
   }
@@ -85,22 +88,44 @@ export function computeWins(profile: Profile, checkIns: WeeklyCheckIn[]): Win[] 
 }
 
 /**
- * Number of consecutive weeks (counted backward from the latest check-in)
- * with no missing week.
+ * Number of consecutive months (counted backward from the latest check-in)
+ * with no missing month. Tolerates the historical weekly cadence too — if
+ * any check-in landed inside a calendar month, that month counts. The
+ * counter walks back month-by-month from the latest check-in's month.
  */
-function countConsecutiveWeeks(checkIns: WeeklyCheckIn[]): number {
+function countConsecutiveMonths(checkIns: WeeklyCheckIn[]): number {
   if (checkIns.length === 0) return 0;
-  // Sort defensively (caller is supposed to pass ascending).
   const sorted = [...checkIns].sort(
     (a, b) => a.weekStart.getTime() - b.weekStart.getTime()
   );
-  let streak = 1;
-  for (let i = sorted.length - 1; i > 0; i--) {
-    const diff = sorted[i].weekStart.getTime() - sorted[i - 1].weekStart.getTime();
-    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
-    // Allow ±1 day slop for DST.
-    if (Math.abs(diff - oneWeekMs) < 24 * 60 * 60 * 1000) {
+  // Reduce to the set of unique (year, month) keys her check-ins covered.
+  const monthsSet = new Set<string>();
+  for (const c of sorted) {
+    const key = c.weekStart.toLocaleDateString("en-US", {
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "America/Chicago",
+    });
+    monthsSet.add(key);
+  }
+  // Walk back from the latest month, stop on the first gap.
+  const latest = sorted[sorted.length - 1].weekStart;
+  // Build a "month cursor" in Central wall time.
+  let cursor = new Date(
+    Date.UTC(latest.getUTCFullYear(), latest.getUTCMonth(), 15, 12),
+  );
+  let streak = 0;
+  while (true) {
+    const key = cursor.toLocaleDateString("en-US", {
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "America/Chicago",
+    });
+    if (monthsSet.has(key)) {
       streak++;
+      cursor = new Date(
+        Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() - 1, 15, 12),
+      );
     } else {
       break;
     }
