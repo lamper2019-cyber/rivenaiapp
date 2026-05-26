@@ -97,7 +97,7 @@ export default function QuizLandingPage() {
       </nav>
 
       {/* ───────── Hero — C (anchor) + E (choreography) ───────── */}
-      <section className="relative overflow-hidden pt-14 md:pt-24 pb-20 md:pb-28">
+      <section className="relative overflow-hidden pt-20 md:pt-24 pb-28 md:pb-28">
         <div className="max-w-3xl mx-auto px-container-mobile md:px-container-desktop text-center">
           {/* C — Editorial eyebrow: gold rules + label, no chip. */}
           <div
@@ -111,9 +111,14 @@ export default function QuizLandingPage() {
             <span className="block w-10 h-px bg-gold/60" aria-hidden />
           </div>
 
-          {/* E — Headline rises after eyebrow. */}
+          {/* E — Headline rises after eyebrow. Hero size is dramatic:
+              display-md on mobile (40px → was silently no-opping to ~16px
+              before the tailwind tokens were added), display-xl on desktop
+              (56px). Tightened leading + extra top margin so the headline
+              takes meaningful vertical real estate on phones — Sean's
+              call: "make it bigger and go down the screen more." */}
           <h1
-            className="font-display text-display-md md:text-display-lg text-charcoal tracking-tight text-balance leading-[1.05] mt-8 riven-rise-in"
+            className="font-display text-display-md md:text-display-xl text-charcoal tracking-tight text-balance leading-[1.1] md:leading-[1.05] mt-10 md:mt-8 riven-rise-in"
             style={{ animationDelay: "300ms" }}
           >
             Frustrated your body isn&apos;t responding the way it used to
@@ -318,17 +323,14 @@ export default function QuizLandingPage() {
               <PullQuote
                 quote="I tried everything. RIVEN was the first time the numbers actually moved."
                 name="Keisha"
-                tagline="Two months in"
               />
               <PullQuote
                 quote="Sean's voice in my pocket every Monday is what made it stick."
                 name="Yvonne"
-                tagline="Six months"
               />
               <PullQuote
                 quote="I stopped white-knuckling food. Real change, not all-or-nothing."
                 name="Brianna"
-                tagline="22 weeks in"
               />
             </div>
           </div>
@@ -485,11 +487,9 @@ function PillarColumn({
 function PullQuote({
   quote,
   name,
-  tagline,
 }: {
   quote: string;
   name: string;
-  tagline: string;
 }) {
   return (
     <figure className="space-y-5">
@@ -505,7 +505,7 @@ function PullQuote({
       <figcaption className="space-y-2">
         <span className="block w-12 h-px bg-cream/40" aria-hidden />
         <p className="font-body text-label-md tracking-widest uppercase text-cream/80">
-          {name} · {tagline}
+          {name}
         </p>
       </figcaption>
     </figure>

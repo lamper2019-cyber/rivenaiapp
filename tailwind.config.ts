@@ -77,7 +77,15 @@ const config: Config = {
         "label-sm": ["var(--font-plus-jakarta)", "Plus Jakarta Sans", "sans-serif"],
       },
       fontSize: {
+        // Display scale — DM Serif. display-xl is the new top tier for
+        // dramatic hero moments. display-md and display-sm fill in the
+        // gap that used to silently no-op (classes existed in components
+        // but no token = browser-default fallback on mobile, so headlines
+        // shrunk to ~16px on phones).
+        "display-xl": ["56px", { lineHeight: "60px", letterSpacing: "-0.02em", fontWeight: "400" }],
         "display-lg": ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "400" }],
+        "display-md": ["40px", { lineHeight: "44px", letterSpacing: "-0.01em", fontWeight: "400" }],
+        "display-sm": ["32px", { lineHeight: "38px", letterSpacing: "-0.01em", fontWeight: "400" }],
         "headline-lg": ["32px", { lineHeight: "40px", fontWeight: "400" }],
         "headline-lg-mobile": ["28px", { lineHeight: "36px", fontWeight: "400" }],
         "headline-md": ["24px", { lineHeight: "32px", fontWeight: "400" }],
