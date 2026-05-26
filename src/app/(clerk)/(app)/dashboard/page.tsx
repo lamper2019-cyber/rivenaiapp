@@ -98,11 +98,16 @@ export default async function DashboardPage() {
 
   // Only render the Sunday surface when there IS a prompt AND we're
   // either inside the open window OR she already participated this week
-  // (so she can re-read her own answer + others' on Monday morning).
+  // (so she can re-read her own pick + the room's tally on Monday).
+  // Participation = tapped a choice (tap formats) OR wrote an answer
+  // (legacy "open" format). Tally / others lists count too so the room
+  // stays visible to anyone who shows up after Sunday closes.
   const showSunday =
     sundaySnapshot?.prompt !== null &&
     sundaySnapshot !== null &&
     (sundaySnapshot.isOpen ||
+      sundaySnapshot.myChoice !== null ||
+      sundaySnapshot.totalTaps > 0 ||
       sundaySnapshot.myAnswer !== null ||
       sundaySnapshot.others.length > 0);
 
@@ -167,6 +172,11 @@ export default async function DashboardPage() {
         <SundayRitual
           promptId={sundaySnapshot.prompt.id}
           question={sundaySnapshot.prompt.question}
+          kind={sundaySnapshot.prompt.kind}
+          options={sundaySnapshot.prompt.options}
+          tally={sundaySnapshot.tally}
+          myChoice={sundaySnapshot.myChoice}
+          totalTaps={sundaySnapshot.totalTaps}
           myAnswer={sundaySnapshot.myAnswer}
           others={sundaySnapshot.others}
           isOpen={sundaySnapshot.isOpen}

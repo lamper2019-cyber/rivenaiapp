@@ -5,7 +5,13 @@ import { prisma } from "@/lib/prisma";
 import { TriggerMondayCheckinsButton } from "./trigger-monday-checkins-button";
 import { CompAllClientsButton } from "./comp-all-clients-button";
 import { SundayPromptForm } from "./sunday-prompt-form";
-import { getCurrentWeekPrompt } from "@/lib/sunday-ritual";
+import {
+  getCurrentWeekPrompt,
+  isSundayPromptKind,
+  parseOptions,
+  pickNextRotationKind,
+  type SundayPromptKind,
+} from "@/lib/sunday-ritual";
 
 /**
  * Coach profile page. Lives under (coach) so the layout already gates by
@@ -42,6 +48,27 @@ export default async function CoachProfilePage() {
   // This week's Sunday prompt — drives the editor below. Falls back to
   // an empty draft if Sean hasn't set one yet for the current ISO week.
   const currentSundayPrompt = await getCurrentWeekPrompt().catch(() => null);
+  const suggestedKind = await pickNextRotationKind().catch(
+    () => "pulse" as const,
+  );
+
+  // Existing kind (if a prompt is already saved this week) — drop "open"
+  // from the editor's view since the legacy format is retired for new
+  // prompts. If a stale "open" row exists for this week, the editor will
+  // re-pick the rotation default and Sean can save over it.
+  const existingKindRaw: SundayPromptKind | null =
+    currentSundayPrompt && isSundayPromptKind(currentSundayPrompt.kind)
+      ? currentSundayPrompt.kind
+      : null;
+  const initialKind =
+    existingKindRaw === "pulse" ||
+    existingKindRaw === "this_or_that" ||
+    existingKindRaw === "is_this_you"
+      ? existingKindRaw
+      : null;
+  const initialOptions = currentSundayPrompt
+    ? parseOptions(currentSundayPrompt.options)
+    : [];
   const sundayWeekStartLabel = currentSundayPrompt?.weekStart
     ? currentSundayPrompt.weekStart.toLocaleDateString("en-US", {
         month: "short",
@@ -122,7 +149,10 @@ export default async function CoachProfilePage() {
         <div className="border-t border-outline-variant/40 pt-6">
           <SundayPromptForm
             initialQuestion={currentSundayPrompt?.question ?? ""}
+            initialKind={initialKind}
+            initialOptions={initialOptions}
             weekStartLabel={sundayWeekStartLabel}
+            suggestedKind={suggestedKind}
           />
         </div>
       </section>

@@ -711,12 +711,22 @@ export async function deleteLead(
 
 // ─────────────────────── Sunday ritual prompt editor ───────────────────────
 
+const TAP_KINDS_SET = new Set(["pulse", "this_or_that", "is_this_you"] as const);
+type TapKind = "pulse" | "this_or_that" | "is_this_you";
+
+const OptionSchema = z.object({
+  key: z.string().min(1).max(64).transform((s) => s.trim()),
+  label: z.string().min(1).max(200).transform((s) => s.trim()),
+});
+
 const SundayPromptSchema = z.object({
   question: z
     .string()
     .min(1, "Write something — even one line works.")
     .max(500, "Keep the prompt under 500 characters")
     .transform((s) => s.trim()),
+  kind: z.enum(["pulse", "this_or_that", "is_this_you"]),
+  options: z.array(OptionSchema).min(2).max(4),
 });
 
 export type SetSundayPromptResult =
@@ -726,7 +736,12 @@ export type SetSundayPromptResult =
 /**
  * Coach writes / updates this week's Sunday ritual prompt. Keyed by ISO
  * weekStart so each week gets one prompt; running this multiple times
- * the same week just edits the question (idempotent).
+ * the same week just edits everything (idempotent).
+ *
+ * Three tap-based formats live here (pulse / this_or_that / is_this_you).
+ * The legacy "open" written format is retired for new prompts — historical
+ * prompts still render in replay mode, but the editor doesn't surface it
+ * as a choice anymore.
  */
 export async function setSundayPrompt(
   formData: FormData,
@@ -750,14 +765,51 @@ export async function setSundayPrompt(
     return { ok: false, error: "Only coaches can set the Sunday prompt." };
   }
 
+  // Options arrive as a JSON-encoded array under one field. The editor
+  // serializes its UI state before submit; we parse + zod-validate here.
+  let optionsRaw: unknown;
+  try {
+    const optionsStr = formData.get("options");
+    optionsRaw =
+      typeof optionsStr === "string" && optionsStr.length > 0
+        ? JSON.parse(optionsStr)
+        : [];
+  } catch {
+    return { ok: false, error: "Options were malformed — try again." };
+  }
+
+  const kindRaw = formData.get("kind");
+  if (typeof kindRaw !== "string" || !TAP_KINDS_SET.has(kindRaw as TapKind)) {
+    return { ok: false, error: "Pick a format." };
+  }
+
   const parsed = SundayPromptSchema.safeParse({
     question: formData.get("question"),
+    kind: kindRaw,
+    options: optionsRaw,
   });
   if (!parsed.success) {
     return {
       ok: false,
       error: parsed.error.issues[0]?.message ?? "Invalid input",
     };
+  }
+
+  // this_or_that needs exactly 2 options; pulse / is_this_you need 3.
+  const expected = parsed.data.kind === "this_or_that" ? 2 : 3;
+  if (parsed.data.options.length !== expected) {
+    return {
+      ok: false,
+      error: `${
+        parsed.data.kind === "this_or_that" ? "This or that" : "This format"
+      } needs ${expected} options.`,
+    };
+  }
+
+  // Keys must be unique within a prompt — the tally column is keyed by them.
+  const keys = new Set(parsed.data.options.map((o) => o.key));
+  if (keys.size !== parsed.data.options.length) {
+    return { ok: false, error: "Option keys must be unique." };
   }
 
   // ISO week start (Monday) — inline to avoid circular dep with @/lib/week.
@@ -771,8 +823,17 @@ export async function setSundayPrompt(
 
   await prisma.sundayPrompt.upsert({
     where: { weekStart: monday },
-    create: { weekStart: monday, question: parsed.data.question },
-    update: { question: parsed.data.question },
+    create: {
+      weekStart: monday,
+      question: parsed.data.question,
+      kind: parsed.data.kind,
+      options: parsed.data.options,
+    },
+    update: {
+      question: parsed.data.question,
+      kind: parsed.data.kind,
+      options: parsed.data.options,
+    },
   });
 
   revalidatePath("/coach/profile");

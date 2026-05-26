@@ -356,6 +356,18 @@ model SundayPrompt {
   // up this week's prompt by this key.
   weekStart DateTime @unique
   question  String
+  // Format kind. "pulse" = 3-tap bar poll, "this_or_that" = binary card,
+  // "is_this_you" = relatable + 3 confession reactions, "open" = legacy
+  // free-text answer (historical only — new prompts auto-rotate through
+  // the three tap formats). The coach editor can override the auto-picked
+  // kind per week.
+  kind      String   @default("pulse")
+  // Options for tap formats. Shape depends on kind:
+  //   pulse:        [{ key: "discipline", label: "discipline" }, ...]  (3 entries)
+  //   this_or_that: [{ key: "left", label: "I'll start Monday" }, ...] (2 entries)
+  //   is_this_you:  [{ key: "me", label: "😤 me" }, ...]               (3 entries)
+  //   open:         null (use SundayPromptAnswer.body)
+  options   Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   answers   SundayPromptAnswer[]
@@ -367,7 +379,12 @@ model SundayPromptAnswer {
   prompt    SundayPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  body      String   @db.Text
+  // Option key she tapped for tap-format prompts (pulse / this_or_that /
+  // is_this_you). Null on legacy "open" answers, which use body instead.
+  choice    String?
+  // Free-text answer. Nullable now — only legacy "open" prompts populate
+  // this field. New tap-format answers leave body null.
+  body      String?  @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   reactions SundayPromptReaction[]

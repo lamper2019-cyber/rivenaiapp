@@ -5,7 +5,11 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { isRitualOpen, SUNDAY_REACTION_KINDS } from "@/lib/sunday-ritual";
+import {
+  isRitualOpen,
+  parseOptions,
+  SUNDAY_REACTION_KINDS,
+} from "@/lib/sunday-ritual";
 
 /**
  * Server actions for the Sunday ritual surface on /dashboard.
@@ -185,4 +189,98 @@ export async function toggleSundayReaction(
   });
   revalidatePath("/dashboard");
   return { ok: true, on: true };
+}
+
+// ─────────────────────── Tap a Sunday choice ───────────────────────
+
+const TapSchema = z.object({
+  promptId: z.string().min(1),
+  choice: z.string().min(1).max(64),
+});
+
+export type TapSundayChoiceResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Server action for the three tap formats (pulse / this-or-that /
+ * is-this-you). She picks an option, we upsert her answer with `choice`
+ * set. Re-tapping a different option updates instead of creating a second
+ * row — the unique on (promptId, userId) handles that.
+ *
+ * Gated to Sunday Central time so the room only fills on the actual ritual
+ * day; off-Sunday the surface renders in replay mode.
+ */
+export async function tapSundayChoice(
+  input: z.infer<typeof TapSchema>,
+): Promise<TapSundayChoiceResult> {
+  if (!isRitualOpen()) {
+    return {
+      ok: false,
+      error: "The ritual is replay-only outside Sunday Central time.",
+    };
+  }
+  const parsed = TapSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid input",
+    };
+  }
+
+  const { userId } = auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: isClerkConfigured ? "Not signed in." : "Add Clerk keys to .env.local.",
+    };
+  }
+
+  // Load the prompt + verify the choice is one of its declared options.
+  // Otherwise a stale client (or a curious dev tools session) could write
+  // arbitrary strings into the tally column.
+  const prompt = await prisma.sundayPrompt.findUnique({
+    where: { id: parsed.data.promptId },
+    select: { id: true, kind: true, options: true },
+  });
+  if (!prompt) return { ok: false, error: "Prompt not found." };
+  if (prompt.kind === "open") {
+    return { ok: false, error: "This format doesn't take tap answers." };
+  }
+  const validKeys = new Set(parseOptions(prompt.options).map((o) => o.key));
+  if (!validKeys.has(parsed.data.choice)) {
+    return { ok: false, error: "Unknown choice." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+    select: { id: true, role: true, subscriptionStatus: true },
+  });
+  if (!user) return { ok: false, error: "Account not found." };
+  const okStatuses = ["trialing", "active", "comped"];
+  const canTap =
+    user.role === "COACH" ||
+    (user.role === "CLIENT" &&
+      user.subscriptionStatus !== null &&
+      okStatuses.includes(user.subscriptionStatus));
+  if (!canTap) {
+    return { ok: false, error: "Only active members can join the ritual." };
+  }
+
+  await prisma.sundayPromptAnswer.upsert({
+    where: {
+      promptId_userId: { promptId: prompt.id, userId: user.id },
+    },
+    create: {
+      promptId: prompt.id,
+      userId: user.id,
+      choice: parsed.data.choice,
+    },
+    update: {
+      choice: parsed.data.choice,
+    },
+  });
+
+  revalidatePath("/dashboard");
+  return { ok: true };
 }
