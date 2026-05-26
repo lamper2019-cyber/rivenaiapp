@@ -490,26 +490,26 @@ export function nextStepFor(
       }
       return {
         tag: "Your next step",
-        copy: `${firstName}, you asked for an app — watch the 12-minute breakdown first, then start the trial at the end of the video.`,
+        copy: `${firstName}, you asked for the app. Twelve minutes will show you exactly what's in it.`,
         ctaLabel: "Watch the breakdown",
         ctaHref: "/quiz/vsl",
-        note: "Free · then signup at the end of the video.",
+        note: "Free. Trial starts at the end.",
       };
     case "COACH":
       return {
         tag: "Your next step",
-        copy: `${firstName}, 1:1 coaching opens when seats free up — Sean reads every active client's data before he picks the next round. Watch the 12-minute breakdown to see how the app trial gets you in line for the next intake.`,
+        copy: `${firstName}, real talk: 1:1 is full. The app's the door. Twelve minutes will show you why.`,
         ctaLabel: "Watch the breakdown",
         ctaHref: "/quiz/vsl",
-        note: "Free · then start the app trial at the end of the video.",
+        note: "Free. Trial starts at the end.",
       };
     case "DONE_FOR_YOU":
       return {
         tag: "Your next step",
-        copy: `${firstName}, the private tier (meal plans + 1:1) is invite-only. Sean evaluates every active client each quarter for the next intake — watch the 12-minute breakdown to see how the app trial puts you on the shortlist.`,
+        copy: `${firstName}, the private tier is invite-only. The app's the only way in. Twelve minutes will show you why.`,
         ctaLabel: "Watch the breakdown",
         ctaHref: "/quiz/vsl",
-        note: "Free · then start the app trial at the end of the video.",
+        note: "Free. Trial starts at the end.",
       };
   }
 }
