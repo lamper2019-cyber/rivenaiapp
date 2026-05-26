@@ -97,7 +97,7 @@ export async function submitSundayAnswer(
 
 const ToggleSchema = z.object({
   answerId: z.string().min(1),
-  kind: z.enum(["rose", "strong", "leaf"]),
+  kind: z.enum(["heart", "fire"]),
 });
 
 export type ToggleSundayReactionResult =

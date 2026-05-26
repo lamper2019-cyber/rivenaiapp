@@ -16,10 +16,12 @@ import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
 import { getRecentPulseEvents } from "@/lib/pulse";
 import { getCollectiveStats } from "@/lib/collective-counter";
 import { getCheerCandidates } from "@/lib/cheer";
+import { getCheerReceivedThisWeek } from "@/lib/cheer-received";
 import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
 import { PulseStrip } from "@/components/pulse-strip";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
+import { CheerReceivedCard } from "@/components/cheer-received-card";
 import { SundayRitual } from "@/components/sunday-ritual";
 
 // Force a fresh server render on every request. The page reads `auth()` so
@@ -82,13 +84,19 @@ export default async function DashboardPage() {
   // Promise resolves to a safe fallback so a slow query or empty result
   // never blocks the rest of the dashboard. Run in parallel because none
   // of them depend on each other.
-  const [pulseEvents, collectiveStats, cheerCandidates, sundaySnapshot] =
-    await Promise.all([
-      getRecentPulseEvents(clientUserId).catch(() => []),
-      getCollectiveStats().catch(() => null),
-      getCheerCandidates(clientUserId).catch(() => []),
-      getSundayRitualSnapshot(clientUserId).catch(() => null),
-    ]);
+  const [
+    pulseEvents,
+    collectiveStats,
+    cheerCandidates,
+    sundaySnapshot,
+    cheerReceived,
+  ] = await Promise.all([
+    getRecentPulseEvents(clientUserId).catch(() => []),
+    getCollectiveStats().catch(() => null),
+    getCheerCandidates(clientUserId).catch(() => []),
+    getSundayRitualSnapshot(clientUserId).catch(() => null),
+    getCheerReceivedThisWeek(clientUserId).catch(() => null),
+  ]);
 
   // Only render the Sunday surface when there IS a prompt AND we're
   // either inside the open window OR she already participated this week
@@ -163,6 +171,10 @@ export default async function DashboardPage() {
           isOpen={sundaySnapshot.isOpen}
         />
       )}
+      {/* "🌹 N women have your back this week" — surfaces every received
+          cheer in-app so push reliability isn't the only signal. First
+          thing she sees after Sunday ritual / above the activity feed. */}
+      {cheerReceived && <CheerReceivedCard summary={cheerReceived} />}
       {cheerCandidates.length > 0 && (
         <CheerPrompts candidates={cheerCandidates} />
       )}

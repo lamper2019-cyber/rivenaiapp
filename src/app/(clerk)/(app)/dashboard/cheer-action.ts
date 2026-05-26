@@ -90,30 +90,60 @@ export async function sendCheer(
     return { ok: false, error: "Couldn't send right now. Try again." };
   }
 
-  // Count total cheers for this recipient + context (used for push body).
-  const cheerCount = await prisma.cheerReaction.count({
+  // Throttle: only push if cheerLastPushAt is null or > 10 min ago.
+  // The dashboard card surfaces every cheer regardless — push is a
+  // bonus channel, not the truth.
+  const TEN_MIN_MS = 10 * 60 * 1000;
+  const recipient = await prisma.user.findUnique({
+    where: { id: parsed.data.recipientUserId },
+    select: { cheerLastPushAt: true },
+  });
+  const lastPush = recipient?.cheerLastPushAt?.getTime() ?? 0;
+  const shouldPush = Date.now() - lastPush > TEN_MIN_MS;
+
+  // Count this Monday-to-now cheers (matches the dashboard card window
+  // — Mon–Sun ISO week). Used as the push-body number so it lines up
+  // with what she'll see when she opens the app.
+  const weekStart = isoWeekStart(new Date());
+  const weekCount = await prisma.cheerReaction.count({
     where: {
       recipientUserId: parsed.data.recipientUserId,
-      context: parsed.data.context,
+      createdAt: { gte: weekStart },
     },
   });
 
-  // Push to the recipient. Best-effort; never blocks the result.
-  const pushBody =
-    cheerCount === 1
-      ? "Someone in RIVEN is rooting for you."
-      : `${cheerCount} women in RIVEN are rooting for you.`;
-  try {
-    await sendPushToUser(parsed.data.recipientUserId, {
-      title: "A 🌹 from your sisters",
-      body: pushBody,
-      url: "/dashboard",
-      tag: `cheer-${parsed.data.recipientUserId}-${parsed.data.context}`,
-    });
-  } catch {
-    /* push failure shouldn't surface — the DB row is the truth */
+  if (shouldPush) {
+    const pushBody =
+      weekCount === 1
+        ? "Someone in RIVEN sent you a 🌹."
+        : `${weekCount} women in RIVEN have your back this week.`;
+    try {
+      await sendPushToUser(parsed.data.recipientUserId, {
+        title: "A 🌹 from your sisters",
+        body: pushBody,
+        url: "/dashboard",
+        tag: `cheer-${parsed.data.recipientUserId}`,
+      });
+      await prisma.user.update({
+        where: { id: parsed.data.recipientUserId },
+        data: { cheerLastPushAt: new Date() },
+      });
+    } catch {
+      /* push failure shouldn't surface — the DB row is the truth */
+    }
   }
 
   revalidatePath("/dashboard");
-  return { ok: true, cheerCount };
+  return { ok: true, cheerCount: weekCount };
+}
+
+/** Monday 00:00:00 of the current ISO week (local). Inline so this file
+ *  doesn't pull a UI lib. Mirrors src/lib/week.ts but server-only. */
+function isoWeekStart(now: Date): Date {
+  const day = now.getDay(); // 0 = Sunday, 6 = Saturday
+  const offsetToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() + offsetToMonday);
+  return monday;
 }

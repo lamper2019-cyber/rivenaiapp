@@ -10,18 +10,13 @@ import { startOfIsoWeek } from "@/lib/week";
  *   - Is the ritual "open" right now? (= today is Sunday in Central time)
  */
 
-export type SundayReactionKind = "rose" | "strong" | "leaf";
+export type SundayReactionKind = "heart" | "fire";
 
-export const SUNDAY_REACTION_KINDS: SundayReactionKind[] = [
-  "rose",
-  "strong",
-  "leaf",
-];
+export const SUNDAY_REACTION_KINDS: SundayReactionKind[] = ["heart", "fire"];
 
 export const SUNDAY_REACTION_LABEL: Record<SundayReactionKind, string> = {
-  rose: "🌹",
-  strong: "💪",
-  leaf: "🌿",
+  heart: "❤️",
+  fire: "🔥",
 };
 
 export type SundayAnswerSummary = {
@@ -108,14 +103,12 @@ export async function getSundayRitualSnapshot(
       myAnswer = { id: a.id, body: a.body };
     }
     const reactionCounts: Record<SundayReactionKind, number> = {
-      rose: 0,
-      strong: 0,
-      leaf: 0,
+      heart: 0,
+      fire: 0,
     };
     const myReactions: Record<SundayReactionKind, boolean> = {
-      rose: false,
-      strong: false,
-      leaf: false,
+      heart: false,
+      fire: false,
     };
     for (const r of a.reactions) {
       if ((SUNDAY_REACTION_KINDS as string[]).includes(r.kind)) {

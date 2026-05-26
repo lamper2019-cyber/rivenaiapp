@@ -75,6 +75,12 @@ model User {
   subscriptionStatus           String?
   subscriptionCurrentPeriodEnd DateTime?
 
+  // Throttle for peer cheer pushes. When a 🌹 lands and cheerLastPushAt
+  // is null or > 10 min ago, send a push and update this timestamp.
+  // Subsequent cheers inside the same 10-min window skip the push to
+  // avoid buzz-buzz-buzz — the dashboard card surfaces them instead.
+  cheerLastPushAt              DateTime?
+
   profile           Profile?
   mealLogs          MealLog[]
   dailyTotals       DailyTotals[]
