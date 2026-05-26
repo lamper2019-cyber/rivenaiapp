@@ -399,6 +399,23 @@ async function runChatTool(args: {
     carbs: 0,
   };
 
+  // Last 30 days of flagReasons so Claude rotates the angle in the
+  // FLAG KNOWLEDGE BANK instead of repeating the same sentence twice.
+  const recentFlagged = await prisma.mealLog.findMany({
+    where: {
+      userId: args.userId,
+      processedFlag: true,
+      flagReason: { not: null },
+      createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 12,
+    select: { flagReason: true },
+  });
+  const recentFlagReasons = recentFlagged
+    .map((r) => r.flagReason)
+    .filter((s): s is string => !!s);
+
   const analysis = await analyzeMeal({
     profile: {
       name: args.profile.name,
@@ -408,6 +425,7 @@ async function runChatTool(args: {
     },
     todayTotals: todayBuckets,
     description,
+    recentFlagReasons,
   });
 
   const { mealLogId, sums } = await persistMealLog({

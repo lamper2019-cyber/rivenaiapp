@@ -91,6 +91,24 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
     carbs: todayTotals?.totalCarbs ?? 0,
   };
 
+  // Last 30 days of flagReasons so the meal-logging Claude can pick a
+  // different angle / fact / symptom than what we already told her —
+  // per the FLAG KNOWLEDGE BANK rotation rule in the system prompt.
+  const recentFlagged = await prisma.mealLog.findMany({
+    where: {
+      userId: user.id,
+      processedFlag: true,
+      flagReason: { not: null },
+      createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 12,
+    select: { flagReason: true },
+  });
+  const recentFlagReasons = recentFlagged
+    .map((r) => r.flagReason)
+    .filter((s): s is string => !!s);
+
   // Analyze + persist via the shared pipeline (also used by the RIVEN AI
   // chat tool — both paths land in the same MealLog + DailyTotals state).
   let analysis: MealAnalysis;
@@ -105,6 +123,7 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
       },
       todayTotals: currentTotals,
       description,
+      recentFlagReasons,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

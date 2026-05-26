@@ -63,6 +63,11 @@ export async function analyzeMeal(args: {
   profile: { name: string; cutCalories: number; proteinFloor: number };
   todayTotals: MealPipelineTotals;
   description: string;
+  /** Last ~30 days of this client's flagReason strings (most recent first).
+   *  Passed to Claude so it doesn't reuse the same angle / fact / symptom
+   *  combination two meals in a row. Optional — callers that don't have
+   *  the data handy can omit. */
+  recentFlagReasons?: string[];
 }): Promise<MealAnalysis> {
   const userMessage = buildMealUserMessage(args);
 
@@ -160,10 +165,23 @@ function buildMealUserMessage(args: {
   profile: { name: string; cutCalories: number; proteinFloor: number };
   todayTotals: MealPipelineTotals;
   description: string;
+  recentFlagReasons?: string[];
 }): string {
-  const { profile, todayTotals, description } = args;
+  const { profile, todayTotals, description, recentFlagReasons } = args;
   const caloriesRemaining = profile.cutCalories - todayTotals.calories;
   const proteinRemaining = profile.proteinFloor - todayTotals.protein;
+
+  // Pass up to the last 8 flagReasons so Claude has enough variety to
+  // avoid — but not so much that the prompt balloons. Filter empties.
+  const recentFlags = (recentFlagReasons ?? [])
+    .filter((s) => s && s.trim().length > 0)
+    .slice(0, 8);
+
+  const recentFlagsBlock = recentFlags.length
+    ? `\nRECENT FLAG REASONS (DO NOT REPEAT THESE — use a different fact and a different symptom):\n${recentFlags
+        .map((r, i) => `${i + 1}. ${r}`)
+        .join("\n")}\n`
+    : "";
 
   return `CLIENT: ${profile.name}
 
@@ -176,7 +194,7 @@ TODAY SO FAR
 - Protein: ${todayTotals.protein}g / ${profile.proteinFloor}g (${proteinRemaining > 0 ? `${proteinRemaining}g still to hit floor` : `floor met`})
 - Fat: ${todayTotals.fat}g
 - Carbs: ${todayTotals.carbs}g
-
+${recentFlagsBlock}
 MEAL TO ANALYZE
 ${description}
 
