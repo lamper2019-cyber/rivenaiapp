@@ -7,7 +7,9 @@ import { startOfCentralDay } from "@/lib/dates";
  * push notification: "3 women are rooting for you."
  *
  * Hard-day detection (any one fires):
- *   - no log in 24h+
+ *   - no log at exactly 2, 4, or 6 central-days since her most recent
+ *     log (escalating rungs — the card doesn't show every single day she
+ *     hasn't logged, only at these three milestones)
  *   - 3+ day streak that broke yesterday
  *   - way-over yesterday (totalCal > target × 1.5)
  *
@@ -43,13 +45,16 @@ const ACTIVE_FILTER = {
  * prompts for. Excludes the viewer herself. Excludes contexts she's
  * already cheered (no double-cheers).
  */
+/** Days-since-last-log rungs at which the "hasn't logged" cheer card fires.
+ *  Only these three windows — not every day she's silent. */
+const NO_LOG_RUNG_DAYS = [2, 4, 6];
+
 export async function getCheerCandidates(viewerUserId: string): Promise<CheerCandidate[]> {
   const today = startOfCentralDay();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   const twoDaysAgo = new Date(today);
   twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-  const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const fifteenDaysAgo = new Date(today);
   fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
 
@@ -108,21 +113,32 @@ export async function getCheerCandidates(viewerUserId: string): Promise<CheerCan
     const firstName = (profile.name ?? "").trim().split(/\s+/)[0];
     if (!firstName) continue;
 
-    // ── rule 1: no log in 24h ────────────────────────────────────────
+    // ── rule 1: no log at exactly 2/4/6 days ─────────────────────────
+    // The card escalates in three rungs instead of pinging every day.
+    // Compute the central-day gap between today and her most recent log;
+    // fire only when that gap matches one of NO_LOG_RUNG_DAYS. Clients
+    // who've never logged at all (mostRecent === null) don't trigger —
+    // that's an onboarding issue, not a peer-cheer one.
     const mostRecent = client.mealLogs.reduce<Date | null>((latest, m) => {
       return !latest || m.createdAt > latest ? m.createdAt : latest;
     }, null);
-    if (!mostRecent || mostRecent < cutoff24h) {
-      const key = `${client.id}|no_log_24h`;
-      if (!cheeredSet.has(key)) {
-        candidates.push({
-          recipientUserId: client.id,
-          firstName,
-          context: "no_log_24h",
-          reason: `${firstName} hasn't logged in 24 hours — send her a 🌹`,
-          cheerCountForContext: countMap.get(key) ?? 0,
-        });
-        continue; // one prompt per recipient, even if multiple rules fire
+    if (mostRecent) {
+      const mostRecentDay = startOfCentralDay(mostRecent);
+      const gapDays = Math.round(
+        (today.getTime() - mostRecentDay.getTime()) / 86_400_000,
+      );
+      if (NO_LOG_RUNG_DAYS.includes(gapDays)) {
+        const key = `${client.id}|no_log_24h`;
+        if (!cheeredSet.has(key)) {
+          candidates.push({
+            recipientUserId: client.id,
+            firstName,
+            context: "no_log_24h",
+            reason: `${firstName} hasn't logged — send her a 🌹`,
+            cheerCountForContext: countMap.get(key) ?? 0,
+          });
+          continue; // one prompt per recipient, even if multiple rules fire
+        }
       }
     }
 
