@@ -15,7 +15,8 @@ import { getCollectiveStats } from "@/lib/collective-counter";
 import { getCheerCandidates } from "@/lib/cheer";
 import { getCheerReceivedThisWeek } from "@/lib/cheer-received";
 import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
-import { getDailyMoodSnapshot } from "@/lib/daily-mood";
+import { getDailyMoodSnapshot, MOOD_KINDS, type MoodKind } from "@/lib/daily-mood";
+import { pickCoachLineForMood } from "@/lib/coach-mood-lines";
 import { PulseStrip } from "@/components/pulse-strip";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
@@ -164,10 +165,16 @@ export default async function DashboardPage() {
       {/* Ambient community surfaces. Each one self-hides on empty data,
           so on a quiet morning none of them render and the dashboard
           reads exactly as it used to. */}
-      {/* Daily mood ribbon — one tap, see how the room is feeling. The
-          lowest-friction community touchpoint we have; sits first because
-          it asks for the least and renders even on a quiet morning. */}
-      {moodSnapshot && <DailyMoodRibbon snapshot={moodSnapshot} />}
+      {/* Daily mood ribbon — one tap to send her mood, then collapses
+          into a Sean-voice coaching line matched to what she picked.
+          Lines are deterministic per (user, day, mood) so the surface
+          doesn't shuffle on revisits. */}
+      {moodSnapshot && (
+        <DailyMoodRibbon
+          snapshot={moodSnapshot}
+          coachLine={buildCoachLineMap(clientUserId)}
+        />
+      )}
       {showSunday && sundaySnapshot?.prompt && (
         <SundayRitual
           promptId={sundaySnapshot.prompt.id}
@@ -306,6 +313,21 @@ function ProgressCard({
       </div>
     </div>
   );
+}
+
+/**
+ * Pre-compute one coaching line per mood so the client component can
+ * swap to the right one instantly after a tap without a server round
+ * trip. Each line is deterministic per (userId, central day, mood) so
+ * re-opening the dashboard later in the day shows the same line.
+ */
+function buildCoachLineMap(userId: string): Record<MoodKind, string> {
+  const now = new Date();
+  const out = {} as Record<MoodKind, string>;
+  for (const mood of MOOD_KINDS) {
+    out[mood] = pickCoachLineForMood(mood, userId, now);
+  }
+  return out;
 }
 
 function UnauthedPlaceholder({ children }: { children: React.ReactNode }) {

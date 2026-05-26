@@ -1,12 +1,17 @@
 import type { CheerReceivedSummary } from "@/lib/cheer-received";
 
 /**
- * Single quiet line at the top of /dashboard showing this week's cheer
- * count for the viewer. Hides when count is zero — empty weeks read as
- * a normal dashboard, no "0 women rooting for you" awkwardness.
+ * Persistent surface showing this week's cheer tally for the viewer.
+ * Hides at zero (empty weeks read as a normal dashboard).
  *
- * Peaceful-discipline coded: gold-accent dot, charcoal copy, sage-tinted
- * card. No emojis screaming for attention; the count does the work.
+ * The headline names the count. The subtitle, when present, names the
+ * "why" of the most recent rose — softened so it reads as recognition,
+ * not exposure ("she saw you show up on a heavy day" not "your heavy
+ * day"). The subject of the sentence is HER, the receiver.
+ *
+ * Renders alongside the falling-roses ceremony (which fires only on
+ * fresh unseen roses) — that one is the moment, this one is the
+ * persistent reminder.
  */
 export function CheerReceivedCard({
   summary,
@@ -32,7 +37,7 @@ export function CheerReceivedCard({
           </p>
           {summary.mostRecentContext && (
             <p className="font-body text-label-sm text-on-surface-variant mt-1">
-              most recent: someone saw {summary.mostRecentContext}
+              Sent because {summary.mostRecentContext}.
             </p>
           )}
         </div>

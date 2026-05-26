@@ -13,11 +13,15 @@ export type CheerReceivedSummary = {
   mostRecentContext: string | null;
 };
 
+// Softened context phrases. Sean's note: the originals read judgey
+// ("your streak that broke", "your heavy day"). Reframed so the subject
+// is HER showing up, not the failure that triggered the rose.
+// Phrasing slots into "Sent because ___." in the card.
 const CONTEXT_PHRASES: Record<string, string> = {
-  no_log_24h: "the day you went quiet",
-  broke_streak: "your streak that broke",
-  way_over_target: "your heavy day",
-  manual: "you, just because",
+  no_log_24h: "she saw you come back",
+  broke_streak: "she saw you stay in it",
+  way_over_target: "she saw you show up on a heavy day",
+  manual: "she wanted you to know she's rooting for you",
 };
 
 export async function getCheerReceivedThisWeek(

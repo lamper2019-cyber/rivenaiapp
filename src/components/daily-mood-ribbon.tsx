@@ -11,86 +11,75 @@ import {
 import { setMyMood } from "@/app/(clerk)/(app)/dashboard/mood-action";
 
 /**
- * One-tap-a-day community pulse. Tap an emoji → her pick highlights,
- * a clone of that emoji floats up and fades (the little reward moment),
- * and the aggregate sentence updates with her vote folded in.
+ * One-tap-a-day community pulse. The flow:
  *
- * Optimistic update: tap → state flips immediately → server action fires
- * in a transition. Re-tapping a different mood updates instead of stacking.
+ *   1. Buttons visible → she taps.
+ *   2. Tapped emoji clones and floats up (~900ms, fades out).
+ *   3. Ribbon collapses, replaced by one Sean-voice coaching line
+ *      matched to the mood she picked. That line is "her reward" for
+ *      tapping — feels like she's been seen, not just measured.
  *
- * Animation: `riven-float-up` keyframe in globals.css. Reduced-motion users
- * get the same state transition with no float — the keyframe is overridden.
+ * If she opens the dashboard later in the day after already tapping,
+ * the buttons are gone — she sees the same coaching line directly.
+ * The line is deterministic per (user, day, mood) so it doesn't
+ * shuffle between visits.
+ *
+ * Reduced-motion users get the same swap with no float animation.
  */
 export function DailyMoodRibbon({
   snapshot,
+  coachLine,
 }: {
   snapshot: DailyMoodSnapshot;
+  // Server picks the line (uses userId + day for determinism). Passed
+  // in pre-resolved so the surface doesn't shuffle on every render.
+  // Keyed by mood so we can show the right one after a tap without
+  // a round-trip.
+  coachLine: Record<MoodKind, string>;
 }) {
   const [myMood, setLocal] = useState<MoodKind | null>(snapshot.myMood);
-  const [counts, setCounts] = useState<Record<MoodKind, number>>(snapshot.counts);
   const [, startTransition] = useTransition();
   // Each tap fires a float-up animation with a fresh React key so even
-  // re-taps (same mood) re-trigger. Cleared via setTimeout after the
-  // animation duration so the DOM stays light.
+  // re-taps re-trigger. Cleared after the animation duration.
   const [floats, setFloats] = useState<
     Array<{ id: number; mood: MoodKind; col: number }>
   >([]);
 
   function handleTap(mood: MoodKind, columnIndex: number) {
     const previous = myMood;
-    setLocal(mood);
-    setCounts((c) => {
-      const next = { ...c };
-      if (previous && previous !== mood) {
-        next[previous] = Math.max(0, next[previous] - 1);
-      }
-      if (previous !== mood) {
-        next[mood] = next[mood] + 1;
-      }
-      return next;
-    });
+    if (previous === mood) return; // no-op on re-tap of same mood
 
-    // Spawn a floating clone. ID is just monotonically increasing — uses
-    // Date.now so two taps in the same frame still get unique keys.
+    // Spawn a floating clone for the visual "send."
     const floatId = Date.now() + Math.random();
     setFloats((prev) => [...prev, { id: floatId, mood, col: columnIndex }]);
-    // Clean up after the animation finishes (matches the 900ms in CSS,
-    // with a tiny buffer).
     window.setTimeout(() => {
       setFloats((prev) => prev.filter((f) => f.id !== floatId));
     }, 1000);
+
+    // After ~600ms (when the float is mostly done), collapse the
+    // ribbon into the coaching view by setting myMood. We delay so the
+    // animation has time to read — instant swap would make it look like
+    // the buttons just disappeared.
+    window.setTimeout(() => {
+      setLocal(mood);
+    }, 550);
 
     startTransition(async () => {
       const r = await setMyMood({ mood });
       if (!r.ok) {
         // Rollback on failure. Rare; network/db hiccup only.
         setLocal(previous);
-        setCounts(snapshot.counts);
       }
     });
   }
 
-  const totalAfterTap =
-    Object.values(counts).reduce((sum, n) => sum + n, 0) || 0;
-
-  // Find the top mood from the live (optimistic) counts so the aggregate
-  // sentence updates with her tap.
-  let liveTop: MoodKind | null = null;
-  let liveTopCount = 0;
-  for (const k of MOOD_KINDS) {
-    if (counts[k] > liveTopCount) {
-      liveTopCount = counts[k];
-      liveTop = k;
-    }
+  // Already tapped (either on this visit or earlier today) → show the
+  // coaching surface directly. No buttons, no totals — just Sean's voice.
+  if (myMood !== null) {
+    return <CoachingSurface mood={myMood} line={coachLine[myMood]} />;
   }
 
-  const aggregateSentence = (() => {
-    if (totalAfterTap === 0) return "Be the first to check in today.";
-    if (!liveTop) return null;
-    const noun = liveTopCount === 1 ? "woman" : "women";
-    return `${liveTopCount} ${noun} logged ${MOOD_EMOJI[liveTop]} ${MOOD_LABEL[liveTop]} today.`;
-  })();
-
+  // Not yet tapped → show the four buttons.
   return (
     <section
       aria-label="Daily mood ribbon"
@@ -103,57 +92,67 @@ export function DailyMoodRibbon({
       {/* Relative wrapper so the floating clones can absolute-position
           relative to each column. */}
       <div className="mt-3 grid grid-cols-4 gap-2 relative">
-        {MOOD_KINDS.map((kind, idx) => {
-          const isMine = myMood === kind;
-          return (
-            <button
-              key={kind}
-              type="button"
-              onClick={() => handleTap(kind, idx)}
-              aria-pressed={isMine}
-              aria-label={MOOD_LABEL[kind]}
-              className={`relative flex flex-col items-center gap-1 py-3 rounded-md border transition-all active:scale-95 ${
-                isMine
-                  ? "bg-secondary-container/60 border-gold/60 shadow-elevation-1"
-                  : "bg-transparent border-outline-variant/40 hover:bg-surface-container/40"
-              }`}
-            >
-              <span className="text-[26px] leading-none" aria-hidden>
-                {MOOD_EMOJI[kind]}
-              </span>
-              <span
-                className={`font-body text-label-sm tracking-wide ${
-                  isMine ? "text-charcoal" : "text-on-surface-variant/70"
-                }`}
-              >
-                {MOOD_LABEL[kind]}
-              </span>
+        {MOOD_KINDS.map((kind, idx) => (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => handleTap(kind, idx)}
+            aria-label={MOOD_LABEL[kind]}
+            className="relative flex flex-col items-center gap-1 py-3 rounded-md border border-outline-variant/40 bg-transparent transition-all active:scale-95 hover:bg-surface-container/40"
+          >
+            <span className="text-[26px] leading-none" aria-hidden>
+              {MOOD_EMOJI[kind]}
+            </span>
+            <span className="font-body text-label-sm tracking-wide text-on-surface-variant/70">
+              {MOOD_LABEL[kind]}
+            </span>
 
-              {/* Float-up clones for this column. Absolute-positioned so
-                  they don't shift layout while floating up. Each clone
-                  unmounts itself after the keyframe via the parent's
-                  setTimeout cleanup. */}
-              {floats
-                .filter((f) => f.col === idx)
-                .map((f) => (
-                  <span
-                    key={f.id}
-                    aria-hidden
-                    className="riven-float-up absolute left-1/2 top-3 -translate-x-1/2 text-[28px] leading-none"
-                  >
-                    {MOOD_EMOJI[f.mood]}
-                  </span>
-                ))}
-            </button>
-          );
-        })}
+            {/* Float-up clones for this column. Absolute-positioned so
+                they don't shift layout while floating up. */}
+            {floats
+              .filter((f) => f.col === idx)
+              .map((f) => (
+                <span
+                  key={f.id}
+                  aria-hidden
+                  className="riven-float-up absolute left-1/2 top-3 -translate-x-1/2 text-[28px] leading-none"
+                >
+                  {MOOD_EMOJI[f.mood]}
+                </span>
+              ))}
+          </button>
+        ))}
       </div>
-
-      {aggregateSentence && (
-        <p className="mt-3 font-body text-label-sm text-on-surface-variant/80">
-          {aggregateSentence}
-        </p>
-      )}
     </section>
   );
 }
+
+/**
+ * The post-tap surface — a single coaching line in Sean's voice,
+ * matched to her mood. Replaces the buttons + aggregate sentence
+ * entirely. Quiet, single block of type, no decoration.
+ *
+ * Uses the secondary-container background + gold border to signal
+ * "this came from Sean" without screaming it.
+ */
+function CoachingSurface({ mood, line }: { mood: MoodKind; line: string }) {
+  return (
+    <section
+      aria-label="Today's note from Sean"
+      className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-5 shadow-elevation-1 riven-rise-in"
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className="shrink-0 text-[24px] leading-none mt-0.5"
+          aria-hidden
+        >
+          {MOOD_EMOJI[mood]}
+        </span>
+        <p className="font-body text-body-md text-charcoal leading-relaxed flex-1 min-w-0">
+          {line}
+        </p>
+      </div>
+    </section>
+  );
+}
+
