@@ -16,9 +16,11 @@ import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
 import { getRecentPulseEvents } from "@/lib/pulse";
 import { getCollectiveStats } from "@/lib/collective-counter";
 import { getCheerCandidates } from "@/lib/cheer";
+import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
 import { PulseStrip } from "@/components/pulse-strip";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
+import { SundayRitual } from "@/components/sunday-ritual";
 
 // Force a fresh server render on every request. The page reads `auth()` so
 // it's already implicitly dynamic, but pinning it explicitly is belt-and-
@@ -76,15 +78,27 @@ export default async function DashboardPage() {
     recentCoachMessages,
   } = data;
 
-  // Ambient community trio — pulse feed, collective stats, cheer candidates.
-  // Best-effort: each Promise resolves to a safe fallback so a slow query
-  // or empty result never blocks the rest of the dashboard. Run in parallel
-  // because none of them depend on each other.
-  const [pulseEvents, collectiveStats, cheerCandidates] = await Promise.all([
-    getRecentPulseEvents(clientUserId).catch(() => []),
-    getCollectiveStats().catch(() => null),
-    getCheerCandidates(clientUserId).catch(() => []),
-  ]);
+  // Ambient community trio + Sunday ritual snapshot. Best-effort: each
+  // Promise resolves to a safe fallback so a slow query or empty result
+  // never blocks the rest of the dashboard. Run in parallel because none
+  // of them depend on each other.
+  const [pulseEvents, collectiveStats, cheerCandidates, sundaySnapshot] =
+    await Promise.all([
+      getRecentPulseEvents(clientUserId).catch(() => []),
+      getCollectiveStats().catch(() => null),
+      getCheerCandidates(clientUserId).catch(() => []),
+      getSundayRitualSnapshot(clientUserId).catch(() => null),
+    ]);
+
+  // Only render the Sunday surface when there IS a prompt AND we're
+  // either inside the open window OR she already participated this week
+  // (so she can re-read her own answer + others' on Monday morning).
+  const showSunday =
+    sundaySnapshot?.prompt !== null &&
+    sundaySnapshot !== null &&
+    (sundaySnapshot.isOpen ||
+      sundaySnapshot.myAnswer !== null ||
+      sundaySnapshot.others.length > 0);
 
   // Honors per-day calorie cycling (Rora et al.); falls back to flat
   // cutCalories when no schedule is set, so every other client sees the
@@ -137,9 +151,18 @@ export default async function DashboardPage() {
 
       {pacing?.isBehind && <MealReminderCard tier={pacing.tier} />}
 
-      {/* Ambient community trio — pulse / collective / cheer. Each one
-          self-hides on empty data, so on a quiet morning none of them
-          render and the dashboard reads exactly as it used to. */}
+      {/* Ambient community surfaces. Each one self-hides on empty data,
+          so on a quiet morning none of them render and the dashboard
+          reads exactly as it used to. */}
+      {showSunday && sundaySnapshot?.prompt && (
+        <SundayRitual
+          promptId={sundaySnapshot.prompt.id}
+          question={sundaySnapshot.prompt.question}
+          myAnswer={sundaySnapshot.myAnswer}
+          others={sundaySnapshot.others}
+          isOpen={sundaySnapshot.isOpen}
+        />
+      )}
       {cheerCandidates.length > 0 && (
         <CheerPrompts candidates={cheerCandidates} />
       )}

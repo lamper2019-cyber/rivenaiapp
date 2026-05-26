@@ -643,3 +643,139 @@ export async function compAllExistingClients(): Promise<CompAllClientsResult> {
     alreadyComped,
   };
 }
+
+// ─────────────────────── Leads (quiz funnel) ───────────────────────
+
+const DeleteLeadSchema = z.object({
+  leadId: z.string().min(1),
+});
+
+export type DeleteLeadResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Coach deletes a single quiz lead. Hard delete — the Lead row has no FK
+ * relations (convertedToUserId is a loose string by design), so nothing
+ * cascades and no client data is touched.
+ */
+export async function deleteLead(
+  formData: FormData,
+): Promise<DeleteLeadResult> {
+  const { userId } = auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: isClerkConfigured ? "Not signed in." : "Add Clerk keys to .env.local.",
+    };
+  }
+
+  const parsed = DeleteLeadSchema.safeParse({ leadId: formData.get("leadId") });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  let coach;
+  try {
+    coach = await prisma.user.findUnique({
+      where: { clerkId: userId },
+      select: { role: true },
+    });
+  } catch {
+    return { ok: false, error: "Database not connected." };
+  }
+  if (!coach) return { ok: false, error: "Coach record not found." };
+  if (coach.role !== "COACH") {
+    return { ok: false, error: "Only coaches can delete leads." };
+  }
+
+  try {
+    await prisma.lead.delete({ where: { id: parsed.data.leadId } });
+  } catch (err) {
+    // P2025 = record to delete does not exist. Treat as already-gone success
+    // so a double-tap from the UI doesn't flash a scary error.
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2025"
+    ) {
+      revalidatePath("/coach/leads");
+      return { ok: true };
+    }
+    console.error("deleteLead failed", err);
+    return { ok: false, error: "Couldn't delete — try again." };
+  }
+
+  revalidatePath("/coach/leads");
+  return { ok: true };
+}
+
+// ─────────────────────── Sunday ritual prompt editor ───────────────────────
+
+const SundayPromptSchema = z.object({
+  question: z
+    .string()
+    .min(1, "Write something — even one line works.")
+    .max(500, "Keep the prompt under 500 characters")
+    .transform((s) => s.trim()),
+});
+
+export type SetSundayPromptResult =
+  | { ok: true; weekStart: string }
+  | { ok: false; error: string };
+
+/**
+ * Coach writes / updates this week's Sunday ritual prompt. Keyed by ISO
+ * weekStart so each week gets one prompt; running this multiple times
+ * the same week just edits the question (idempotent).
+ */
+export async function setSundayPrompt(
+  formData: FormData,
+): Promise<SetSundayPromptResult> {
+  const { userId } = auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: isClerkConfigured ? "Not signed in." : "Add Clerk keys to .env.local.",
+    };
+  }
+
+  let coach;
+  try {
+    coach = await prisma.user.findUnique({ where: { clerkId: userId } });
+  } catch {
+    return { ok: false, error: "Database not connected." };
+  }
+  if (!coach) return { ok: false, error: "Coach record not found." };
+  if (coach.role !== "COACH") {
+    return { ok: false, error: "Only coaches can set the Sunday prompt." };
+  }
+
+  const parsed = SundayPromptSchema.safeParse({
+    question: formData.get("question"),
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid input",
+    };
+  }
+
+  // ISO week start (Monday) — inline to avoid circular dep with @/lib/week.
+  // Equivalent to startOfIsoWeek(new Date()).
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun..6=Sat
+  const offsetToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() + offsetToMonday);
+
+  await prisma.sundayPrompt.upsert({
+    where: { weekStart: monday },
+    create: { weekStart: monday, question: parsed.data.question },
+    update: { question: parsed.data.question },
+  });
+
+  revalidatePath("/coach/profile");
+  revalidatePath("/dashboard");
+  return { ok: true, weekStart: monday.toISOString() };
+}

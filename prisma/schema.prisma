@@ -85,6 +85,8 @@ model User {
   pushSubscriptions PushSubscription[]
   cheersReceived   CheerReaction[]    @relation("CheersReceived")
   cheersSent       CheerReaction[]    @relation("CheersSent")
+  sundayAnswers    SundayPromptAnswer[]
+  sundayReactions  SundayPromptReaction[]
 }
 
 model Profile {
@@ -330,4 +332,53 @@ model Lead {
   @@index([email])
   @@index([createdAt])
   @@index([budgetTier, score])
+}
+
+// Sunday Daily Ritual — once-a-week shared reflection prompt for the
+// community. Sean writes the question (via /coach/profile editor); on
+// Sundays it appears at the top of every active client's dashboard with
+// an answer composer and the rest of the room's answers below.
+//
+// "Open Sunday" semantics per Sean's pick: answers + reactions are
+// accepted any time the local day is Sunday in Central. Outside that
+// window the surface renders as replay-only.
+
+model SundayPrompt {
+  id        String   @id @default(cuid())
+  // ISO-week Monday — one SundayPrompt per week. The Sunday surface looks
+  // up this week's prompt by this key.
+  weekStart DateTime @unique
+  question  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  answers   SundayPromptAnswer[]
+}
+
+model SundayPromptAnswer {
+  id        String   @id @default(cuid())
+  promptId  String
+  prompt    SundayPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  reactions SundayPromptReaction[]
+
+  @@unique([promptId, userId])
+  @@index([promptId, createdAt])
+}
+
+model SundayPromptReaction {
+  id        String   @id @default(cuid())
+  answerId  String
+  answer    SundayPromptAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // "rose" 🌹 (peaceful) | "strong" 💪 (encouragement) | "leaf" 🌿 (steady)
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@unique([answerId, userId, kind])
+  @@index([answerId])
 }

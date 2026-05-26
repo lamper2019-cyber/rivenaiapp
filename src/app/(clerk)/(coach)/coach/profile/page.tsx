@@ -4,6 +4,8 @@ import { auth, currentUser, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TriggerMondayCheckinsButton } from "./trigger-monday-checkins-button";
 import { CompAllClientsButton } from "./comp-all-clients-button";
+import { SundayPromptForm } from "./sunday-prompt-form";
+import { getCurrentWeekPrompt } from "@/lib/sunday-ritual";
 
 /**
  * Coach profile page. Lives under (coach) so the layout already gates by
@@ -36,6 +38,27 @@ export default async function CoachProfilePage() {
         timeZone: "America/Chicago",
       })
     : null;
+
+  // This week's Sunday prompt — drives the editor below. Falls back to
+  // an empty draft if Sean hasn't set one yet for the current ISO week.
+  const currentSundayPrompt = await getCurrentWeekPrompt().catch(() => null);
+  const sundayWeekStartLabel = currentSundayPrompt?.weekStart
+    ? currentSundayPrompt.weekStart.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      })
+    : (() => {
+        // Compute this week's Monday for the label even before save.
+        const now = new Date();
+        const day = now.getDay();
+        const offset = day === 0 ? -6 : 1 - day;
+        const monday = new Date(now);
+        monday.setDate(monday.getDate() + offset);
+        return monday.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
+      })();
 
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-12 space-y-section-gap">
@@ -95,6 +118,12 @@ export default async function CoachProfilePage() {
         <TriggerMondayCheckinsButton />
         <div className="border-t border-outline-variant/40 pt-6">
           <CompAllClientsButton />
+        </div>
+        <div className="border-t border-outline-variant/40 pt-6">
+          <SundayPromptForm
+            initialQuestion={currentSundayPrompt?.question ?? ""}
+            weekStartLabel={sundayWeekStartLabel}
+          />
         </div>
       </section>
 
