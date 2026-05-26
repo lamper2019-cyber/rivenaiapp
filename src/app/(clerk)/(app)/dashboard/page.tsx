@@ -14,6 +14,7 @@ import { getRecentPulseEvents } from "@/lib/pulse";
 import { getCollectiveStats } from "@/lib/collective-counter";
 import { getCheerCandidates } from "@/lib/cheer";
 import { getCheerReceivedThisWeek } from "@/lib/cheer-received";
+import { getCheerCeremonyState } from "@/lib/cheer-ceremony";
 import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
 import { getDailyMoodSnapshot, MOOD_KINDS, type MoodKind } from "@/lib/daily-mood";
 import { pickCoachLineForMood } from "@/lib/coach-mood-lines";
@@ -21,6 +22,7 @@ import { PulseStrip } from "@/components/pulse-strip";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
 import { CheerReceivedCard } from "@/components/cheer-received-card";
+import { CheerCeremony } from "@/components/cheer-ceremony";
 import { SundayRitual } from "@/components/sunday-ritual";
 import { DailyMoodRibbon } from "@/components/daily-mood-ribbon";
 
@@ -88,6 +90,7 @@ export default async function DashboardPage() {
     sundaySnapshot,
     cheerReceived,
     moodSnapshot,
+    cheerCeremony,
   ] = await Promise.all([
     getRecentPulseEvents(clientUserId).catch(() => []),
     getCollectiveStats().catch(() => null),
@@ -95,6 +98,7 @@ export default async function DashboardPage() {
     getSundayRitualSnapshot(clientUserId).catch(() => null),
     getCheerReceivedThisWeek(clientUserId).catch(() => null),
     getDailyMoodSnapshot(clientUserId).catch(() => null),
+    getCheerCeremonyState(clientUserId).catch(() => null),
   ]);
 
   // Only render the Sunday surface when there IS a prompt AND we're
@@ -135,6 +139,19 @@ export default async function DashboardPage() {
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-3xl mx-auto py-12 space-y-section-gap">
       <RefreshOnDayChange />
+
+      {/* Falling-roses ceremony: fires if she opens /dashboard with any
+          unseen 🌹 from peers. Renders as a fixed full-screen overlay so
+          it sits above all other content; dismisses to nothing once she
+          taps "Lock it in" and the markCheersAsSeen action lands. */}
+      {cheerCeremony && cheerCeremony.roses.length > 0 && (
+        <CheerCeremony
+          roses={cheerCeremony.roses}
+          overflowCount={cheerCeremony.overflowCount}
+          isFirstCeremony={cheerCeremony.isFirstCeremony}
+        />
+      )}
+
       {recentCoachMessages.length > 0 && (
         <CoachMessageBadge messages={recentCoachMessages} />
       )}

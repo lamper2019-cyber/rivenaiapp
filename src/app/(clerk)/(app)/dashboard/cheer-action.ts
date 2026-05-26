@@ -137,6 +137,54 @@ export async function sendCheer(
   return { ok: true, cheerCount: weekCount };
 }
 
+/**
+ * Mark the falling-roses ceremony as seen. Bumps cheersLastSeenAt so
+ * the next dashboard load doesn't replay the same roses, and sets
+ * firstCheerCeremonySeenAt if this was her very first ceremony.
+ *
+ * Idempotent — safe to call from useEffect cleanup, double-clicks, etc.
+ */
+export type MarkCheersAsSeenResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function markCheersAsSeen(): Promise<MarkCheersAsSeenResult> {
+  const { userId } = auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: isClerkConfigured ? "Not signed in." : "Add Clerk keys to .env.local.",
+    };
+  }
+
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { clerkId: userId },
+      select: { id: true, firstCheerCeremonySeenAt: true },
+    });
+  } catch {
+    return { ok: false, error: "Database not connected." };
+  }
+  if (!user) return { ok: false, error: "Account not found." };
+
+  const now = new Date();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      cheersLastSeenAt: now,
+      // Only set firstCheerCeremonySeenAt on the first time through;
+      // never overwrite once it's been recorded.
+      ...(user.firstCheerCeremonySeenAt === null
+        ? { firstCheerCeremonySeenAt: now }
+        : {}),
+    },
+  });
+
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 /** Monday 00:00:00 of the current ISO week (local). Inline so this file
  *  doesn't pull a UI lib. Mirrors src/lib/week.ts but server-only. */
 function isoWeekStart(now: Date): Date {

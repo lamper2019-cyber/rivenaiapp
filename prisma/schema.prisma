@@ -81,6 +81,15 @@ model User {
   // avoid buzz-buzz-buzz — the dashboard card surfaces them instead.
   cheerLastPushAt              DateTime?
 
+  // Falling-roses ceremony state. The animated overlay fires on
+  // /dashboard whenever there are CheerReactions newer than this
+  // timestamp. We bump it to now() after she sits through (or skips)
+  // the animation. firstCheerCeremonySeenAt records when the welcome
+  // banner played — fires once per user, ever; subsequent ceremonies
+  // skip straight to the rose drop.
+  cheersLastSeenAt             DateTime?
+  firstCheerCeremonySeenAt     DateTime?
+
   profile           Profile?
   mealLogs          MealLog[]
   dailyTotals       DailyTotals[]

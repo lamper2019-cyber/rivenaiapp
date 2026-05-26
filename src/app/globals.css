@@ -204,6 +204,60 @@ body {
   animation: riven-score-pop 680ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
+/* Rose fall: a 🌹 drops from above the viewport to roughly mid-screen,
+   lingers with the sender's name, then fades. Used in the falling-roses
+   ceremony on /dashboard. Each rose runs the whole 2.2s cycle on its
+   own staggered start so several can be in flight at once if needed.
+   Translate uses vh units so it lands at a consistent visual point
+   regardless of viewport height. */
+@keyframes riven-rose-fall {
+  0% {
+    transform: translateY(-30vh) scale(0.7) rotate(-12deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  55% {
+    transform: translateY(0) scale(1.05) rotate(2deg);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(8vh) scale(0.95) rotate(0deg);
+    opacity: 0;
+  }
+}
+.riven-rose-fall {
+  animation: riven-rose-fall 2200ms cubic-bezier(0.4, 0.2, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* Sender-name fade-in: appears once the rose has landed (~700ms in)
+   and lingers as the rose holds, then fades out with it. */
+@keyframes riven-rose-name {
+  0%   { opacity: 0; transform: translateY(8px); }
+  35%  { opacity: 0; transform: translateY(8px); }
+  50%  { opacity: 1; transform: translateY(0); }
+  80%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(0); }
+}
+.riven-rose-name {
+  animation: riven-rose-name 2200ms cubic-bezier(0.4, 0.2, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .riven-rose-fall,
+  .riven-rose-name {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Float-up & fade: a clone of the tapped emoji rises ~72px and dissolves.
    Used on the daily-mood ribbon so picking a mood feels rewarded without
    any confetti chaos. Quiet, premium, brand-appropriate. */
