@@ -325,8 +325,10 @@ model PendingAiReply {
   // When the cron should fire this reply. Stored as UTC instant; the
   // cron picks up anything with scheduledFor <= now() AND status="pending".
   scheduledFor    DateTime
-  // "pending" | "sent" | "failed" — rows are kept after firing for
-  // analytics + debugging. status="sent" rows can be purged later.
+  // "pending" | "sent" | "failed" | "cancelled" — rows are kept after
+  // firing for analytics + debugging. Cancelled rows are queued
+  // replies Sean overrode by writing back himself from the coach
+  // messaging dashboard. Sent/failed/cancelled rows can be purged later.
   status          String   @default("pending")
   // Populated by the cron route on send or failure.
   sentAt          DateTime?

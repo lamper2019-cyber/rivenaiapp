@@ -18,6 +18,12 @@ const NAV_ITEMS: NavItem[] = [
     matches: (p) => p === "/coach" || p.startsWith("/coach/clients"),
   },
   {
+    href: "/coach/messages",
+    label: "Messages",
+    icon: "forum",
+    matches: (p) => p.startsWith("/coach/messages"),
+  },
+  {
     href: "/coach/leads",
     label: "Leads",
     icon: "person_search",
