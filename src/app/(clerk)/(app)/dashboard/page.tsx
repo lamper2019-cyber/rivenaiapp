@@ -18,7 +18,7 @@ import { getCheerCeremonyState } from "@/lib/cheer-ceremony";
 import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
 import { getDailyMoodSnapshot, MOOD_KINDS, type MoodKind } from "@/lib/daily-mood";
 import { pickCoachLineForMood } from "@/lib/coach-mood-lines";
-import { PulseStrip } from "@/components/pulse-strip";
+import { PulseToasts } from "@/components/pulse-toasts";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
 import { CheerReceivedCard } from "@/components/cheer-received-card";
@@ -213,7 +213,12 @@ export default async function DashboardPage() {
       {cheerCandidates.length > 0 && (
         <CheerPrompts candidates={cheerCandidates} />
       )}
-      <PulseStrip events={pulseEvents} />
+      {/* Pulse toasts replaced the persistent PulseStrip per Sean: one
+          event pops up at a time (Shopify-style "someone just bought"
+          pattern), holds for ~5s, then fades. Self-renders no DOM when
+          there are no events. Lives as a fixed overlay so it doesn't
+          take inline space. */}
+      <PulseToasts events={pulseEvents} />
       {collectiveStats && <CollectiveCounter stats={collectiveStats} />}
 
       {/* Today's targets — three progress cards */}
