@@ -144,14 +144,12 @@ export const Q14: ChoiceQuestion = {
   ],
 };
 
-export const Q15: TextareaQuestion = {
-  id: "q15",
-  phase: "qualifying",
-  text: "Anything else I should know?",
-  placeholder: "Optional — type anything that'll help me give you the right plan.",
-};
+// Q15 ("Anything else I should know?") used to live here but the
+// textarea was unreliable on mobile and the answer was never wired into
+// anything downstream — leads kept showing empty q15 fields. Removed
+// per Sean. Coach-side leads page also drops the surrounding card.
 
-export const QUALIFYING_QUESTIONS: Question[] = [Q11, Q12, Q13, Q14, Q15];
+export const QUALIFYING_QUESTIONS: Question[] = [Q11, Q12, Q13, Q14];
 
 export const ALL_QUESTIONS: Question[] = [...PRACTICE_QUESTIONS, ...QUALIFYING_QUESTIONS];
 
@@ -202,7 +200,10 @@ export const AnswersSchema = z.object({
   q12: z.string().trim().min(1).max(100),
   q13: z.string().trim().min(1).max(100),
   q14: Q14Enum,
-  q15: z.string().trim().max(1000).optional().or(z.literal("").transform(() => undefined)),
+  // q15 ("Anything else I should know?") removed — see quiz.ts comment.
+  // Field stays in the Zod schema for one release as `.optional()` so a
+  // user mid-quiz with a stale client bundle doesn't get a 400 on submit.
+  q15: z.string().optional().transform(() => undefined),
 });
 export type Answers = z.infer<typeof AnswersSchema>;
 

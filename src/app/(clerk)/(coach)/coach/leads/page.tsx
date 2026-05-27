@@ -6,6 +6,7 @@ import {
   labelForChoiceAnswer,
   type BudgetTier,
 } from "@/lib/quiz";
+import { DeleteLeadButton } from "./delete-lead-button";
 
 const TIERS: Array<{ key: BudgetTier | "ALL"; label: string }> = [
   { key: "ALL", label: "All" },
@@ -241,16 +242,11 @@ function LeadCard({ lead }: { lead: LeadRow }) {
             />
           </div>
 
-          {answers.q15 && (
-            <div className="rounded-md bg-secondary-container/30 border border-gold/40 px-3 py-3">
-              <p className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant mb-1">
-                Note from her
-              </p>
-              <p className="font-body text-body-md text-charcoal leading-relaxed whitespace-pre-wrap">
-                {answers.q15}
-              </p>
-            </div>
-          )}
+          {/* "Note from her" block (Q15 textarea) removed in 9216436 —
+              Q15 was killed because the textarea was unreliable on mobile
+              and the field was never used downstream. Historical leads
+              with q15 filled in still have the data in the JSON column
+              but it no longer renders here. */}
 
           <div>
             <p className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant mb-2">
@@ -301,6 +297,7 @@ function LeadCard({ lead }: { lead: LeadRow }) {
                 Text her
               </a>
             )}
+            <DeleteLeadButton leadId={lead.id} firstName={lead.firstName} />
           </div>
         </div>
       )}

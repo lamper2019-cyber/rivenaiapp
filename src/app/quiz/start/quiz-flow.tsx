@@ -9,21 +9,25 @@ import {
   Q12,
   Q13,
   Q14,
-  Q15,
   type Answers,
   type ChoiceQuestion,
 } from "@/lib/quiz";
 
 /**
- * Three-phase quiz flow:
+ * Two-phase quiz flow:
  *   step 0   → contact (first name + email + optional phone)
  *   step 1-10 → practice questions q1..q10 (yes/no, auto-advance)
- *   step 11-14 → multiple-choice qualifying questions (auto-advance)
- *   step 15  → open textarea + submit
+ *   step 11-13 → multiple-choice qualifying questions (auto-advance)
+ *   step 14  → final multiple-choice (Q14) + submit
  *
  * State persists to localStorage so a closed tab resumes where she left
  * off (same pattern as onboarding). Auto-advance keeps momentum on the
- * easy questions; contact and textarea steps need an explicit Continue.
+ * easy questions; contact step needs an explicit Continue. The last
+ * question (Q14) auto-fires submit on selection.
+ *
+ * Q15 (open textarea) used to live at step 15 — removed per Sean: the
+ * textarea was unreliable on mobile and the answer was never used
+ * downstream. Total step count drops from 16 to 15 (contact + 14 q's).
  */
 
 type FlowState = {
@@ -33,7 +37,7 @@ type FlowState = {
 };
 
 const STORAGE_KEY = "riven_quiz_state_v1";
-const TOTAL_QUESTIONS = 15;
+const TOTAL_QUESTIONS = 14;
 const TOTAL_STEPS = TOTAL_QUESTIONS + 1; // +1 for the contact step
 
 const DEFAULT_STATE: FlowState = {
@@ -116,7 +120,6 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
     if (state.step === 12) return !!state.answers.q12;
     if (state.step === 13) return !!state.answers.q13;
     if (state.step === 14) return !!state.answers.q14;
-    // q15 is optional — always allowed to submit
     return true;
   }, [state]);
 
@@ -132,7 +135,9 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
       },
       answers: {
         ...state.answers,
-        q15: state.answers.q15?.toString().trim() || undefined,
+        // Q15 removed but kept in payload as undefined for schema parity
+        // with any stale clients mid-flow during the deploy.
+        q15: undefined,
       },
     };
     const fd = new FormData();
@@ -238,26 +243,38 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
           <ChoiceStep
             question={Q14}
             value={state.answers.q14}
-            onSelect={(v) => selectAndAdvance("q14", v)}
+            // Q14 is the last question — just set the answer (no auto-
+            // advance since there's no next step). The footer's "See my
+            // results" button takes over once she's picked.
+            onSelect={(v) => setAnswer("q14", v)}
           />
         )}
 
-        {state.step === 15 && (
-          <TextareaStep
-            text={Q15.text}
-            placeholder={Q15.placeholder}
-            value={state.answers.q15 ?? ""}
-            onChange={(v) => setAnswer("q15", v)}
-          />
+        {/* Back button sits right under the answer area for any non-zero
+            step. Per Sean: the back button was buried at the bottom of
+            the screen and felt unreachable; moving it close to the
+            answers means she doesn't have to scroll to correct a tap. */}
+        {state.step > 0 && (
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={back}
+              disabled={pending}
+              className="inline-flex items-center gap-1 font-body text-label-md tracking-wide text-on-surface-variant hover:text-charcoal active:scale-95 transition-all py-2 px-1"
+            >
+              <span aria-hidden>←</span>
+              Back
+            </button>
+          </div>
         )}
       </section>
 
-      {/* Footer — Back + Continue */}
+      {/* Footer — Continue (step 0) / See my results (step 14) */}
       <footer className="mt-8 space-y-3">
         {/* Hidden form for the submit action. handleSubmit fires it via formRef. */}
         <form ref={formRef} className="hidden" />
 
-        {(state.step === 0 || state.step === 15) && (
+        {(state.step === 0 || (isLast && !!state.answers.q14)) && (
           <button
             type="button"
             onClick={isLast ? handleSubmit : next}
@@ -269,17 +286,6 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
                 ? "Crunching your answers…"
                 : "See my results"
               : "Continue"}
-          </button>
-        )}
-
-        {state.step > 0 && (
-          <button
-            type="button"
-            onClick={back}
-            disabled={pending}
-            className="block w-full text-center font-body text-label-md tracking-wide text-on-surface-variant hover:text-charcoal transition-colors py-2"
-          >
-            ← Back
           </button>
         )}
       </footer>
@@ -481,34 +487,5 @@ function ChoiceStep({
   );
 }
 
-function TextareaStep({
-  text,
-  placeholder,
-  value,
-  onChange,
-}: {
-  text: string;
-  placeholder?: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="space-y-6">
-      <h1 className="font-display text-display-sm md:text-display-md text-charcoal leading-tight text-balance">
-        {text}
-      </h1>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={6}
-        maxLength={1000}
-        placeholder={placeholder}
-        className="w-full rounded-md border border-outline-variant/60 bg-surface-container-lowest px-gutter py-3.5 font-body text-body-md text-charcoal placeholder:text-on-surface-variant/60 focus:border-charcoal focus:outline-none transition-colors resize-none"
-      />
-      <p className="font-body text-label-sm text-on-surface-variant">
-        Optional — most people skip this. The ones who fill it in get the
-        sharpest response.
-      </p>
-    </div>
-  );
-}
+// TextareaStep removed alongside Q15 — the open-answer step was unused
+// downstream and unreliable on mobile.
