@@ -11,7 +11,9 @@ import { startOfCentralDay } from "@/lib/dates";
  *     log (escalating rungs — the card doesn't show every single day she
  *     hasn't logged, only at these three milestones)
  *   - 3+ day streak that broke yesterday
- *   - way-over yesterday (totalCal > target × 1.5)
+ *   - way-over 3 days running (totalCal > target × 1.5 every day of the
+ *     last 3) — a single heavy day is normal life; a pattern earns peers
+ *     the chance to send a 🌹
  *
  * The CheerReaction table has a unique constraint on (recipient, sender,
  * context) so the same sender can't double-spam the same trigger. Once
@@ -59,7 +61,14 @@ export async function getCheerCandidates(viewerUserId: string): Promise<CheerCan
   fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
 
   // Pull every active client (minus the viewer) with the data we need to
-  // evaluate each hard-day rule.
+  // evaluate each hard-day rule. For the way-over-target check we now
+  // need the LAST 3 daily totals (yesterday, day-2, day-3) so we can
+  // detect a 3-in-a-row pattern instead of a single bad day — Sean's
+  // call: a one-off heavy day doesn't earn a community cheer prompt;
+  // a pattern does.
+  const threeDaysAgo = new Date(today);
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
   const clients = await prisma.user.findMany({
     where: {
       ...ACTIVE_FILTER,
@@ -70,9 +79,10 @@ export async function getCheerCandidates(viewerUserId: string): Promise<CheerCan
       id: true,
       profile: { select: { name: true, cutCalories: true } },
       dailyTotals: {
-        where: { date: yesterday },
-        take: 1,
-        select: { totalCalories: true },
+        where: { date: { gte: threeDaysAgo, lt: today } },
+        orderBy: { date: "desc" },
+        take: 3,
+        select: { date: true, totalCalories: true },
       },
       mealLogs: {
         where: { createdAt: { gte: fifteenDaysAgo } },
@@ -171,12 +181,18 @@ export async function getCheerCandidates(viewerUserId: string): Promise<CheerCan
       }
     }
 
-    // ── rule 3: way over yesterday's target (×1.5) ───────────────────
-    const yesterdayTotal = client.dailyTotals[0]?.totalCalories ?? 0;
+    // ── rule 3: way over target for 3 days in a row ─────────────────
+    // Sean's call: a one-off heavy day doesn't earn a community cheer
+    // prompt — that's a normal Saturday. Three in a row is a pattern,
+    // and a pattern earns peers the chance to send a 🌹. Requires all
+    // three of the last 3 daily totals to exceed target × 1.5; missing
+    // days (no DailyTotals row) don't count as "over" — they just break
+    // the streak.
+    const recentDays = client.dailyTotals; // already last 3, desc
     if (
-      yesterdayTotal > 0 &&
       profile.cutCalories > 0 &&
-      yesterdayTotal > profile.cutCalories * 1.5
+      recentDays.length === 3 &&
+      recentDays.every((d) => d.totalCalories > profile.cutCalories * 1.5)
     ) {
       const key = `${client.id}|way_over_target`;
       if (!cheeredSet.has(key)) {
@@ -184,7 +200,7 @@ export async function getCheerCandidates(viewerUserId: string): Promise<CheerCan
           recipientUserId: client.id,
           firstName,
           context: "way_over_target",
-          reason: `${firstName} had a heavy day — send her a 🌹`,
+          reason: `${firstName}'s been heavy 3 days running — send her a 🌹`,
           cheerCountForContext: countMap.get(key) ?? 0,
         });
       }

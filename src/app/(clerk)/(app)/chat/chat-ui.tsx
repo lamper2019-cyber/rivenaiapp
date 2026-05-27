@@ -533,29 +533,34 @@ function MessageBubble({
 
   if (isUser) {
     return (
-      <li className="flex justify-end">
-        <div className="max-w-[85%] rounded-xl px-gutter py-3 bg-charcoal text-cream space-y-2">
-          {message.imageUrls && message.imageUrls.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {message.imageUrls.map((url, i) => (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  key={i}
-                  src={url}
-                  alt="Sent attachment"
-                  width={160}
-                  height={160}
-                  loading="lazy"
-                  decoding="async"
-                  className="max-w-[160px] max-h-[160px] rounded-md object-cover bg-charcoal/40"
-                />
-              ))}
-            </div>
-          )}
+      <li className="group flex justify-end">
+        <div className="flex flex-col items-end gap-1.5 max-w-[85%]">
+          <div className="rounded-xl px-gutter py-3 bg-charcoal text-cream space-y-2">
+            {message.imageUrls && message.imageUrls.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {message.imageUrls.map((url, i) => (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    key={i}
+                    src={url}
+                    alt="Sent attachment"
+                    width={160}
+                    height={160}
+                    loading="lazy"
+                    decoding="async"
+                    className="max-w-[160px] max-h-[160px] rounded-md object-cover bg-charcoal/40"
+                  />
+                ))}
+              </div>
+            )}
+            {message.content && message.content !== "(image)" && (
+              <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
+                {message.content}
+              </p>
+            )}
+          </div>
           {message.content && message.content !== "(image)" && (
-            <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
-              {message.content}
-            </p>
+            <CopyButton text={message.content} />
           )}
         </div>
       </li>
@@ -564,40 +569,83 @@ function MessageBubble({
 
   // Assistant (AI or COACH)
   return (
-    <li className="flex justify-start">
-      <div
-        className={`max-w-[85%] rounded-xl px-gutter py-3 shadow-elevation-1 ${
-          isCoach
-            ? "bg-secondary-container/60 border border-gold/50 text-charcoal"
-            : "bg-surface-container-lowest border border-outline-variant/60 text-charcoal"
-        }`}
-      >
-        <div className="flex items-center gap-2 mb-1.5">
-          <span
-            className={`inline-block w-2 h-2 rounded-full ${
-              isCoach ? "bg-gold" : "bg-sage"
-            }`}
-            aria-hidden
-          />
-          <span className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
-            {isCoach ? "Sean" : "Riven"}
-          </span>
-        </div>
-        <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
-          {message.content}
-          {streaming && message.content.length === 0 && (
-            <span className="inline-flex gap-1">
-              <Dot delay="0ms" />
-              <Dot delay="150ms" />
-              <Dot delay="300ms" />
+    <li className="group flex justify-start">
+      <div className="flex flex-col items-start gap-1.5 max-w-[85%]">
+        <div
+          className={`rounded-xl px-gutter py-3 shadow-elevation-1 ${
+            isCoach
+              ? "bg-secondary-container/60 border border-gold/50 text-charcoal"
+              : "bg-surface-container-lowest border border-outline-variant/60 text-charcoal"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            <span
+              className={`inline-block w-2 h-2 rounded-full ${
+                isCoach ? "bg-gold" : "bg-sage"
+              }`}
+              aria-hidden
+            />
+            <span className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
+              {isCoach ? "Sean" : "Riven"}
             </span>
-          )}
-          {streaming && message.content.length > 0 && (
-            <span className="inline-block w-1.5 h-4 ml-0.5 bg-charcoal/60 align-middle animate-pulse" />
-          )}
-        </p>
+          </div>
+          <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
+            {message.content}
+            {streaming && message.content.length === 0 && (
+              <span className="inline-flex gap-1">
+                <Dot delay="0ms" />
+                <Dot delay="150ms" />
+                <Dot delay="300ms" />
+              </span>
+            )}
+            {streaming && message.content.length > 0 && (
+              <span className="inline-block w-1.5 h-4 ml-0.5 bg-charcoal/60 align-middle animate-pulse" />
+            )}
+          </p>
+        </div>
+        {/* Copy button — appears below the bubble. Hidden while the
+            assistant message is still streaming (no point copying half a
+            response). On touch devices the button is always visible; on
+            desktop it fades in on hover via group-hover. */}
+        {!streaming && message.content && (
+          <CopyButton text={message.content} />
+        )}
       </div>
     </li>
+  );
+}
+
+/**
+ * Small icon-button that copies the bubble's text to clipboard.
+ * Optimistic UI: tap → label flips to "Copied" for ~1.5s, then back.
+ * Uses navigator.clipboard with a graceful no-op if the API is missing
+ * (insecure context, very old browser).
+ */
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  async function handleCopy() {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+      }
+    } catch {
+      /* clipboard blocked — silently no-op */
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      aria-label={copied ? "Copied" : "Copy message"}
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-md font-body text-label-sm text-on-surface-variant/70 hover:text-charcoal hover:bg-surface-container/40 transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100 sm:opacity-0 [@media(hover:none)]:opacity-100"
+    >
+      <span className="material-symbols-outlined text-[14px]" aria-hidden>
+        {copied ? "check" : "content_copy"}
+      </span>
+      {copied ? "Copied" : "Copy"}
+    </button>
   );
 }
 

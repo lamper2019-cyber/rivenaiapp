@@ -426,14 +426,9 @@ function MealRowItem({
         title={`Log this whole meal again: ${meal.description}`}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {meal.processedFlag && (
-            <span
-              aria-label="Flagged: ultra-processed or refined"
-              className="material-symbols-outlined text-soft-red text-[18px] shrink-0"
-            >
-              error
-            </span>
-          )}
+          {/* Red exclamation removed per Sean — the food name shouldn't
+              wear a warning sticker. Any heads-up text still lives in the
+              ResultCard for the most recently logged meal. */}
           <span className="font-body text-body-md text-charcoal truncate">
             {headerLabel}
           </span>
@@ -532,27 +527,21 @@ function ResultCard({
 }) {
   return (
     <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter md:p-6 shadow-elevation-2 space-y-4">
-      {/* Flag pill — only when something refined / processed is on the plate.
-          Sits above the coaching prose so the "why" reads as context, not a
-          lecture appended at the end. */}
+      {/* Heads-up note — only when something refined / processed is on
+          the plate. Sits above the coaching prose so the "why" reads as
+          context, not a lecture appended at the end. No red exclamation
+          icon (Sean's call: a red alarm next to her food makes the whole
+          log feel judgmental). Soft gold-tinted card with quiet "Heads up"
+          label — same surface as our reminder cards. AI prompt caps the
+          body at 2 sentences. */}
       {analysis.processedFlag && analysis.flagReason && (
-        <div className="rounded-md bg-soft-red/10 border border-soft-red/40 px-gutter py-3">
-          <div className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="material-symbols-outlined text-soft-red text-[20px] shrink-0 mt-0.5"
-            >
-              error
-            </span>
-            <div className="flex-1">
-              <p className="font-body text-label-md tracking-widest uppercase text-soft-red mb-1">
-                Heads up
-              </p>
-              <p className="font-body text-body-md text-charcoal leading-relaxed">
-                {analysis.flagReason}
-              </p>
-            </div>
-          </div>
+        <div className="rounded-md bg-secondary-container/30 border border-gold/40 px-gutter py-3">
+          <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant mb-1">
+            Heads up
+          </p>
+          <p className="font-body text-body-md text-charcoal leading-relaxed">
+            {analysis.flagReason}
+          </p>
         </div>
       )}
 
