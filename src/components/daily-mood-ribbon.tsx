@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   MOOD_CAUSES,
   MOOD_CAUSE_LABEL,
@@ -196,8 +196,9 @@ export function DailyMoodRibbon({
 
       {/* Community poll bars — fires once she's past the follow-up
           (answered or skipped). Shows how the whole active client room
-          is feeling today, as a bar chart sorted by current count.
-          She's already in the count (optimistic), so this includes her. */}
+          is feeling today, as a bar chart sorted by current percent.
+          Ephemeral by design (Sean's call): bars fade in for ~5s, then
+          fade out so they don't compete with the coach line. */}
       {!showCauseChips && (
         <MoodPollBars counts={counts} total={totalTaps} myMood={myMood} />
       )}
@@ -206,9 +207,14 @@ export function DailyMoodRibbon({
 }
 
 /**
- * Compact bar chart of the four moods sorted by current count. The
- * viewer's own mood gets a gold ring so she can see herself in the data.
- * Bars are filled with charcoal at 12% opacity — quiet, not loud.
+ * Ephemeral bar chart of the four moods sorted by percentage. Fades in
+ * when first mounted, holds for ~4.5 seconds, then fades out. The viewer's
+ * own mood gets the gold bar so she can see herself in the data.
+ *
+ * Counts are rendered as percentages of total taps ("50% said sleep")
+ * because raw counts read small when the community is still 8 people.
+ * Percentage framing reads bigger and matches the way she sees stats in
+ * other apps (Shopify-style "47% of customers...").
  */
 function MoodPollBars({
   counts,
@@ -219,9 +225,34 @@ function MoodPollBars({
   total: number;
   myMood: MoodKind;
 }) {
+  // Three phases: "in" (fade-in for 400ms) → "show" (hold for ~4s) →
+  // "out" (fade-out for 600ms, then unmount). State machine lives in a
+  // single visible flag so the className can drive the opacity.
+  const [visible, setVisible] = useState(false);
+  const [unmounted, setUnmounted] = useState(false);
+
+  useEffect(() => {
+    // Tiny defer so the initial render is opacity-0 and the next
+    // render flips to opacity-1 — that's what triggers the fade-in.
+    const inT = window.setTimeout(() => setVisible(true), 30);
+    // Hold ~4 seconds total visible, then fade out + unmount.
+    const outT = window.setTimeout(() => setVisible(false), 4_400);
+    const killT = window.setTimeout(() => setUnmounted(true), 5_100);
+    return () => {
+      window.clearTimeout(inT);
+      window.clearTimeout(outT);
+      window.clearTimeout(killT);
+    };
+  }, []);
+
+  if (unmounted) return null;
   if (total === 0) {
     return (
-      <p className="font-body text-label-sm text-on-surface-variant/80 border-t border-gold/20 pt-3">
+      <p
+        className={`font-body text-label-sm text-on-surface-variant/80 border-t border-gold/20 pt-3 transition-opacity duration-500 ${
+          visible ? "opacity-100" : "opacity-0"
+        }`}
+      >
         Be the first to check in today.
       </p>
     );
@@ -234,7 +265,12 @@ function MoodPollBars({
     return MOOD_KINDS.indexOf(a) - MOOD_KINDS.indexOf(b);
   });
   return (
-    <div className="border-t border-gold/20 pt-3 space-y-2">
+    <div
+      className={`border-t border-gold/20 pt-3 space-y-2 transition-opacity duration-500 ${
+        visible ? "opacity-100" : "opacity-0"
+      }`}
+      aria-live="polite"
+    >
       <p className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
         How the room&apos;s feeling
       </p>
@@ -262,7 +298,7 @@ function MoodPollBars({
                   isMine ? "text-charcoal font-semibold" : "text-on-surface-variant"
                 }`}
               >
-                {count}
+                {pct}%
               </span>
             </li>
           );

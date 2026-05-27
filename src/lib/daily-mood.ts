@@ -23,7 +23,9 @@ export const MOOD_CAUSES: MoodCause[] = ["sleep", "food", "stress"];
 export const MOOD_EMOJI: Record<MoodKind, string> = {
   tired: "😤",
   blah: "🥱",
-  good: "🙂",
+  // 🤩 reads as "I'm having a good one" with more enthusiasm than the
+  // flat 🙂; per Sean. Stored key is still "good" — no migration needed.
+  good: "🤩",
   fire: "🔥",
 };
 
