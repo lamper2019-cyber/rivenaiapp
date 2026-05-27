@@ -427,6 +427,12 @@ model DailyMood {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   // "tired" 😤 | "blah" 🥱 | "good" 🙂 | "fire" 🔥
   mood        String
+  // Optional second-tap follow-up. After she picks a mood she gets a
+  // soft "what's making it ___?" question with three options: "sleep"
+  // | "food" | "stress". Null = she skipped the follow-up (or it's an
+  // 'okay' day she didn't elaborate on). Drives client + coach mood-
+  // pattern dashboards.
+  cause       String?
   centralDate DateTime
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

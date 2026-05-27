@@ -18,6 +18,8 @@ import { EditTargetsForm } from "./edit-targets-form";
 import { CalorieScheduleForm } from "./calorie-schedule-form";
 import { CompToggle } from "./comp-toggle";
 import { parseSchedule } from "@/lib/calorie-schedule";
+import { getMyMoodHistory } from "@/lib/daily-mood";
+import { MoodHistory } from "@/components/mood-history";
 
 const PHASE_LABEL: Record<string, string> = {
   PHASE_1: "Phase 1",
@@ -162,6 +164,11 @@ export default async function CoachClientDetailPage({
     ).get(client.id) ?? new Array(CALENDAR_DAYS).fill(false);
   const heatmap7 = take7(heatmap28);
 
+  // 30-day mood history — feeds the Overview "Mood patterns" card so
+  // Sean can spot what's driving her tired/meh days month over month.
+  // Best-effort; if it fails, the panel just hides.
+  const moodHistory = await getMyMoodHistory(client.id, 30).catch(() => []);
+
   // ---------------- Tab contents ----------------
 
   const overviewContent = (
@@ -251,6 +258,12 @@ export default async function CoachClientDetailPage({
           />
         </section>
       )}
+
+      {/* Mood patterns — last 30 days of one-tap mood + optional cause
+          (sleep / food / stress). Lets Sean spot the lever to pull at
+          the monthly check-in: "her meh days have been mostly sleep-
+          driven this month." Same component clients see on /profile. */}
+      <MoodHistory entries={moodHistory} />
     </div>
   );
 

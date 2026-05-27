@@ -15,8 +15,10 @@ import { startOfCentralDay } from "@/lib/dates";
  */
 
 export type MoodKind = "tired" | "blah" | "good" | "fire";
+export type MoodCause = "sleep" | "food" | "stress";
 
 export const MOOD_KINDS: MoodKind[] = ["tired", "blah", "good", "fire"];
+export const MOOD_CAUSES: MoodCause[] = ["sleep", "food", "stress"];
 
 export const MOOD_EMOJI: Record<MoodKind, string> = {
   tired: "😤",
@@ -34,8 +36,19 @@ export const MOOD_LABEL: Record<MoodKind, string> = {
   fire: "fire",
 };
 
+export const MOOD_CAUSE_LABEL: Record<MoodCause, string> = {
+  sleep: "sleep",
+  food: "food",
+  stress: "stress",
+};
+
+export function isMoodCause(value: string | null | undefined): value is MoodCause {
+  return value === "sleep" || value === "food" || value === "stress";
+}
+
 export type DailyMoodSnapshot = {
   myMood: MoodKind | null;
+  myCause: MoodCause | null;
   counts: Record<MoodKind, number>;
   // The single mood with the highest count. Tie-breaker: earlier in MOOD_KINDS
   // (tired → blah → good → fire) so a 1-1-1-1 day still picks something.
@@ -54,7 +67,7 @@ export async function getDailyMoodSnapshot(
   const [mine, rows] = await Promise.all([
     prisma.dailyMood.findUnique({
       where: { userId_centralDate: { userId, centralDate: today } },
-      select: { mood: true },
+      select: { mood: true, cause: true },
     }),
     prisma.dailyMood.findMany({
       where: {
@@ -89,8 +102,42 @@ export async function getDailyMoodSnapshot(
 
   const totalTaps = rows.length;
   const myMood = isMoodKind(mine?.mood ?? null) ? (mine!.mood as MoodKind) : null;
+  const myCause = isMoodCause(mine?.cause ?? null) ? (mine!.cause as MoodCause) : null;
 
-  return { myMood, counts, topMood, totalTaps };
+  return { myMood, myCause, counts, topMood, totalTaps };
+}
+
+/**
+ * Personal mood history for the /profile page. Last 30 central-days of
+ * (mood, cause) for one user — drives a small heatmap-ish strip + cause
+ * tally on her profile so she can see her own patterns.
+ */
+export type MoodHistoryEntry = {
+  centralDate: Date;
+  mood: MoodKind;
+  cause: MoodCause | null;
+};
+
+export async function getMyMoodHistory(
+  userId: string,
+  days: number = 30,
+): Promise<MoodHistoryEntry[]> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const rows = await prisma.dailyMood.findMany({
+    where: { userId, centralDate: { gte: cutoff } },
+    orderBy: { centralDate: "asc" },
+    select: { mood: true, cause: true, centralDate: true },
+  });
+  return rows
+    .filter((r): r is { mood: string; cause: string | null; centralDate: Date } =>
+      isMoodKind(r.mood),
+    )
+    .map((r) => ({
+      centralDate: r.centralDate,
+      mood: r.mood as MoodKind,
+      cause: isMoodCause(r.cause) ? (r.cause as MoodCause) : null,
+    }));
 }
 
 export function isMoodKind(value: string | null | undefined): value is MoodKind {

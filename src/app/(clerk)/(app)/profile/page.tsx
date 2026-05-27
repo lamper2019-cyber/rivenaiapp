@@ -17,6 +17,8 @@ import {
   getPromptForClientWeek,
 } from "@/lib/content-prompts";
 import { DeleteAccountButton } from "./delete-account-button";
+import { getMyMoodHistory, type MoodHistoryEntry } from "@/lib/daily-mood";
+import { MoodHistory } from "@/components/mood-history";
 
 const PHASE_LABEL: Record<string, string> = {
   PHASE_1: "Phase 1 · Active",
@@ -48,6 +50,7 @@ export default async function ProfilePage() {
     photoUrl: string | null;
     promptText: string;
   } | null = null;
+  let moodHistory: MoodHistoryEntry[] = [];
 
   const weekStart = startOfIsoWeek(new Date());
   const monthStart = startOfCentralMonth();
@@ -63,7 +66,7 @@ export default async function ProfilePage() {
       subscriptionStatus = user?.subscriptionStatus ?? null;
 
       if (user) {
-        [checkIns, monthCheckIn, weekContent] = await Promise.all([
+        [checkIns, monthCheckIn, weekContent, moodHistory] = await Promise.all([
           prisma.weeklyCheckIn.findMany({
             where: { userId: user.id },
             orderBy: { weekStart: "asc" },
@@ -85,6 +88,7 @@ export default async function ProfilePage() {
               promptText: true,
             },
           }),
+          getMyMoodHistory(user.id, 30),
         ]);
       }
 
@@ -215,6 +219,10 @@ export default async function ProfilePage() {
           </div>
         </section>
       )}
+
+      {/* Mood history — last 30 days. Self-hides on empty data (new
+          clients without enough taps yet). */}
+      <MoodHistory entries={moodHistory} />
 
       <section className="space-y-3">
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
