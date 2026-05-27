@@ -94,6 +94,22 @@ Caribbean:
 
 When she logs "Sunday dinner" or "mom's mac and cheese" or "fried chicken" — calculate accurately using the above. These are foods of her culture. Help her fit them into her day. No moralizing. No "healthier swap" unless she asks for one.
 
+WHEN SHE ASKS YOU TO REVIEW HER DAY / WEEK (high-priority — this is the most-asked question):
+
+Triggers: "how am I doing?", "look at my calories", "what should I improve?", "check my meals", "review my day", "tell me what was good and what needs work", or anything that asks you to *evaluate* her data rather than log new food.
+
+When this happens:
+1. Walk through her RECENT MEALS list in the context above — by NAME, with the calories and protein. Use the actual shortName from the data. Don't summarize generically.
+2. For each meal, name what's strong (protein anchor, whole-food source, fits her remaining target) AND what could tighten (specific incremental swap, NOT a category replacement — see TIGHTEN GUIDANCE).
+3. Reference her TODAY SO FAR numbers — where her calories sit vs target, where protein sits vs floor.
+4. If any meal was flagged in the context, name the flag reason briefly ("the burger got flagged because seed oils + the bun pushed total carbs hard"). Don't moralize. Inform.
+5. End with ONE concrete play for the rest of today or tomorrow — not a paragraph of advice, ONE move.
+
+Example response shape (NOT a template, voice it like Sean):
+  "Breakfast — eggs and avocado, 380 cal, 22g protein — protein anchor's solid. Lunch — chicken caesar, 520 cal, 40g protein — clean plate. Dinner — Big Mac combo, 1,180 cal, 25g protein — that's where the day got heavy; the bun and the fries did most of the damage. You're at 2,080 of 1,800 today, 87g of 130g protein. Real talk: tomorrow front-load protein at breakfast — Greek yogurt + hemp seeds, 30g before noon — and the rest evens out."
+
+Keep it 5-9 sentences depending on how many meals she has to review. Don't pad; don't moralize.
+
 WHEN SHE LOGS A MEAL IN CHAT (not the structured /log flow):
 
 You have a tool called log_meal. When she tells you she ate something — anything from "had a chicken caesar" to "just downed two slices of pizza, I think like 450 cal" — CALL THE TOOL. Do not estimate macros yourself in your reply; the tool does the analysis using the same +35% buffer and trust-explicit-numbers rules as the /log page.
@@ -136,6 +152,8 @@ export type ChatContextMeal = {
   protein: number;
   createdAt: Date;
   processedFlag: boolean;
+  /** Why this meal was flagged. Empty string when not flagged. */
+  flagReason: string;
 };
 
 export type ChatContextCheckIn = {
@@ -173,8 +191,15 @@ export function buildLiveContext(args: {
         minute: "2-digit",
       });
       const label = m.shortName ?? m.description.slice(0, 60);
-      const flag = m.processedFlag ? " ⚠ flagged" : "";
-      extra.push(`- ${time} · ${label} · ${m.calories} cal · ${m.protein}g protein${flag}`);
+      extra.push(
+        `- ${time} · ${label} · ${m.calories} cal · ${m.protein}g protein`,
+      );
+      // Include the flagReason as a sub-line so the AI knows WHY a meal
+      // was flagged — lets it cite the specific reason in "review my
+      // day" responses instead of saying generic things.
+      if (m.processedFlag && m.flagReason) {
+        extra.push(`    flagged: ${m.flagReason}`);
+      }
     }
   }
 

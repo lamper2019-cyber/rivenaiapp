@@ -138,6 +138,11 @@ export async function POST(req: Request) {
           calories: true,
           protein: true,
           processedFlag: true,
+          // flagReason joins the context so the AI knows WHY a meal was
+          // flagged — lets it call out specifics ("the burger pushed you
+          // over because of the bun and the sweet tea") instead of just
+          // generic "this was flagged."
+          flagReason: true,
           createdAt: true,
         },
       }),
@@ -172,6 +177,10 @@ export async function POST(req: Request) {
     calories: m.calories,
     protein: m.protein,
     processedFlag: m.processedFlag,
+    // DB column is nullable on legacy rows logged before flagReason was
+    // mandatory; normalize to empty string so the context formatter
+    // doesn't have to think about null.
+    flagReason: m.flagReason ?? "",
     createdAt: m.createdAt,
   }));
 
@@ -242,7 +251,13 @@ export async function POST(req: Request) {
         for (let iter = 0; iter < TOOL_LOOP_MAX_ITERATIONS; iter++) {
           const stream = anthropic.messages.stream({
             model: CHAT_MODEL,
-            max_tokens: 1024,
+            // Bumped from 1024 → 1600. "How am I doing this week?" /
+            // "look at my meals and tell me what to improve" responses
+            // were running out of room mid-stream because they have to
+            // reference 5 recent meals AND give a Sean-voice take. 1600
+            // gives breathing room; rarely-needed bigger answers can
+            // still finish in a follow-up iteration.
+            max_tokens: 1600,
             system: [
               { type: "text", text: CHAT_PERSONA_PROMPT },
               {
