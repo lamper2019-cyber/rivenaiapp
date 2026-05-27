@@ -5,7 +5,13 @@ import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { startOfCentralDay } from "@/lib/dates";
-import { MOOD_CAUSES, MOOD_KINDS } from "@/lib/daily-mood";
+import {
+  ALL_MOOD_CAUSES,
+  MOOD_CAUSES_BY_MOOD,
+  MOOD_KINDS,
+  isMoodKind,
+  type MoodKind,
+} from "@/lib/daily-mood";
 
 /**
  * Persist today's mood (and optional cause) for the signed-in client.
@@ -22,7 +28,10 @@ const SetMoodSchema = z.object({
 });
 
 const SetMoodCauseSchema = z.object({
-  cause: z.enum(MOOD_CAUSES as [string, ...string[]]),
+  // Loose check at the schema layer; the strict per-mood validation
+  // happens after we read today's mood from the DB (only valid for the
+  // mood she actually tapped).
+  cause: z.enum(ALL_MOOD_CAUSES as [string, ...string[]]),
 });
 
 export type SetMoodResult =
@@ -71,6 +80,8 @@ export async function setMyMood(
       // Re-tapping a different mood mid-day clears the previous cause
       // — the "why" the day was meh at noon might not match the why
       // it's good at 9 PM. Keeping the old cause attached would lie.
+      // It also matters now that causes are per-mood: "period" valid
+      // for 'tired' wouldn't make sense if she switched to 'fire'.
       update: { mood: parsed.data.mood, cause: null },
     });
   } catch {
@@ -82,10 +93,10 @@ export async function setMyMood(
 }
 
 /**
- * Optional follow-up tap. After she picks a mood she gets a soft
- * "what's making it ___?" question — sleep / food / stress. This sets
- * the cause column on today's DailyMood row. Idempotent; re-tapping
- * a different cause updates.
+ * Optional follow-up tap. After she picks a mood she gets the per-mood
+ * "what's making it ___?" question. Strict validation: the cause must
+ * be in the allowed chip list FOR HER CURRENT MOOD. Sending "period"
+ * with mood "fire" gets refused — that's a stale client.
  */
 export async function setMyMoodCause(
   input: z.infer<typeof SetMoodCauseSchema>,
@@ -116,15 +127,19 @@ export async function setMyMoodCause(
 
   const today = startOfCentralDay();
 
-  // Only update an existing row — if she hasn't tapped a mood yet for
-  // today, we have nothing to attach a cause to. The UI should never
-  // call this before setMyMood, but defend the order anyway.
   const existing = await prisma.dailyMood.findUnique({
     where: { userId_centralDate: { userId: user.id, centralDate: today } },
-    select: { id: true },
+    select: { id: true, mood: true },
   });
   if (!existing) {
     return { ok: false, error: "Pick a mood first." };
+  }
+  if (!isMoodKind(existing.mood)) {
+    return { ok: false, error: "Mood is invalid." };
+  }
+  const allowed = MOOD_CAUSES_BY_MOOD[existing.mood as MoodKind];
+  if (!allowed.includes(parsed.data.cause)) {
+    return { ok: false, error: "That cause doesn't fit today's mood." };
   }
 
   try {

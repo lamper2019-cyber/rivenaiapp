@@ -2,13 +2,12 @@
 
 import { useEffect, useState, useTransition } from "react";
 import {
-  MOOD_CAUSES,
-  MOOD_CAUSE_LABEL,
+  MOOD_CAUSES_BY_MOOD,
   MOOD_EMOJI,
   MOOD_KINDS,
   MOOD_LABEL,
+  moodCauseLabel,
   type DailyMoodSnapshot,
-  type MoodCause,
   type MoodKind,
 } from "@/lib/daily-mood";
 import {
@@ -41,7 +40,7 @@ export function DailyMoodRibbon({
   coachLine: Record<MoodKind, string>;
 }) {
   const [myMood, setLocalMood] = useState<MoodKind | null>(snapshot.myMood);
-  const [myCause, setLocalCause] = useState<MoodCause | null>(snapshot.myCause);
+  const [myCause, setLocalCause] = useState<string | null>(snapshot.myCause);
   // True after she skips the follow-up. Persists for the session so the
   // chips don't re-appear if the snapshot revalidates.
   const [skippedCause, setSkippedCause] = useState(false);
@@ -93,7 +92,7 @@ export function DailyMoodRibbon({
     });
   }
 
-  function handleCauseTap(cause: MoodCause) {
+  function handleCauseTap(cause: string) {
     const previous = myCause;
     setLocalCause(cause);
     startTransition(async () => {
@@ -165,22 +164,24 @@ export function DailyMoodRibbon({
         </p>
       </div>
 
-      {/* Follow-up: what's making it ___? Three soft chip buttons.
-          Skips to the poll if she taps "skip." */}
+      {/* Follow-up: what's making it ___? Per-mood chip set — see
+          MOOD_CAUSES_BY_MOOD. The question reads back her own word
+          ("what's making it tired?" / "what's making it fire?") so
+          the language stays in her voice. */}
       {showCauseChips && (
         <div className="border-t border-gold/20 pt-3">
           <p className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant mb-2">
             What&apos;s making it {MOOD_LABEL[myMood]}?
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            {MOOD_CAUSES.map((cause) => (
+            {MOOD_CAUSES_BY_MOOD[myMood].map((cause) => (
               <button
                 key={cause}
                 type="button"
                 onClick={() => handleCauseTap(cause)}
                 className="inline-flex items-center rounded-full bg-surface-container-lowest border border-outline-variant/60 px-4 py-1.5 font-body text-label-sm text-charcoal hover:border-charcoal/40 active:scale-95 transition-all"
               >
-                {MOOD_CAUSE_LABEL[cause]}
+                {moodCauseLabel(cause)}
               </button>
             ))}
             <button

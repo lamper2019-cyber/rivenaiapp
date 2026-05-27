@@ -15,10 +15,31 @@ import { startOfCentralDay } from "@/lib/dates";
  */
 
 export type MoodKind = "tired" | "blah" | "good" | "fire";
-export type MoodCause = "sleep" | "food" | "stress";
+
+/**
+ * Per-mood cause chips. Different chips respond to different moods so
+ * the follow-up actually fits where she is — "What's making it tired?"
+ * needs a different vocabulary than "What's making it fire?"
+ *
+ * Stored loosely as plain strings on DailyMood.cause; validation lives
+ * server-side (mood-action.ts) and reads the mood from the DB before
+ * accepting a cause. Frontend reads the same map to render chips.
+ */
+export const MOOD_CAUSES_BY_MOOD: Record<MoodKind, readonly string[]> = {
+  tired: ["sleep", "period", "stress", "work"],
+  blah: ["motivation", "sleep", "weather", "vibes"],
+  good: ["workout", "food", "a win", "vibes"],
+  fire: ["workout", "momentum", "a win", "locked in"],
+} as const;
+
+/** Union of every cause that can appear under ANY mood — used as a
+ *  loose validation backstop. The strict per-mood check happens in
+ *  the server action where we know which mood the row carries. */
+export const ALL_MOOD_CAUSES: readonly string[] = Array.from(
+  new Set(Object.values(MOOD_CAUSES_BY_MOOD).flatMap((arr) => [...arr])),
+);
 
 export const MOOD_KINDS: MoodKind[] = ["tired", "blah", "good", "fire"];
-export const MOOD_CAUSES: MoodCause[] = ["sleep", "food", "stress"];
 
 export const MOOD_EMOJI: Record<MoodKind, string> = {
   tired: "😤",
@@ -38,19 +59,22 @@ export const MOOD_LABEL: Record<MoodKind, string> = {
   fire: "fire",
 };
 
-export const MOOD_CAUSE_LABEL: Record<MoodCause, string> = {
-  sleep: "sleep",
-  food: "food",
-  stress: "stress",
-};
+/** Display labels for cause chips. Currently identity (the chip key
+ *  IS the human label). Kept as a function so future renames (e.g.
+ *  "locked in" → "locked-in") don't require schema churn. */
+export function moodCauseLabel(cause: string): string {
+  return cause;
+}
 
-export function isMoodCause(value: string | null | undefined): value is MoodCause {
-  return value === "sleep" || value === "food" || value === "stress";
+/** A "valid cause" is any string that appears in at least one mood's
+ *  chip list. Strict per-mood validation happens server-side. */
+export function isMoodCause(value: string | null | undefined): value is string {
+  return typeof value === "string" && ALL_MOOD_CAUSES.includes(value);
 }
 
 export type DailyMoodSnapshot = {
   myMood: MoodKind | null;
-  myCause: MoodCause | null;
+  myCause: string | null;
   counts: Record<MoodKind, number>;
   // The single mood with the highest count. Tie-breaker: earlier in MOOD_KINDS
   // (tired → blah → good → fire) so a 1-1-1-1 day still picks something.
@@ -104,7 +128,9 @@ export async function getDailyMoodSnapshot(
 
   const totalTaps = rows.length;
   const myMood = isMoodKind(mine?.mood ?? null) ? (mine!.mood as MoodKind) : null;
-  const myCause = isMoodCause(mine?.cause ?? null) ? (mine!.cause as MoodCause) : null;
+  // Cause is stored as a plain string; accept anything currently in our
+  // chip vocabulary OR a historical value still attached to a row.
+  const myCause = mine?.cause ?? null;
 
   return { myMood, myCause, counts, topMood, totalTaps };
 }
@@ -117,7 +143,7 @@ export async function getDailyMoodSnapshot(
 export type MoodHistoryEntry = {
   centralDate: Date;
   mood: MoodKind;
-  cause: MoodCause | null;
+  cause: string | null;
 };
 
 export async function getMyMoodHistory(
@@ -138,7 +164,11 @@ export async function getMyMoodHistory(
     .map((r) => ({
       centralDate: r.centralDate,
       mood: r.mood as MoodKind,
-      cause: isMoodCause(r.cause) ? (r.cause as MoodCause) : null,
+      // Cause is stored as a plain string with no DB-level constraint —
+      // pass it through. Renderers display whatever's there; if the
+      // chip vocabulary changed since she tapped, the tally still shows
+      // the legacy value with no special handling.
+      cause: r.cause,
     }));
 }
 
