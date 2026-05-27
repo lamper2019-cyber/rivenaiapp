@@ -12,7 +12,10 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/log", label: "Log", icon: "edit_note" },
-  { href: "/chat", label: "RIVEN AI", icon: "auto_awesome" },
+  // /chat is now the unified Sean thread. RIVEN AI's not a destination
+  // anymore — the same model powers Sean's auto-replies on this thread,
+  // delayed 1.5-15 min so they don't read as a bot.
+  { href: "/chat", label: "Sean", icon: "forum" },
   { href: "/profile", label: "Profile", icon: "person" },
 ];
 

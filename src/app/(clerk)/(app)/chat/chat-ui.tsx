@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { SUGGESTED_PROMPTS } from "@/lib/chat-prompt";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { sendToSean } from "./sean-actions";
 
 const MAX_IMAGES_PER_MESSAGE = 4;
 
@@ -25,15 +26,26 @@ type PendingAttachment = {
 export function ChatUI({
   initialMessages,
   onboarded,
+  initialHasPendingReply = false,
 }: {
   initialMessages: ChatMessage[];
   onboarded: boolean;
+  /** Server-side hint: does this user have a PendingAiReply queued?
+   *  Drives the "Sean's reading..." indicator on first paint so it's
+   *  visible immediately rather than after the first polling tick. */
+  initialHasPendingReply?: boolean;
 }) {
+  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
-  const [streaming, setStreaming] = useState(false);
+  // "sending" = her send() in flight (saving the user message + scheduling
+  // a reply). "hasPendingReply" = there's a PendingAiReply queued for her
+  // — used to show the "Sean's reading..." indicator until the cron fires.
+  const [sending, setSending] = useState(false);
+  const [hasPendingReply, setHasPendingReply] = useState(initialHasPendingReply);
   const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
   // Drives the staggered exit animation on the empty-state cards. Stays
   // true through the animation window so EmptyState keeps mounting; the
   // wrapper around send() flips it on, waits, then calls actual send.
@@ -62,6 +74,29 @@ export function ChatUI({
     ta.style.height = "auto";
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [input]);
+
+  // Poll for new messages while a reply is pending. Sean's auto-reply
+  // lands somewhere in the 1.5-15 minute window so we don't need
+  // realtime — refreshing every 20 seconds is plenty to catch it
+  // shortly after the cron fires. router.refresh() re-runs the server
+  // page component, which re-fetches the thread + pending-reply state.
+  useEffect(() => {
+    if (!hasPendingReply) return;
+    const interval = window.setInterval(() => {
+      startTransition(() => {
+        router.refresh();
+      });
+    }, 20_000);
+    return () => window.clearInterval(interval);
+  }, [hasPendingReply, router]);
+
+  // Sync local state when initialMessages / initialHasPendingReply
+  // change (router.refresh() updates props). New assistant messages
+  // mean the reply landed — clear the pending flag.
+  useEffect(() => {
+    setMessages(initialMessages);
+    setHasPendingReply(initialHasPendingReply);
+  }, [initialMessages, initialHasPendingReply]);
 
   // Revoke any object URLs and stop the recorder if the component unmounts.
   useEffect(() => {
@@ -159,11 +194,10 @@ export function ChatUI({
       .map((a) => a.publicUrl!);
 
     if (!trimmed && uploadedImages.length === 0) return;
-    if (streaming) return;
+    if (sending) return;
 
-    // First message in this thread — animate the suggested prompts out
-    // before the user's message lands. Keeps EmptyState mounted through
-    // the animation by reading `emptyExiting`, see render below.
+    // First message in this thread — animate the empty state out
+    // before the user's message lands.
     if (messages.length === 0 && !emptyExiting) {
       setEmptyExiting(true);
       await new Promise((r) => setTimeout(r, EMPTY_EXIT_MS));
@@ -172,61 +206,41 @@ export function ChatUI({
     setError(null);
     setInput("");
 
+    // Optimistic: drop her message into the thread immediately so the
+    // UI feels instant. No assistant placeholder — Sean's reply lands
+    // 1.5-15 min later via the cron, and the polling effect picks it
+    // up. While waiting, the "Sean's reading..." indicator shows.
     const userMsg: ChatMessage = {
       id: `local-user-${Date.now()}`,
       role: "user",
-      kind: "AI",
+      kind: "COACH",
       content: trimmed,
       imageUrls: uploadedImages,
     };
-    const placeholder: ChatMessage = {
-      id: `local-assistant-${Date.now()}`,
-      role: "assistant",
-      kind: "AI",
-      content: "",
-    };
-    setMessages((prev) => [...prev, userMsg, placeholder]);
+    setMessages((prev) => [...prev, userMsg]);
     setAttachments([]);
-    setStreaming(true);
-    // Cards have already finished their exit animation by this point —
-    // unmount EmptyState so the messages list takes over.
+    setSending(true);
     setEmptyExiting(false);
 
     try {
-      const response = await fetch("/api/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: trimmed || "(image)",
-          imageUrls: uploadedImages,
-        }),
+      const r = await sendToSean({
+        message: trimmed || "(image)",
+        imageUrls: uploadedImages,
       });
-
-      if (!response.ok || !response.body) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? `Request failed: ${response.status}`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let assistantText = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        assistantText += decoder.decode(value, { stream: true });
-        setMessages((prev) => {
-          const next = [...prev];
-          next[next.length - 1] = { ...placeholder, content: assistantText };
-          return next;
-        });
-      }
+      if (!r.ok) throw new Error(r.error);
+      setHasPendingReply(true);
+      // Refresh once to pick up the server-rendered version of the
+      // message (canonical id, server timestamp). The polling effect
+      // takes over from here.
+      startTransition(() => router.refresh());
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
       setError(msg);
+      // Rollback the optimistic user message so she doesn't see a
+      // dead bubble.
       setMessages((prev) => prev.slice(0, -1));
     } finally {
-      setStreaming(false);
+      setSending(false);
     }
   }
 
@@ -336,7 +350,7 @@ export function ChatUI({
   const anyUploadInFlight = attachments.some((a) => a.status === "uploading");
   const hasAnyAttachment = attachments.length > 0;
   const canSend =
-    !streaming &&
+    !sending &&
     !anyUploadInFlight &&
     !recording &&
     !transcribing &&
@@ -349,7 +363,7 @@ export function ChatUI({
         {!onboarded && (
           <div className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-3 mb-6">
             <p className="font-body text-body-md text-charcoal">
-              Complete onboarding before chatting with RIVEN. Head back to{" "}
+              Complete onboarding before messaging Sean. Head back to{" "}
               <a href="/onboarding" className="underline underline-offset-4">
                 /onboarding
               </a>
@@ -361,22 +375,37 @@ export function ChatUI({
         {(isEmpty || emptyExiting) && onboarded ? (
           <EmptyState
             onPrompt={(p) => send(p)}
-            disabled={streaming}
+            disabled={sending}
             exiting={emptyExiting}
           />
         ) : (
           <ul className="space-y-6 py-4">
             {messages.map((m) => (
-              <MessageBubble
-                key={m.id}
-                message={m}
-                streaming={
-                  streaming &&
-                  m.id === messages[messages.length - 1]?.id &&
-                  m.role === "assistant"
-                }
-              />
+              <MessageBubble key={m.id} message={m} />
             ))}
+            {/* "Sean's reading..." indicator while a PendingAiReply is
+                queued. Sits below the last user message. Reads as a
+                normal assistant-style bubble with three pulsing dots —
+                same shape as the cheer-prompt dots so visual language
+                stays consistent. */}
+            {hasPendingReply && (
+              <li className="flex justify-start">
+                <div className="rounded-xl px-gutter py-3 bg-surface-container-lowest border border-outline-variant/60 shadow-elevation-1 inline-flex items-center gap-2">
+                  <span
+                    className="inline-block w-2 h-2 rounded-full bg-sage"
+                    aria-hidden
+                  />
+                  <span className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
+                    Sean&apos;s reading
+                  </span>
+                  <span className="inline-flex gap-1">
+                    <Dot delay="0ms" />
+                    <Dot delay="150ms" />
+                    <Dot delay="300ms" />
+                  </span>
+                </div>
+              </li>
+            )}
           </ul>
         )}
 
@@ -459,7 +488,7 @@ export function ChatUI({
               type="button"
               onClick={handlePickFiles}
               disabled={
-                streaming ||
+                sending ||
                 !onboarded ||
                 recording ||
                 transcribing ||
@@ -474,7 +503,7 @@ export function ChatUI({
             <button
               type="button"
               onClick={toggleRecording}
-              disabled={streaming || !onboarded || transcribing}
+              disabled={sending || !onboarded || transcribing}
               aria-label={recording ? "Stop recording" : "Record voice memo"}
               className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                 recording
@@ -492,13 +521,13 @@ export function ChatUI({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={streaming || !onboarded}
+              disabled={sending || !onboarded}
               rows={1}
               placeholder={
                 onboarded
                   ? hasAnyAttachment
                     ? "Add a question about the photo…"
-                    : "Message RIVEN…"
+                    : "Message Sean…"
                   : "Onboarding required"
               }
               maxLength={2000}
@@ -511,7 +540,7 @@ export function ChatUI({
               className="shrink-0 w-10 h-10 rounded-full bg-charcoal text-cream flex items-center justify-center transition-all active:scale-95 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-[20px]">
-                {streaming || anyUploadInFlight ? "more_horiz" : "arrow_upward"}
+                {sending || anyUploadInFlight ? "more_horiz" : "arrow_upward"}
               </span>
             </button>
           </div>
@@ -523,10 +552,8 @@ export function ChatUI({
 
 function MessageBubble({
   message,
-  streaming,
 }: {
   message: ChatMessage;
-  streaming: boolean;
 }) {
   const isUser = message.role === "user";
   const isCoach = message.kind === "COACH" && !isUser;
@@ -591,25 +618,12 @@ function MessageBubble({
           </div>
           <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
             {message.content}
-            {streaming && message.content.length === 0 && (
-              <span className="inline-flex gap-1">
-                <Dot delay="0ms" />
-                <Dot delay="150ms" />
-                <Dot delay="300ms" />
-              </span>
-            )}
-            {streaming && message.content.length > 0 && (
-              <span className="inline-block w-1.5 h-4 ml-0.5 bg-charcoal/60 align-middle animate-pulse" />
-            )}
           </p>
         </div>
-        {/* Copy button — appears below the bubble. Hidden while the
-            assistant message is still streaming (no point copying half a
-            response). On touch devices the button is always visible; on
-            desktop it fades in on hover via group-hover. */}
-        {!streaming && message.content && (
-          <CopyButton text={message.content} />
-        )}
+        {/* Copy button — appears below the bubble. On touch devices
+            the button is always visible; on desktop it fades in on
+            hover via group-hover. */}
+        {message.content && <CopyButton text={message.content} />}
       </div>
     </li>
   );
@@ -666,49 +680,38 @@ function Dot({ delay }: { delay: string }) {
 }
 
 function EmptyState({
-  onPrompt,
-  disabled,
+  // onPrompt + disabled were used for the old AI suggested-prompts grid.
+  // Unified thread doesn't need suggestions — Sean writes proactively
+  // via the cron, and her first message is whatever's on her mind. Kept
+  // the same props signature so the parent doesn't churn.
   exiting,
 }: {
   onPrompt: (prompt: string) => void;
   disabled: boolean;
   exiting: boolean;
 }) {
-  // Single clean exit per element: opacity + small downward drift, staggered
-  // across the cards so they leave one after another like a falling pulldown.
-  // Each item runs ~250ms; stagger = 60ms; transitions never overlap with
-  // remount because the parent keeps EmptyState alive for the full duration.
   const introOpacity = exiting ? "opacity-0" : "opacity-100";
   const introTransform = exiting ? "translate-y-3" : "translate-y-0";
   return (
     <div
-      className={`flex-1 flex flex-col justify-center py-6 space-y-5 ${
+      className={`flex-1 flex flex-col justify-center py-6 space-y-5 text-center ${
         exiting ? "pointer-events-none" : ""
       }`}
       aria-hidden={exiting}
     >
       <p
-        className={`font-body text-body-md text-on-surface-variant text-center max-w-md mx-auto transition-[opacity,transform] duration-[250ms] ease-out ${introOpacity} ${introTransform}`}
+        className={`font-display text-headline-md text-charcoal max-w-md mx-auto transition-[opacity,transform] duration-[250ms] ease-out ${introOpacity} ${introTransform}`}
       >
-        Ask anything about your wellness journey, meal plans, or progress
-        tracking. Tap the photo icon to send a meal pic.
+        Say what&apos;s on your mind.
       </p>
-      <div className="grid sm:grid-cols-2 gap-3">
-        {SUGGESTED_PROMPTS.map((prompt, idx) => (
-          <button
-            key={prompt}
-            type="button"
-            disabled={disabled || exiting}
-            onClick={() => onPrompt(prompt)}
-            style={{
-              transitionDelay: exiting ? `${60 + idx * 60}ms` : "0ms",
-            }}
-            className={`text-left rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-3 font-body text-body-md text-charcoal hover:border-gold hover:bg-cream disabled:opacity-60 shadow-elevation-1 transition-[opacity,transform,colors] duration-[250ms] ease-out ${introOpacity} ${introTransform}`}
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
+      <p
+        className={`font-body text-body-md text-on-surface-variant max-w-md mx-auto leading-relaxed transition-[opacity,transform] duration-[250ms] ease-out ${introOpacity} ${introTransform}`}
+        style={{ transitionDelay: exiting ? "0ms" : "100ms" }}
+      >
+        Quick question, meal you&apos;re unsure about, a hard day —
+        Sean reads everything. He answers in a few minutes most of
+        the time. Tap the photo icon to share a meal pic.
+      </p>
     </div>
   );
 }
