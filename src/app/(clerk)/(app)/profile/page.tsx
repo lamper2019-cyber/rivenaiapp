@@ -2,17 +2,18 @@ import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { computeWins, type Win } from "@/lib/progress";
+import { computeWins, toWeightSeries, type Win } from "@/lib/progress";
 import { PushSubscribeButton } from "@/components/push-subscribe-button";
+import { Sparkline } from "@/components/sparkline";
 import { startOfCentralMonth } from "@/lib/dates";
 import { DeleteAccountButton } from "./delete-account-button";
 import { getMyMoodHistory, type MoodHistoryEntry } from "@/lib/daily-mood";
 import { MoodHistory } from "@/components/mood-history";
 
-// Phase label, sparkline series, and weekly content prompt helpers
-// removed alongside the surfaces that consumed them — see comments
-// below in the JSX. Wins still compute (used in the "Wins" section)
-// and pull start/goal weight off Profile directly.
+// Weight sparkline returned after the 2026-05-27 simplification — the
+// 30-day slider check-in writes here so the graph has real signal.
+// Waist trend is intentionally NOT shown; Sean wanted weight as the
+// primary number-to-watch on /profile.
 
 export default async function ProfilePage() {
   const { userId } = auth();
@@ -103,11 +104,29 @@ export default async function ProfilePage() {
         </section>
       )}
 
-      {/* Weight trend, waist trend, and streak-protection blocks were
-          removed per Sean — too much "tracking app" energy on a screen
-          that should feel chill. Trends still live in the coach view;
-          streak data still feeds the Sean thread proactive logic.
-          Photo timeline stays — visual progress without the chart vibe. */}
+      {/* Weight trend returned 2026-05-27 — now that the 30-day slider
+          check-in writes a row regularly, the chart has real signal.
+          Waist trend stays hidden (Sean wants weight as the only
+          tracked number on /profile). Streak-protection block remains
+          out — that data still feeds proactive logic but doesn't
+          earn screen real estate. */}
+      {checkIns.length > 0 && profile && (
+        <section className="space-y-3">
+          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+            Weight
+          </h2>
+          <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-5 shadow-elevation-1 text-charcoal">
+            <Sparkline
+              data={toWeightSeries(checkIns)}
+              unit="lb"
+              target={profile.goalWeight}
+            />
+            <p className="font-body text-label-sm text-on-surface-variant/70 mt-3">
+              Goal {profile.goalWeight} lb · Start {profile.startWeight} lb
+            </p>
+          </div>
+        </section>
+      )}
 
       {photoCheckIns.length > 0 && (
         <section className="space-y-3">
@@ -137,6 +156,11 @@ export default async function ProfilePage() {
             </p>
           </div>
         ) : (
+          // The primary monthly check-in is now the slider card at the
+          // top of /dashboard (it auto-surfaces every 30 days). This
+          // link stays for clients who want the heavier form — photos,
+          // sleep, stress, wins-and-struggles — but is no longer the
+          // default path.
           <Link
             href="/check-in"
             className="block rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-4 hover:border-gold transition-colors shadow-elevation-1"
@@ -144,10 +168,10 @@ export default async function ProfilePage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="font-display text-headline-md text-charcoal">
-                  Monthly check-in
+                  Full check-in
                 </p>
                 <p className="font-body text-body-md text-on-surface-variant mt-1">
-                  Weight, waist, photos, and how the month actually went.
+                  Photos, sleep, stress, and wins from the month — optional.
                 </p>
               </div>
               <span className="material-symbols-outlined text-on-surface-variant">

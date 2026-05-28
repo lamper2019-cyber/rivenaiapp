@@ -22,7 +22,94 @@ Read this BEFORE the older sections below. A lot has shifted in the
 last week and the older sections reflect earlier behavior in places
 that contradict what's now live.
 
-### The headline shift: RIVEN AI retired as a destination → unified "Sean" thread
+### 2026-05-27 simplification pass — Sean's "keep it simple" reset
+
+End-of-day pivot. Sean said: *"I want to keep it simple, I don't have
+users to test complex flows yet."* Stripped the app to its bones.
+
+**Three tabs only: Home / Log / Profile.** The "Sean" tab is gone. Sean's
+coaching is now a single surface — the `SeanPromptHeadline` at the top
+of `/dashboard`. No bottom-input chat, no thread history UI, no
+back-and-forth.
+
+What that means concretely:
+
+- **`/chat` is now a redirect to `/dashboard`.** The route is preserved
+  so old push-notification deep-links bounce home rather than 404.
+  The `ChatUI` component file still exists (dead code, will be cleaned
+  up later if Sean stays committed to this path).
+- **AI auto-reply pipeline shut off.** `sendToSean` no longer schedules
+  a `PendingAiReply`. The `process-ai-replies` cron route is gated
+  behind `ENABLE_PROCESS_AI_REPLIES=1` (defense-in-depth so any stale
+  queued rows don't drain into surprise pings). The `scheduleAiReply`
+  helper and `PendingAiReply` table are still in the codebase but no
+  longer called from any production path.
+- **All push notification deep-links → `/dashboard`.** Updated in
+  `coach/messages/actions.ts` (text replies), `coach/messages/voice-actions.ts`
+  (voice memos), `lib/coach-actions.ts` (manual coach messages + target
+  updates), `lib/sean-daily-checkins.ts` (cron pings — already there).
+  No surface should ever deep-link to `/chat` again.
+- **`SeanPromptHeadline` plays audio inline.** Voice memos from Sean
+  now render an HTML5 `<audio controls>` element directly in the
+  headline card — no "Listen" CTA, no second tap, no /chat redirect.
+- **Chip-tap replies still work.** She taps, the message persists
+  (so Sean sees her response in `/coach/messages`), `chipsRepliedAt`
+  is stamped, the headline collapses to a "Sent. Sean'll see this."
+  confirmation. No AI follow-up.
+
+**30-day weight check-in card on `/dashboard`.** New surface at the
+top of /dashboard (above PWA banner). Sliders for weight + waist,
+nothing else. Auto-appears when 30+ days have passed since her last
+WeeklyCheckIn row (or 30+ days after `Profile.onboardedAt` for clients
+who've never checked in). Submitting writes a `WeeklyCheckIn` row with
+sensible defaults for the heavy fields (menuAdherence=MOSTLY, sleepAvg=7,
+cycleStatus=NA, stress=5, winsAndStruggles="") and updates
+`Profile.currentWeight`. Files: `src/lib/monthly-weight-checkin.ts`,
+`src/app/(clerk)/(app)/dashboard/monthly-weight-actions.ts`,
+`src/components/monthly-weight-checkin-card.tsx`.
+
+**Full `/check-in` form still exists**, repositioned on `/profile` as
+"Full check-in" — optional path for clients who want to log photos,
+sleep, stress, and wins-and-struggles. The slider on /dashboard is the
+default monthly cadence.
+
+**Weight graph restored on `/profile`.** Sparkline over all
+`WeeklyCheckIn.weight` rows with goal-weight target line. Was removed
+during the chill-pass earlier this session; now justified because the
+slider check-in actually writes data on a predictable cadence. Waist
+graph stays hidden — Sean wants weight as the single tracked number
+on /profile.
+
+**Retired crons** (kill-switched, not deleted from code):
+
+- `sean-messages` — RETIRED 2026-05-26, gate `ENABLE_SEAN_MESSAGES_CRON=1`.
+  Coverage moved to morning/midday/evening check-in crons.
+- `process-ai-replies` — RETIRED 2026-05-27, gate
+  `ENABLE_PROCESS_AI_REPLIES=1`. No /chat input means no client
+  messages to reply to.
+
+**Active crons:**
+
+- `morning-checkin` ~8 AM CT — Sean prompt to every active client.
+- `midday-checkin` ~1 PM CT — Sean prompt only to clients who haven't
+  logged a meal today.
+- `evening-checkin` ~8 PM CT — Sean prompt to every active client.
+- All three drop a COACH ChatMessage with chipOptions, fire a push to
+  `/dashboard`, and respect a 4-hour cooldown vs any other COACH
+  message to avoid pile-on.
+- `monday-checkin` (Sunday ritual prompt rotation) — still alive.
+
+The cumulative effect: she gets ~2 Sean pings/day max, all delivered
+via the same `SeanPromptHeadline` surface, all answerable in one tap.
+
+### The headline shift: RIVEN AI retired as a destination → unified "Sean" thread [SUPERSEDED 2026-05-27]
+
+**[Note: this section describes the mid-week state. The /chat thread
+and AI auto-reply pipeline have since been retired — see the
+"2026-05-27 simplification pass" above. Kept for historical context
+on how the chip-prompt + voice-memo surfaces came to exist; those
+mechanics still apply, they just render through `SeanPromptHeadline`
+on /dashboard now instead of a separate /chat tab.]**
 
 The biggest mental-model change. Before this sprint: `/chat` was a streaming AI assistant, separate from `/messages` (Sean's proactive coach notes). Two surfaces, two voices.
 

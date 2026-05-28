@@ -34,6 +34,8 @@ import { CheerReceivedCard } from "@/components/cheer-received-card";
 import { CheerCeremony } from "@/components/cheer-ceremony";
 import { SundayRitual } from "@/components/sunday-ritual";
 import { DailyMoodRibbon } from "@/components/daily-mood-ribbon";
+import { MonthlyWeightCheckinCard } from "@/components/monthly-weight-checkin-card";
+import { getMonthlyWeightSnapshot } from "@/lib/monthly-weight-checkin";
 
 // Force a fresh server render on every request. The page reads `auth()` so
 // it's already implicitly dynamic, but pinning it explicitly is belt-and-
@@ -103,6 +105,7 @@ export default async function DashboardPage() {
     cheerReceived,
     moodSnapshot,
     cheerCeremony,
+    monthlyWeightSnapshot,
   ] = await Promise.all([
     getRecentPulseEvents(clientUserId).catch(() => []),
     getCollectiveStats().catch(() => null),
@@ -112,6 +115,7 @@ export default async function DashboardPage() {
     getCheerReceivedThisWeek(clientUserId).catch(() => null),
     getDailyMoodSnapshot(clientUserId).catch(() => null),
     getCheerCeremonyState(clientUserId).catch(() => null),
+    getMonthlyWeightSnapshot(clientUserId).catch(() => null),
   ]);
 
   // Only render the Sunday surface when there IS a prompt AND we're
@@ -202,6 +206,17 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* 30-day weight check-in. Surfaces only when getMonthlyWeightSnapshot
+          says she's due (30+ days since last check-in / signup). Slider-only
+          — two numbers, no photos, no questionnaire. Submitting writes a
+          WeeklyCheckIn row + updates Profile.currentWeight, and the card
+          self-hides on next render. The full /check-in route still exists
+          for clients who want the heavier form, but this is now the
+          default monthly cadence. */}
+      {monthlyWeightSnapshot && (
+        <MonthlyWeightCheckinCard snapshot={monthlyWeightSnapshot} />
+      )}
 
       {/* Self-hides if already installed as PWA or dismissed. */}
       <PwaInstallBanner />

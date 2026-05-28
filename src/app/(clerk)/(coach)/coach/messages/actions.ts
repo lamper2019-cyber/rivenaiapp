@@ -99,12 +99,13 @@ export async function sendCoachReply(
 
   // Push the client so the notification lands fast. If push is
   // unconfigured or the subscription is dead, swallow — the message
-  // still lands in her thread on next /chat visit.
+  // still surfaces in the SeanPromptHeadline next time she opens
+  // /dashboard.
   try {
     await sendPushToUser(parsed.data.clientUserId, {
       title: "Sean wrote you",
       body: parsed.data.message.slice(0, 140),
-      url: "/chat",
+      url: "/dashboard",
       tag: `sean-${parsed.data.clientUserId}`,
     });
   } catch {
@@ -112,6 +113,6 @@ export async function sendCoachReply(
   }
 
   revalidatePath("/coach/messages");
-  revalidatePath("/chat");
+  revalidatePath("/dashboard");
   return { ok: true, messageId: message.id };
 }

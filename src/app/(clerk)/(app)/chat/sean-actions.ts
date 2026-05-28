@@ -4,22 +4,27 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { scheduleAiReply } from "@/lib/sean-auto-reply";
 
 /**
- * Client-side action: she sends Sean a message on the unified thread.
+ * Client-side action: chip-tap reply to a Sean prompt.
  *
- * Two flows go through this single action:
+ * As of 2026-05-27 the only caller is SeanPromptHeadline on /dashboard.
+ * /chat is retired (it redirects home), there is no bottom input, and
+ * the AI auto-reply pipeline is shut off — Sean's coaching is now a
+ * "ping → tap → done" loop, not a thread.
  *
- *   - Free-text / voice transcript: pass `message` only.
- *   - Tap-reply chip: pass `message` (the chip's value) + chipMessageId
- *     (the Sean-side message whose chips she tapped). Action marks
- *     that row's chipsRepliedAt so the chips collapse server-side.
+ * Effect:
+ *   1. Persist her USER message (kind=COACH) so Sean's /coach/messages
+ *      view shows the response.
+ *   2. If this is a chip-reply, stamp chipsRepliedAt on the Sean prompt
+ *      so the chips collapse on next render.
  *
- * Either way the effect is the same downstream:
- *   1. Persist her USER message (kind=COACH).
- *   2. Schedule an AI auto-reply (~90-130s delay).
- *   3. Optionally cancel any earlier pending reply if she's mid-thread.
+ * No AI scheduler call. No /chat revalidate (no page to refresh).
+ *
+ * `message` doubles as the chip value — passing it explicitly keeps
+ * the schema backward-compatible with any old caller that might still
+ * route through here (e.g., a stale offline-queued tap firing after
+ * the deploy).
  */
 
 const SendSchema = z.object({
@@ -39,7 +44,7 @@ const SendSchema = z.object({
 });
 
 export type SendToSeanResult =
-  | { ok: true; messageId: string; pendingReplyId: string; scheduledFor: string }
+  | { ok: true; messageId: string }
   | { ok: false; error: string };
 
 export async function sendToSean(
@@ -89,10 +94,10 @@ export async function sendToSean(
     select: { id: true },
   });
 
-  // 1b. If this is a chip-reply, stamp chipsRepliedAt on the Sean
-  //     message so the chips collapse on next render. Defensive update
-  //     gated to that user's own messages so a stale client can't
-  //     mark someone else's row.
+  // 2. If this is a chip-reply, stamp chipsRepliedAt on the Sean
+  //    message so the chips collapse on next render. Defensive update
+  //    gated to that user's own messages so a stale client can't
+  //    mark someone else's row.
   if (parsed.data.chipMessageId) {
     await prisma.chatMessage.updateMany({
       where: {
@@ -104,17 +109,9 @@ export async function sendToSean(
     });
   }
 
-  // 2. Schedule the AI auto-reply.
-  const pending = await scheduleAiReply({
-    userId: user.id,
-    triggerMessageId: userMessage.id,
-  });
-
-  revalidatePath("/chat");
-  return {
-    ok: true,
-    messageId: userMessage.id,
-    pendingReplyId: pending.id,
-    scheduledFor: pending.scheduledFor.toISOString(),
-  };
+  // The data lands on /coach/messages for Sean and the SeanPromptHeadline
+  // re-renders the answered state on /dashboard.
+  revalidatePath("/dashboard");
+  revalidatePath("/coach/messages");
+  return { ok: true, messageId: userMessage.id };
 }

@@ -67,11 +67,12 @@ export async function loadDashboardData(clerkId: string) {
         select: { id: true, createdAt: true },
       });
     })(),
-    // Most recent COACH message in the last 24h — drives the new
+    // Most recent COACH message in the last 24h — drives the
     // "Today with Sean" headline. If it has chipOptions set and
     // chipsRepliedAt null, the headline renders the tap chips; if
-    // it has audioUrl set, it renders an audio player; otherwise
-    // it shows the text + a "Reply" link to /chat.
+    // it has audioUrl set, it renders an inline audio player;
+    // otherwise it just shows the text. No /chat thread — Sean's
+    // coaching is a single-surface "ping → tap → done" loop.
     prisma.chatMessage.findFirst({
       where: {
         userId: user.id,

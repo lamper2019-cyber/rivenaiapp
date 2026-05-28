@@ -107,7 +107,7 @@ export async function sendVoiceMoment(
     await sendPushToUser(moment.recipientUserId, {
       title: "Sean recorded you a voice memo",
       body: "Tap to listen.",
-      url: "/chat",
+      url: "/dashboard",
       tag: `voice-${moment.recipientUserId}`,
     });
   } catch {
@@ -115,7 +115,7 @@ export async function sendVoiceMoment(
   }
 
   revalidatePath("/coach/messages");
-  revalidatePath("/chat");
+  revalidatePath("/dashboard");
   return { ok: true, messageId: message.id };
 }
 

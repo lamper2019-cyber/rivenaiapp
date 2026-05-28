@@ -12,21 +12,14 @@ export const maxDuration = 60;
 /**
  * Process due AI auto-replies on the unified "Sean" thread.
  *
- * Suggested external schedule: every 1 minute via Railway cron, hits:
- *   POST https://yourdomain.com/api/cron/process-ai-replies
- *   Authorization: Bearer $CRON_SECRET
+ * [RETIRED 2026-05-27] Sean's "keep it simple" pass removed the
+ * /chat thread entirely. Without a typing input there are no client
+ * messages for the AI to reply to — sendToSean now skips the
+ * scheduler entirely. This route is gated OFF by default to drain
+ * cleanly even if Railway hasn't been disabled yet.
  *
- * Each tick:
- *   1. Find up to BATCH_SIZE pending replies with scheduledFor <= now()
- *   2. Process them sequentially (so they don't all hammer the API)
- *   3. Each one generates a Sean-voice reply and inserts a COACH
- *      ChatMessage. processPendingReply handles atomic claim so this
- *      route is safe to overlap with another tick.
- *
- * Note: the route returns 200 even when individual replies fail —
- * those rows get marked status="failed" with the error stored. The
- * route only returns non-200 when something catastrophic happens
- * (DB down, missing secret).
+ * Set ENABLE_PROCESS_AI_REPLIES=1 in env to revive it (only useful
+ * if the /chat thread is also revived).
  */
 const BATCH_SIZE = 20;
 
@@ -42,6 +35,18 @@ export async function POST(req: Request) {
   const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   if (provided !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Kill switch — defense in depth so a stray scheduled row from
+  // before the simplification doesn't get drained and ping a client
+  // with an unexpected AI reply.
+  if (process.env.ENABLE_PROCESS_AI_REPLIES !== "1") {
+    return NextResponse.json({
+      ok: true,
+      retired: true,
+      message:
+        "process-ai-replies cron is retired. /chat thread is gone; Sean's coaching is now SeanPromptHeadline-only. Set ENABLE_PROCESS_AI_REPLIES=1 to revive.",
+    });
   }
 
   const now = new Date();

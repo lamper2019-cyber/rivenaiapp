@@ -1,138 +1,23 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { ChatUI, type ChatMessage } from "./chat-ui";
-
-const HISTORY_LIMIT = 30;
+import { redirect } from "next/navigation";
 
 /**
- * The "Sean" tab — unified message thread.
+ * /chat retired 2026-05-27 per Sean's "keep it simple" pass.
  *
- * Renders every COACH-kind message for the viewer (her side as role=USER,
- * Sean's side as role=ASSISTANT — whether real Sean wrote it or the
- * auto-reply scheduler did). aiGenerated is loaded but NOT shown in the
- * UI; clients see all assistant messages as "from Sean."
+ * Sean's coaching is now a single surface — the SeanPromptHeadline
+ * at the top of /dashboard. No bottom-input thread, no chat history
+ * UI. He pings 3x/day via the morning/midday/evening crons; she
+ * answers with chip taps. Old push notifications that still deep-link
+ * to /chat (any unread iOS banner) land here and bounce her home.
  *
- * Replaces the previous /chat page (RIVEN AI bot, kind=AI). Old AI
- * messages stay in the DB but don't render here — different surface,
- * different mental model. RIVEN AI as a destination is retired.
+ * Keep the route around for the redirect — it's cheaper to hop than
+ * to chase every old client-side link or stale notification payload.
+ * The companion file `sean-actions.ts` lives in this folder still
+ * because the chip-tap action it exports is imported by
+ * SeanPromptHeadline; route segments don't need a page to host
+ * server actions.
  */
-export default async function ChatPage() {
-  const { userId } = auth();
+export const dynamic = "force-dynamic";
 
-  let initialMessages: ChatMessage[] = [];
-  let onboarded = true;
-  let pendingReplyId: string | null = null;
-
-  if (userId) {
-    try {
-      const user = await prisma.user.findUnique({
-        where: { clerkId: userId },
-        include: { profile: { select: { id: true } } },
-      });
-      onboarded = !!user?.profile;
-
-      if (user) {
-        const [messagesDesc, pending] = await Promise.all([
-          prisma.chatMessage.findMany({
-            where: { userId: user.id, kind: "COACH" },
-            orderBy: { createdAt: "desc" },
-            take: HISTORY_LIMIT,
-            select: {
-              id: true,
-              role: true,
-              kind: true,
-              content: true,
-              imageUrls: true,
-              aiGenerated: true,
-              audioUrl: true,
-              audioDurationSec: true,
-              chipOptions: true,
-              chipsRepliedAt: true,
-            },
-          }),
-          // Is there a pending AI reply queued for her? Drives the
-          // "Sean's reading..." indicator in the UI so she knows a
-          // response is coming.
-          prisma.pendingAiReply.findFirst({
-            where: { userId: user.id, status: "pending" },
-            orderBy: { scheduledFor: "asc" },
-            select: { id: true },
-          }),
-        ]);
-        initialMessages = messagesDesc.reverse().map((m) => ({
-          id: m.id,
-          role: m.role === "USER" ? ("user" as const) : ("assistant" as const),
-          kind: m.kind,
-          content: m.content,
-          imageUrls: m.imageUrls,
-          senderName: undefined,
-          audioUrl: m.audioUrl,
-          audioDurationSec: m.audioDurationSec,
-          chipOptions: parseChipOptions(m.chipOptions),
-          chipsRepliedAt: m.chipsRepliedAt
-            ? m.chipsRepliedAt.toISOString()
-            : null,
-        }));
-        pendingReplyId = pending?.id ?? null;
-      }
-    } catch {
-      /* DB unavailable — render empty state */
-    }
-  }
-
-  return (
-    <main className="relative flex flex-col min-h-screen pb-32">
-      <header className="px-container-mobile md:px-container-desktop max-w-3xl mx-auto w-full pt-8 pb-4">
-        <div className="flex items-center gap-3">
-          <span
-            className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gold/15 border border-gold/40"
-            aria-hidden
-          >
-            <span className="font-display text-headline-md text-charcoal leading-none">
-              S
-            </span>
-          </span>
-          <div>
-            <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-              Sean
-            </p>
-            <p className="font-body text-label-sm text-on-surface-variant/80">
-              Your coach
-            </p>
-          </div>
-        </div>
-      </header>
-
-      <ChatUI
-        initialMessages={initialMessages}
-        onboarded={onboarded}
-        initialHasPendingReply={pendingReplyId !== null}
-      />
-
-      <div className="fixed top-[20%] right-[-15%] w-[40%] h-[30%] bg-sage/5 blur-[120px] rounded-full pointer-events-none -z-10" />
-    </main>
-  );
-}
-
-/** Parse the JSON chipOptions column into a typed array. Returns []
- *  on null/malformed so render code can just check length. */
-function parseChipOptions(
-  raw: unknown,
-): Array<{ label: string; value: string }> {
-  if (!Array.isArray(raw)) return [];
-  const out: Array<{ label: string; value: string }> = [];
-  for (const item of raw) {
-    if (
-      item &&
-      typeof item === "object" &&
-      typeof (item as Record<string, unknown>).label === "string" &&
-      typeof (item as Record<string, unknown>).value === "string"
-    ) {
-      out.push({
-        label: (item as { label: string }).label,
-        value: (item as { value: string }).value,
-      });
-    }
-  }
-  return out;
+export default function ChatPage() {
+  redirect("/dashboard");
 }

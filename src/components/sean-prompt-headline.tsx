@@ -1,26 +1,32 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { sendToSean } from "@/app/(clerk)/(app)/chat/sean-actions";
 
 /**
  * "Today with Sean" — the top of /dashboard.
  *
+ * As of 2026-05-27 this is the ONLY surface for Sean's coaching. The
+ * old /chat thread is retired (redirects to /dashboard), the bottom-
+ * input is gone, and the AI auto-reply scheduler is shut off. Sean
+ * pings 3x/day via crons; she answers with chip taps and that's it.
+ *
  * Three render modes based on the latest COACH ChatMessage in the
  * last 24h:
  *
  *   1. Unanswered chip-prompt (chipOptions set + chipsRepliedAt null)
  *      → Render Sean's question + tap chips. Tap collapses chips
- *      locally + fires sendToSean. Same flow as the chips in /chat.
+ *      locally + fires sendToSean.
  *
  *   2. Voice memo (audioUrl set)
- *      → Render an "open thread" CTA. The actual audio player lives
- *      in /chat; the headline just announces it.
+ *      → Render an inline HTML5 audio player so she listens without
+ *      leaving the home screen. No deep-link, no separate page.
  *
- *   3. Plain text (no chips, no audio, OR chips already tapped)
- *      → Render Sean's words as a quoted preview + "Reply →" link.
+ *   3. Plain text or already-answered chips
+ *      → Just render Sean's words. No reply CTA. After she taps a
+ *      chip we briefly show a "Sent. Sean'll see this." confirmation
+ *      so the tap feels acknowledged.
  *
  * If `prompt` is null, the parent renders the time-aware ritual card
  * instead — see /dashboard.
@@ -46,6 +52,10 @@ export function SeanPromptHeadline({
   const [chipsRepliedLocal, setChipsRepliedLocal] = useState<boolean>(
     !!prompt.chipsRepliedAt,
   );
+  // Track whether the local-tap just happened (vs. an older replied
+  // state from the DB). Only the just-tapped state shows "Sent.";
+  // a stale reply from a previous session is silent.
+  const [justSent, setJustSent] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +64,7 @@ export function SeanPromptHeadline({
 
   function handleTap(value: string) {
     setChipsRepliedLocal(true);
+    setJustSent(true);
     startTransition(async () => {
       const r = await sendToSean({
         message: value,
@@ -63,6 +74,7 @@ export function SeanPromptHeadline({
       if (!r.ok) {
         setError(r.error);
         setChipsRepliedLocal(false);
+        setJustSent(false);
         return;
       }
       router.refresh();
@@ -92,16 +104,26 @@ export function SeanPromptHeadline({
         {prompt.content}
       </p>
 
-      {prompt.audioUrl && !hasUnansweredChips && (
-        <Link
-          href="/chat"
-          className="inline-flex items-center gap-2 bg-charcoal text-cream px-5 py-2.5 rounded-full font-body text-label-sm tracking-widest uppercase shadow-elevation-1 hover:opacity-90 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined text-[16px]" aria-hidden>
-            play_arrow
-          </span>
-          Listen
-        </Link>
+      {prompt.audioUrl && (
+        <div className="space-y-1.5">
+          {/* Native HTML5 controls — covers play/pause/scrub/volume
+              without bringing in a UI library. Tinted to match the
+              cream/charcoal palette via the standard browser styling;
+              don't fight it, mobile Safari ignores most overrides. */}
+          <audio
+            src={prompt.audioUrl}
+            controls
+            preload="metadata"
+            className="w-full"
+          >
+            Your browser doesn&apos;t support audio playback.
+          </audio>
+          {prompt.audioDurationSec ? (
+            <p className="font-body text-label-sm text-on-surface-variant/70">
+              {formatDuration(prompt.audioDurationSec)}
+            </p>
+          ) : null}
+        </div>
       )}
 
       {hasUnansweredChips && (
@@ -120,14 +142,10 @@ export function SeanPromptHeadline({
         </div>
       )}
 
-      {!hasUnansweredChips && !prompt.audioUrl && (
-        <Link
-          href="/chat"
-          className="inline-flex items-center gap-1 font-body text-label-md tracking-wide text-charcoal hover:opacity-70 transition-opacity"
-        >
-          {chipsRepliedLocal && prompt.chips.length > 0 ? "Open thread" : "Reply"}
-          <span aria-hidden>→</span>
-        </Link>
+      {justSent && (
+        <p className="font-body text-label-sm text-sage">
+          Sent. Sean&apos;ll see this.
+        </p>
       )}
 
       {error && (
@@ -135,4 +153,10 @@ export function SeanPromptHeadline({
       )}
     </section>
   );
+}
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }

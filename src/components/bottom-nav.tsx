@@ -10,12 +10,13 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
+  // Three tabs only — Sean tab retired 2026-05-27 per Sean's "keep it
+  // simple" pass. All his messages now land at the top of /dashboard
+  // via SeanPromptHeadline (chips, voice memos, plain text). No
+  // bottom-input thread, no chat surface. He pings 3x/day via the
+  // morning/midday/evening crons; she answers with chip taps.
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/log", label: "Log", icon: "edit_note" },
-  // /chat is now the unified Sean thread. RIVEN AI's not a destination
-  // anymore — the same model powers Sean's auto-replies on this thread,
-  // delayed 1.5-15 min so they don't read as a bot.
-  { href: "/chat", label: "Sean", icon: "forum" },
   { href: "/profile", label: "Profile", icon: "person" },
 ];
 

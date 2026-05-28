@@ -85,14 +85,15 @@ export async function sendCoachMessage(
   });
 
   // Fan out a phone push. Best-effort — never blocks the action result.
+  // Deep-link to /dashboard so she lands on the SeanPromptHeadline
+  // showing the new message (the /chat thread is retired).
   await sendPushToUser(client.id, {
     title: "Message from Sean",
     body: preview(parsed.data.content, 120),
-    url: "/chat",
+    url: "/dashboard",
     tag: `coach-msg-${message.id}`,
   });
 
-  revalidatePath("/chat");
   revalidatePath("/dashboard");
   revalidatePath(`/coach/clients/${client.id}`);
   return { ok: true, messageId: message.id };
@@ -210,14 +211,15 @@ export async function updateClientTargets(
   });
 
   // Phone push so the client sees the change land in real time.
+  // Deep-links to /dashboard since /chat is retired — the targets
+  // announcement will surface in the SeanPromptHeadline.
   await sendPushToUser(client.id, {
     title: "Sean updated your targets",
     body: preview(announcement, 120),
-    url: "/chat",
+    url: "/dashboard",
     tag: `coach-targets-${message.id}`,
   });
 
-  revalidatePath("/chat");
   revalidatePath("/dashboard");
   revalidatePath(`/coach/clients/${client.id}`);
   return { ok: true, messageId: message.id };
