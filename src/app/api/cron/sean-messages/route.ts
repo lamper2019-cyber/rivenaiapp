@@ -9,15 +9,24 @@ export const maxDuration = 800;
 /**
  * Proactive Sean-voice messaging tick.
  *
+ * [RETIRED 2026-05-27] This hourly engine ran on top of the new 3x/day
+ * chip-prompt routes and was the main source of push fatigue. The
+ * categories it covered are now served by:
+ *   - Daily/weekly/monthly rhythm  → morning/midday/evening-checkin
+ *                                    cron routes (chip prompts)
+ *   - Behavioral 24h/72h           → no-log cheer prompts (peer-driven)
+ *   - Progress streak 30/60/90     → peer-wins surface + voice moments
+ *
+ * The route is GATED OFF by default. Set ENABLE_SEAN_MESSAGES_CRON=1
+ * in env if you want to revive it. Sean's plan: disable the Railway
+ * service entirely so this is never called in production.
+ *
+ * Code preserved in case we want to reuse the 100-variant banks for
+ * a different surface later (e.g., a single weekly digest).
+ *
  * Protected by CRON_SECRET. Schedule from Railway (or any HTTP cron):
  *   POST https://rivenmethod.com/api/cron/sean-messages
  *   Authorization: Bearer $CRON_SECRET
- *   Cron expression: 0 * * * *   (hourly, every hour UTC)
- *
- * The endpoint figures out the current Central time and decides what (if
- * anything) to send per client. Most hours nothing fires — that's intended.
- * Wed 7 PM / Fri 7 PM / 6 PM behavioral / 7 AM behavioral are the only
- * Phase 1 windows that produce sends.
  */
 export async function POST(req: Request) {
   const expected = process.env.CRON_SECRET;
@@ -32,6 +41,18 @@ export async function POST(req: Request) {
   const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   if (provided !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Kill switch — route no-ops unless explicitly enabled. Keeps the
+  // hourly cron safe to leave alive on Railway while the service
+  // itself is disabled (defense in depth).
+  if (process.env.ENABLE_SEAN_MESSAGES_CRON !== "1") {
+    return NextResponse.json({
+      ok: true,
+      retired: true,
+      message:
+        "sean-messages cron is retired. Coverage moved to morning/midday/evening-checkin + peer-wins + voice moments. Set ENABLE_SEAN_MESSAGES_CRON=1 to revive.",
+    });
   }
 
   const result = await runSeanMessagesTick();
