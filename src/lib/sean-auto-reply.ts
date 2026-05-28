@@ -16,14 +16,18 @@ import type Anthropic from "@anthropic-ai/sdk";
  *
  * When a client sends Sean a message, we don't reply instantly — that
  * gives away that an AI is on the other side. Instead we queue a reply
- * via PendingAiReply with a randomized scheduledFor in the 1.5-15
- * minute range, skewed toward 1-5 minutes so most days feel like Sean
- * answered quickly.
+ * via PendingAiReply with a randomized scheduledFor in the ~90-130
+ * second range — every reply lands within ~2 minutes, with small jitter
+ * so two consecutive replies don't have the same gap.
  *
- * Distribution (Sean's spec):
- *   - 85% of replies: 90s - 300s (1.5 - 5 min)
- *   - 10% of replies: 300s - 600s (5 - 10 min)
- *   - 5%  of replies: 600s - 900s (10 - 15 min)
+ * Distribution (Sean's tightened spec):
+ *   - All replies: 90s - 130s (1.5 - 2.2 min)
+ *   - Skewed slightly toward the back of the window (~110s mean)
+ *
+ * The "Sean's reading..." indicator on the client doesn't appear
+ * immediately when she sends — it shows up ~60 seconds in, then holds
+ * until the reply lands. So her experience is: send → quiet for ~60s
+ * → "Sean's reading" → ~60s later → his reply.
  *
  * The cron at /api/cron/process-ai-replies fires every minute, picks
  * due rows, generates the reply via Claude, inserts it as a COACH
@@ -36,19 +40,16 @@ const HISTORY_LIMIT = 20;
 const RECENT_MEAL_HOURS = 36;
 const STREAK_WINDOW_DAYS = 14;
 
-/** Pick a randomized delay in milliseconds matching Sean's spec. */
+/** Pick a randomized delay in milliseconds matching Sean's spec.
+ *  Every reply lands within ~2 minutes (90-130s window). The skew is
+ *  toward the back half of the window so most replies feel like ~2 min
+ *  rather than near-instant. */
 export function pickAiReplyDelayMs(): number {
-  const r = Math.random();
-  if (r < 0.85) {
-    // 1.5 - 5 min → 90,000 - 300,000 ms
-    return 90_000 + Math.random() * 210_000;
-  }
-  if (r < 0.95) {
-    // 5 - 10 min
-    return 300_000 + Math.random() * 300_000;
-  }
-  // 10 - 15 min (rare)
-  return 600_000 + Math.random() * 300_000;
+  // Bias the random toward the back of the range: r ** 0.6 pulls the
+  // mean upward without making it deterministic.
+  const r = 1 - Math.pow(1 - Math.random(), 0.6);
+  // 90s - 130s window
+  return 90_000 + r * 40_000;
 }
 
 /**

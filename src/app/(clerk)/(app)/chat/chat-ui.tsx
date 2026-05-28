@@ -40,10 +40,15 @@ export function ChatUI({
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   // "sending" = her send() in flight (saving the user message + scheduling
-  // a reply). "hasPendingReply" = there's a PendingAiReply queued for her
-  // — used to show the "Sean's reading..." indicator until the cron fires.
+  // a reply). "hasPendingReply" = there's a PendingAiReply queued for her;
+  // "showReadingIndicator" = the ~60s grace period has elapsed and we
+  // should render the "Sean's reading..." bubble. The grace period
+  // hides the indicator from popping up the second she taps send —
+  // that would read as a bot. We let her message sit alone for a beat
+  // first, then the indicator appears.
   const [sending, setSending] = useState(false);
   const [hasPendingReply, setHasPendingReply] = useState(initialHasPendingReply);
+  const [showReadingIndicator, setShowReadingIndicator] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   // Drives the staggered exit animation on the empty-state cards. Stays
@@ -76,9 +81,8 @@ export function ChatUI({
   }, [input]);
 
   // Poll for new messages while a reply is pending. Sean's auto-reply
-  // lands somewhere in the 1.5-15 minute window so we don't need
-  // realtime — refreshing every 20 seconds is plenty to catch it
-  // shortly after the cron fires. router.refresh() re-runs the server
+  // lands within ~2 minutes — refreshing every 15 seconds catches it
+  // quickly after the cron fires. router.refresh() re-runs the server
   // page component, which re-fetches the thread + pending-reply state.
   useEffect(() => {
     if (!hasPendingReply) return;
@@ -86,9 +90,28 @@ export function ChatUI({
       startTransition(() => {
         router.refresh();
       });
-    }, 20_000);
+    }, 15_000);
     return () => window.clearInterval(interval);
   }, [hasPendingReply, router]);
+
+  // The "Sean's reading..." indicator does NOT show immediately. We
+  // wait ~60 seconds after the pending state begins, then show it.
+  // Reads as Sean opened the message and is composing a reply —
+  // matches the ~2 min total wait. If the reply lands inside the
+  // grace window (rare with our distribution but possible), the
+  // indicator never appears and her reply just shows up.
+  const READING_INDICATOR_DELAY_MS = 60_000;
+  useEffect(() => {
+    if (!hasPendingReply) {
+      setShowReadingIndicator(false);
+      return;
+    }
+    const t = window.setTimeout(
+      () => setShowReadingIndicator(true),
+      READING_INDICATOR_DELAY_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, [hasPendingReply]);
 
   // Sync local state when initialMessages / initialHasPendingReply
   // change (router.refresh() updates props). New assistant messages
@@ -383,12 +406,13 @@ export function ChatUI({
             {messages.map((m) => (
               <MessageBubble key={m.id} message={m} />
             ))}
-            {/* "Sean's reading..." indicator while a PendingAiReply is
-                queued. Sits below the last user message. Reads as a
-                normal assistant-style bubble with three pulsing dots —
-                same shape as the cheer-prompt dots so visual language
-                stays consistent. */}
-            {hasPendingReply && (
+            {/* "Sean's reading..." indicator. Doesn't appear until
+                ~60s after she sends (see showReadingIndicator effect
+                above) so it doesn't pop up the second her message
+                lands — that would read as a bot. Sits below the last
+                user message as a normal assistant-style bubble with
+                three pulsing dots. */}
+            {showReadingIndicator && (
               <li className="flex justify-start">
                 <div className="rounded-xl px-gutter py-3 bg-surface-container-lowest border border-outline-variant/60 shadow-elevation-1 inline-flex items-center gap-2">
                   <span
@@ -558,110 +582,74 @@ function MessageBubble({
   const isUser = message.role === "user";
   const isCoach = message.kind === "COACH" && !isUser;
 
+  // Copy buttons removed per Sean — texting Sean doesn't ask for a
+  // "copy text" affordance; it dilutes the conversation. The
+  // CopyButton component itself stays in the file below for now in
+  // case we want it on a different surface later.
+
   if (isUser) {
     return (
-      <li className="group flex justify-end">
-        <div className="flex flex-col items-end gap-1.5 max-w-[85%]">
-          <div className="rounded-xl px-gutter py-3 bg-charcoal text-cream space-y-2">
-            {message.imageUrls && message.imageUrls.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {message.imageUrls.map((url, i) => (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    key={i}
-                    src={url}
-                    alt="Sent attachment"
-                    width={160}
-                    height={160}
-                    loading="lazy"
-                    decoding="async"
-                    className="max-w-[160px] max-h-[160px] rounded-md object-cover bg-charcoal/40"
-                  />
-                ))}
-              </div>
-            )}
-            {message.content && message.content !== "(image)" && (
-              <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
-                {message.content}
-              </p>
-            )}
-          </div>
+      <li className="flex justify-end">
+        <div className="max-w-[85%] rounded-xl px-gutter py-3 bg-charcoal text-cream space-y-2">
+          {message.imageUrls && message.imageUrls.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {message.imageUrls.map((url, i) => (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  key={i}
+                  src={url}
+                  alt="Sent attachment"
+                  width={160}
+                  height={160}
+                  loading="lazy"
+                  decoding="async"
+                  className="max-w-[160px] max-h-[160px] rounded-md object-cover bg-charcoal/40"
+                />
+              ))}
+            </div>
+          )}
           {message.content && message.content !== "(image)" && (
-            <CopyButton text={message.content} />
+            <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
+              {message.content}
+            </p>
           )}
         </div>
       </li>
     );
   }
 
-  // Assistant (AI or COACH)
+  // Assistant — Sean (real or auto-reply, indistinguishable here).
   return (
-    <li className="group flex justify-start">
-      <div className="flex flex-col items-start gap-1.5 max-w-[85%]">
-        <div
-          className={`rounded-xl px-gutter py-3 shadow-elevation-1 ${
-            isCoach
-              ? "bg-secondary-container/60 border border-gold/50 text-charcoal"
-              : "bg-surface-container-lowest border border-outline-variant/60 text-charcoal"
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-1.5">
-            <span
-              className={`inline-block w-2 h-2 rounded-full ${
-                isCoach ? "bg-gold" : "bg-sage"
-              }`}
-              aria-hidden
-            />
-            <span className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
-              {isCoach ? "Sean" : "Riven"}
-            </span>
-          </div>
-          <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
-            {message.content}
-          </p>
+    <li className="flex justify-start">
+      <div
+        className={`max-w-[85%] rounded-xl px-gutter py-3 shadow-elevation-1 ${
+          isCoach
+            ? "bg-secondary-container/60 border border-gold/50 text-charcoal"
+            : "bg-surface-container-lowest border border-outline-variant/60 text-charcoal"
+        }`}
+      >
+        <div className="flex items-center gap-2 mb-1.5">
+          <span
+            className={`inline-block w-2 h-2 rounded-full ${
+              isCoach ? "bg-gold" : "bg-sage"
+            }`}
+            aria-hidden
+          />
+          <span className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
+            {isCoach ? "Sean" : "Riven"}
+          </span>
         </div>
-        {/* Copy button — appears below the bubble. On touch devices
-            the button is always visible; on desktop it fades in on
-            hover via group-hover. */}
-        {message.content && <CopyButton text={message.content} />}
+        <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
+          {message.content}
+        </p>
       </div>
     </li>
   );
 }
 
-/**
- * Small icon-button that copies the bubble's text to clipboard.
- * Optimistic UI: tap → label flips to "Copied" for ~1.5s, then back.
- * Uses navigator.clipboard with a graceful no-op if the API is missing
- * (insecure context, very old browser).
- */
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  async function handleCopy() {
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard) {
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1500);
-      }
-    } catch {
-      /* clipboard blocked — silently no-op */
-    }
-  }
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      aria-label={copied ? "Copied" : "Copy message"}
-      className="inline-flex items-center gap-1 px-2 py-1 rounded-md font-body text-label-sm text-on-surface-variant/70 hover:text-charcoal hover:bg-surface-container/40 transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100 sm:opacity-0 [@media(hover:none)]:opacity-100"
-    >
-      <span className="material-symbols-outlined text-[14px]" aria-hidden>
-        {copied ? "check" : "content_copy"}
-      </span>
-      {copied ? "Copied" : "Copy"}
-    </button>
-  );
-}
+// CopyButton was removed per Sean — texting Sean shouldn't have a
+// "copy text" affordance. Component deleted; can be re-introduced
+// from git history if we want it on a different surface later.
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
