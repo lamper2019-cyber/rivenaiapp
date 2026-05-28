@@ -13,6 +13,7 @@ import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
 import { getRecentPulseEvents } from "@/lib/pulse";
 import { getCollectiveStats } from "@/lib/collective-counter";
 import { getCheerCandidates } from "@/lib/cheer";
+import { getPeerWinCandidates } from "@/lib/peer-wins";
 import { getCheerReceivedThisWeek } from "@/lib/cheer-received";
 import { getCheerCeremonyState } from "@/lib/cheer-ceremony";
 import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
@@ -23,6 +24,7 @@ import { PresenceIndicator } from "@/components/presence-indicator";
 import { PulseToasts } from "@/components/pulse-toasts";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
+import { PeerWins } from "@/components/peer-wins";
 import { CheerReceivedCard } from "@/components/cheer-received-card";
 import { CheerCeremony } from "@/components/cheer-ceremony";
 import { SundayRitual } from "@/components/sunday-ritual";
@@ -92,6 +94,7 @@ export default async function DashboardPage() {
     pulseEvents,
     collectiveStats,
     cheerCandidates,
+    peerWinCandidates,
     sundaySnapshot,
     cheerReceived,
     moodSnapshot,
@@ -100,6 +103,7 @@ export default async function DashboardPage() {
     getRecentPulseEvents(clientUserId).catch(() => []),
     getCollectiveStats().catch(() => null),
     getCheerCandidates(clientUserId).catch(() => []),
+    getPeerWinCandidates(clientUserId).catch(() => []),
     getSundayRitualSnapshot(clientUserId).catch(() => null),
     getCheerReceivedThisWeek(clientUserId).catch(() => null),
     getDailyMoodSnapshot(clientUserId).catch(() => null),
@@ -234,13 +238,24 @@ export default async function DashboardPage() {
       {cheerCandidates.length > 0 && (
         <CheerPrompts candidates={cheerCandidates} />
       )}
+      {/* Peer wins — celebratory mirror of CheerPrompts. Shows when
+          someone hit a streak milestone or just finished a monthly
+          check-in. Same one-tap 🌹 send mechanic, positive trigger. */}
+      {peerWinCandidates.length > 0 && (
+        <PeerWins candidates={peerWinCandidates} />
+      )}
       {/* Pulse toasts replaced the persistent PulseStrip per Sean: one
           event pops up at a time (Shopify-style "someone just bought"
           pattern), holds for ~5s, then fades. Self-renders no DOM when
           there are no events. Lives as a fixed overlay so it doesn't
           take inline space. */}
       <PulseToasts events={pulseEvents} />
-      {collectiveStats && <CollectiveCounter stats={collectiveStats} />}
+      {collectiveStats && (
+        <CollectiveCounter
+          stats={collectiveStats}
+          viewerFirstName={profile.name.split(/\s+/)[0]}
+        />
+      )}
 
       {/* Today's targets — three progress cards */}
       <section className="space-y-3">

@@ -20,7 +20,21 @@ import { sendPushToUser } from "@/lib/push";
 
 const SendCheerSchema = z.object({
   recipientUserId: z.string().min(1),
-  context: z.enum(["no_log_24h", "broke_streak", "way_over_target", "manual"]),
+  context: z.enum([
+    // Hard-day triggers (cheer-candidates.ts)
+    "no_log_24h",
+    "broke_streak",
+    "way_over_target",
+    "manual",
+    // Win triggers (peer-wins.ts) — same mechanic, positive moments.
+    // She can send one rose per (recipient, context) — different
+    // contexts are different roses, so a 30-day-streak rose doesn't
+    // block a later monthly-checkin rose for the same recipient.
+    "win_streak_30",
+    "win_streak_60",
+    "win_streak_90",
+    "win_monthly_checkin",
+  ]),
 });
 
 export type SendCheerResult =
