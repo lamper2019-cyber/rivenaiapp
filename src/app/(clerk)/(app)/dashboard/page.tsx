@@ -9,19 +9,19 @@ import { NotificationOptIn } from "@/components/notification-opt-in";
 import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
 import { getMealPacing, type MealPacingTier } from "@/lib/meal-pacing";
 import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
-import { getRecentPulseEvents } from "@/lib/pulse";
 import { getCollectiveStats } from "@/lib/collective-counter";
 import { getCheerCandidates } from "@/lib/cheer";
 import { getPeerWinCandidates } from "@/lib/peer-wins";
 import { getCheerReceivedThisWeek } from "@/lib/cheer-received";
 import { getCheerCeremonyState } from "@/lib/cheer-ceremony";
 import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
-// Daily mood ribbon retired from /dashboard on 2026-05-27 — Sean
-// asked to swap that slot for the Message-from-Sean bubble. Mood
-// data model + MoodHistory on /profile both stay.
+// Daily mood ribbon retired from /dashboard on 2026-05-27. Mood data
+// model + MoodHistory on /profile both stay.
+// Pulse toasts ("so-and-so just logged a meal") retired same day —
+// Sean asked to remove the activity feed entirely. lib/pulse.ts +
+// the underlying queries remain for any future surface.
 import { PresenceIndicator } from "@/components/presence-indicator";
-import { MessageFromSeanBubble } from "@/components/message-from-sean-bubble";
-import { PulseToasts } from "@/components/pulse-toasts";
+import { CoachMessageBadge } from "@/components/coach-message-badge";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
 import { PeerWins } from "@/components/peer-wins";
@@ -81,18 +81,20 @@ export default async function DashboardPage() {
     profile,
     todayTotals,
     presentNames,
-    latestSeanPrompt,
+    recentCoachMessages,
   } = data;
-  // ritualSlot + morningFocus still load on the server (the loader is
-  // a stable contract) but the time-aware ritual card is gone — the
-  // greeting + rotating Sean-voice quote took its slot.
+  // ritualSlot, morningFocus, latestSeanPrompt still load on the
+  // server (the loader is a stable contract) but the time-aware
+  // ritual card and the inline Sean bubble are both gone. Sean now
+  // lives entirely in the top-right "Message from Sean" pill which
+  // routes to /chat. The greeting + rotating Sean-voice quote took
+  // the inline slot.
 
   // Ambient community trio + Sunday ritual snapshot. Best-effort: each
   // Promise resolves to a safe fallback so a slow query or empty result
   // never blocks the rest of the dashboard. Run in parallel because none
   // of them depend on each other.
   const [
-    pulseEvents,
     collectiveStats,
     cheerCandidates,
     peerWinCandidates,
@@ -101,7 +103,6 @@ export default async function DashboardPage() {
     cheerCeremony,
     monthlyWeightSnapshot,
   ] = await Promise.all([
-    getRecentPulseEvents(clientUserId).catch(() => []),
     getCollectiveStats().catch(() => null),
     getCheerCandidates(clientUserId).catch(() => []),
     getPeerWinCandidates(clientUserId).catch(() => []),
@@ -163,9 +164,11 @@ export default async function DashboardPage() {
         />
       )}
 
-      {/* Top-right coach message chip retired in favor of the new
-          SeanPromptHeadline below. recentCoachMessages is still fetched
-          server-side for analytics + future reuse. */}
+      {/* Top-right "Message from Sean" pill — solid charcoal, serif
+          S monogram, red unread count dot. Routes to /chat where she
+          can read the thread and type back. Self-hides when there's
+          zero coach-message history. */}
+      <CoachMessageBadge messages={recentCoachMessages} />
 
       {/* Greeting + rotating Sean-voice quote. Replaced the time-aware
           ritual card on 2026-05-27 — Sean wanted the old "Good morning,
@@ -179,16 +182,6 @@ export default async function DashboardPage() {
           {pickQuoteForDate(new Date())}
         </p>
       </header>
-
-      {/* Message from Sean — compact bubble. Renders only when there's
-          a COACH message in the last 24h. Tappable (whole bubble) when
-          there are no unanswered chips; chip mode keeps her in place
-          so she can decide without an accidental route. After a chip
-          tap she sees a Sean-voice encouragement for ~2.5s, then the
-          bubble refreshes away. */}
-      {latestSeanPrompt && (
-        <MessageFromSeanBubble prompt={latestSeanPrompt} />
-      )}
 
       {/* Presence chip — self-hides on a quiet morning. */}
       {presentNames.length > 0 && (
@@ -253,12 +246,9 @@ export default async function DashboardPage() {
       {peerWinCandidates.length > 0 && (
         <PeerWins candidates={peerWinCandidates} />
       )}
-      {/* Pulse toasts replaced the persistent PulseStrip per Sean: one
-          event pops up at a time (Shopify-style "someone just bought"
-          pattern), holds for ~5s, then fades. Self-renders no DOM when
-          there are no events. Lives as a fixed overlay so it doesn't
-          take inline space. */}
-      <PulseToasts events={pulseEvents} />
+      {/* Pulse toasts ("So-and-so just logged a meal" pop-ups) retired
+          2026-05-27 — Sean asked to remove the activity feed entirely.
+          The aggregate "Together" stats below still show. */}
       {collectiveStats && (
         <CollectiveCounter
           stats={collectiveStats}

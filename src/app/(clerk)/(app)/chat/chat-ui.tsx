@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { sendToSean } from "./sean-actions";
+import { markCoachMessageSeen } from "@/components/coach-message-badge";
 
 const MAX_IMAGES_PER_MESSAGE = 4;
 
@@ -83,6 +84,13 @@ export function ChatUI({
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Mark coach messages as seen on first paint. Drives the unread state
+  // on the dashboard's top-right "Message from Sean" pill — visiting
+  // here resets the unread count to zero.
+  useEffect(() => {
+    markCoachMessageSeen();
+  }, []);
 
   useEffect(() => {
     const ta = textareaRef.current;

@@ -11,19 +11,19 @@ export type CoachMessageSummary = {
 };
 
 /**
- * Floating "Message from Sean" chip in the top-right of the home screen.
+ * "Message from Sean" pill — top-right of the home screen.
  *
- * Persistent — renders whenever the server hands us at least one recent
- * (≤30d) coach message so the client can always scroll back. State shifts
- * based on the localStorage "last seen at" timestamp:
+ * Single visual treatment: solid charcoal pill, cream text, serif S
+ * monogram. Same look as the log-button pill so the dashboard reads
+ * as a small set of consistent charcoal tappables. A red count dot
+ * on the avatar is the only unread cue — no gold halo, no breath
+ * animation (per Sean's 2026-05-27 evening direction).
  *
- *   Unread (any message createdAt > seenAt):
- *     - Solid gold pill, charcoal text, red count dot on the avatar.
- *   Read (no message newer than seenAt):
- *     - Charcoal pill, cream text, no dot.
- *
- * Tapping routes to /messages, which writes Date.now() to localStorage and
- * collapses the chip back to the read state on the next dashboard load.
+ * Tap routes to /chat (the unified Sean thread, with typing input).
+ * Visiting /chat calls `markCoachMessageSeen` which writes Date.now()
+ * to localStorage; the badge's "unread" state is everything newer
+ * than that timestamp. Self-hides when she has zero coach messages
+ * on record (new clients before the first cron fires).
  */
 export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[] }) {
   // null until we've read localStorage — avoids hydration flicker between
@@ -48,38 +48,28 @@ export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[
   ).length;
   const isUnread = unreadCount > 0;
 
-  // Unread: liquid-glass bubble with a soft gold breath halo radiating out
-  // every 2.8s — translucent white over the dashboard's cream, backdrop-blur
-  // for the frosted effect, brighter top border for the light-highlight
-  // detail. Read: solid charcoal pill, quiet. backdrop-blur-xl emits both
-  // backdrop-filter and -webkit-backdrop-filter so iOS Safari renders the
-  // frost.
-  const stateClasses = isUnread
-    ? "bg-white/55 backdrop-blur-xl text-charcoal border-white/40 border-t-white/70 riven-coach-breath"
-    : "bg-charcoal text-cream border-charcoal shadow-elevation-1";
-
   return (
     <Link
-      href="/messages"
+      href="/chat"
       aria-label={
         isUnread
           ? `${unreadCount} new ${unreadCount === 1 ? "message" : "messages"} from Sean`
           : "View messages from Sean"
       }
-      className={`fixed top-[calc(env(safe-area-inset-top)_+_12px)] right-3 z-50 inline-flex items-center gap-2 rounded-full border pl-1 pr-3 py-1 active:scale-95 transition-colors ${stateClasses}`}
+      className="fixed top-[calc(env(safe-area-inset-top)_+_12px)] right-3 z-50 inline-flex items-center gap-2 rounded-full bg-charcoal text-cream border border-charcoal pl-1 pr-3 py-1 shadow-elevation-1 active:scale-95 transition-transform"
     >
       <span className="relative inline-block w-7 h-7">
-        {/* Brand monogram instead of a photo — reads cleanly at any size and
-            matches the serif typography elsewhere in RIVEN. */}
+        {/* Brand monogram — reads cleanly at any size and matches the
+            serif typography elsewhere in RIVEN. */}
         <span
           aria-hidden
-          className="flex w-7 h-7 rounded-full bg-charcoal text-gold items-center justify-center font-display text-[16px] leading-none"
+          className="flex w-7 h-7 rounded-full bg-cream text-charcoal items-center justify-center font-display text-[16px] leading-none"
         >
           S
         </span>
         {isUnread && (
           <span
-            className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-[3px] rounded-full bg-red-500 text-cream text-[10px] font-semibold leading-none ring-2 ring-cream"
+            className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-[3px] rounded-full bg-red-500 text-cream text-[10px] font-semibold leading-none ring-2 ring-charcoal"
             aria-hidden
           >
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -95,7 +85,7 @@ export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[
 
 /**
  * Mark the moment-of-visit as the new "seen at" timestamp. Called from
- * /messages on mount so any messages received before this instant collapse
+ * /chat on mount so any messages received before this instant collapse
  * back to the read state on the next dashboard load.
  */
 export function markCoachMessageSeen() {
