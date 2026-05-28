@@ -3,14 +3,9 @@ import { redirect } from "next/navigation";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
 import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
-// pickQuoteForDate dropped along with the day-quote line per Sean.
-// The helper still exists in @/lib/daily-quotes for any future surface.
+import { pickQuoteForDate } from "@/lib/daily-quotes";
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import { NotificationOptIn } from "@/components/notification-opt-in";
-// CoachMessageBadge removed from /dashboard — the new SeanPromptHeadline
-// at the top of the page replaces the top-right chip. The component
-// itself stays in src/components/coach-message-badge.tsx for any future
-// reuse (e.g., on /coach/clients/[id] if Sean wants a per-client view).
 import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
 import { getMealPacing, type MealPacingTier } from "@/lib/meal-pacing";
 import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
@@ -21,11 +16,11 @@ import { getPeerWinCandidates } from "@/lib/peer-wins";
 import { getCheerReceivedThisWeek } from "@/lib/cheer-received";
 import { getCheerCeremonyState } from "@/lib/cheer-ceremony";
 import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
-import { getDailyMoodSnapshot, MOOD_KINDS, type MoodKind } from "@/lib/daily-mood";
-import { pickCoachLineForMood } from "@/lib/coach-mood-lines";
-import { TimeAwareRitual } from "@/components/time-aware-ritual";
+// Daily mood ribbon retired from /dashboard on 2026-05-27 — Sean
+// asked to swap that slot for the Message-from-Sean bubble. Mood
+// data model + MoodHistory on /profile both stay.
 import { PresenceIndicator } from "@/components/presence-indicator";
-import { SeanPromptHeadline } from "@/components/sean-prompt-headline";
+import { MessageFromSeanBubble } from "@/components/message-from-sean-bubble";
 import { PulseToasts } from "@/components/pulse-toasts";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
@@ -33,7 +28,6 @@ import { PeerWins } from "@/components/peer-wins";
 import { CheerReceivedCard } from "@/components/cheer-received-card";
 import { CheerCeremony } from "@/components/cheer-ceremony";
 import { SundayRitual } from "@/components/sunday-ritual";
-import { DailyMoodRibbon } from "@/components/daily-mood-ribbon";
 import { MonthlyWeightCheckinCard } from "@/components/monthly-weight-checkin-card";
 import { getMonthlyWeightSnapshot } from "@/lib/monthly-weight-checkin";
 
@@ -86,11 +80,12 @@ export default async function DashboardPage() {
     userId: clientUserId,
     profile,
     todayTotals,
-    ritualSlot,
-    morningFocus,
     presentNames,
     latestSeanPrompt,
   } = data;
+  // ritualSlot + morningFocus still load on the server (the loader is
+  // a stable contract) but the time-aware ritual card is gone — the
+  // greeting + rotating Sean-voice quote took its slot.
 
   // Ambient community trio + Sunday ritual snapshot. Best-effort: each
   // Promise resolves to a safe fallback so a slow query or empty result
@@ -103,7 +98,6 @@ export default async function DashboardPage() {
     peerWinCandidates,
     sundaySnapshot,
     cheerReceived,
-    moodSnapshot,
     cheerCeremony,
     monthlyWeightSnapshot,
   ] = await Promise.all([
@@ -113,7 +107,6 @@ export default async function DashboardPage() {
     getPeerWinCandidates(clientUserId).catch(() => []),
     getSundayRitualSnapshot(clientUserId).catch(() => null),
     getCheerReceivedThisWeek(clientUserId).catch(() => null),
-    getDailyMoodSnapshot(clientUserId).catch(() => null),
     getCheerCeremonyState(clientUserId).catch(() => null),
     getMonthlyWeightSnapshot(clientUserId).catch(() => null),
   ]);
@@ -174,38 +167,35 @@ export default async function DashboardPage() {
           SeanPromptHeadline below. recentCoachMessages is still fetched
           server-side for analytics + future reuse. */}
 
-      {/* PRIME REAL ESTATE: "Today with Sean" headline. The most
-          recent Sean message in the last 24h is the first thing she
-          sees — chips when there's an unanswered chip-prompt, text
-          preview when she's already replied, audio CTA when it's a
-          voice memo. Falls back to the time-aware ritual when Sean
-          hasn't messaged in 24h (new clients on day 1, or quiet days
-          before the daily cron fires). Pulls her straight into the
-          conversation without making her hunt for the Sean tab. */}
-      <div className="space-y-4">
-        {latestSeanPrompt ? (
-          <SeanPromptHeadline prompt={latestSeanPrompt} />
-        ) : (
-          <TimeAwareRitual
-            slot={ritualSlot}
-            firstName={profile.name.split(/\s+/)[0]}
-            morningFocus={morningFocus}
-            todayCalories={todayTotals.calories}
-            todayProtein={todayTotals.protein}
-            cutCalorieTarget={getTodayCalorieTarget(profile)}
-            proteinFloorG={profile.proteinFloor}
-            hasLoggedToday={todayTotals.calories > 0}
-          />
-        )}
-        {/* Presence chip — sits below the headline so she sees who
-            else is in RIVEN with her right now. Self-hides on a
-            quiet morning. */}
-        {presentNames.length > 0 && (
-          <div className="rounded-full bg-surface-container-lowest border border-outline-variant/60 px-4 py-2 inline-flex">
-            <PresenceIndicator names={presentNames} />
-          </div>
-        )}
-      </div>
+      {/* Greeting + rotating Sean-voice quote. Replaced the time-aware
+          ritual card on 2026-05-27 — Sean wanted the old "Good morning,
+          [Name]" treatment back. Quote rotates daily off the seeded
+          bank in @/lib/daily-quotes. */}
+      <header className="space-y-2">
+        <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal">
+          {pickGreeting(profile.name.split(/\s+/)[0])}
+        </h1>
+        <p className="font-body text-body-md text-on-surface-variant max-w-prose">
+          {pickQuoteForDate(new Date())}
+        </p>
+      </header>
+
+      {/* Message from Sean — compact bubble. Renders only when there's
+          a COACH message in the last 24h. Tappable (whole bubble) when
+          there are no unanswered chips; chip mode keeps her in place
+          so she can decide without an accidental route. After a chip
+          tap she sees a Sean-voice encouragement for ~2.5s, then the
+          bubble refreshes away. */}
+      {latestSeanPrompt && (
+        <MessageFromSeanBubble prompt={latestSeanPrompt} />
+      )}
+
+      {/* Presence chip — self-hides on a quiet morning. */}
+      {presentNames.length > 0 && (
+        <div className="rounded-full bg-surface-container-lowest border border-outline-variant/60 px-4 py-2 inline-flex">
+          <PresenceIndicator names={presentNames} />
+        </div>
+      )}
 
       {/* 30-day weight check-in. Surfaces only when getMonthlyWeightSnapshot
           says she's due (30+ days since last check-in / signup). Slider-only
@@ -231,17 +221,11 @@ export default async function DashboardPage() {
 
       {/* Ambient community surfaces. Each one self-hides on empty data,
           so on a quiet morning none of them render and the dashboard
-          reads exactly as it used to. */}
-      {/* Daily mood ribbon — one tap to send her mood, then collapses
-          into a Sean-voice coaching line matched to what she picked.
-          Lines are deterministic per (user, day, mood) so the surface
-          doesn't shuffle on revisits. */}
-      {moodSnapshot && (
-        <DailyMoodRibbon
-          snapshot={moodSnapshot}
-          coachLine={buildCoachLineMap(clientUserId)}
-        />
-      )}
+          reads exactly as it used to.
+
+          DailyMoodRibbon retired 2026-05-27 — its slot now belongs to
+          the Message-from-Sean bubble above. Mood data model + mood
+          history on /profile both stay. */}
       {showSunday && sundaySnapshot?.prompt && (
         <SundayRitual
           promptId={sundaySnapshot.prompt.id}
@@ -399,18 +383,22 @@ function ProgressCard({
 }
 
 /**
- * Pre-compute one coaching line per mood so the client component can
- * swap to the right one instantly after a tap without a server round
- * trip. Each line is deterministic per (userId, central day, mood) so
- * re-opening the dashboard later in the day shows the same line.
+ * Greeting picker. Runs Central time so the server (UTC on Railway)
+ * doesn't say "Up early" when she opens the app at 8 PM.
  */
-function buildCoachLineMap(userId: string): Record<MoodKind, string> {
-  const now = new Date();
-  const out = {} as Record<MoodKind, string>;
-  for (const mood of MOOD_KINDS) {
-    out[mood] = pickCoachLineForMood(mood, userId, now);
-  }
-  return out;
+function pickGreeting(name: string): string {
+  const hour = parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      hour: "numeric",
+      hour12: false,
+    }).format(new Date()),
+    10,
+  );
+  if (hour < 5) return `Up early, ${name}.`;
+  if (hour < 12) return `Good morning, ${name}.`;
+  if (hour < 18) return `Afternoon, ${name}.`;
+  return `Evening, ${name}.`;
 }
 
 function UnauthedPlaceholder({ children }: { children: React.ReactNode }) {

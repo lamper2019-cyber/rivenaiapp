@@ -10,13 +10,13 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  // Three tabs only — Sean tab retired 2026-05-27 per Sean's "keep it
-  // simple" pass. All his messages now land at the top of /dashboard
-  // via SeanPromptHeadline (chips, voice memos, plain text). No
-  // bottom-input thread, no chat surface. He pings 3x/day via the
-  // morning/midday/evening crons; she answers with chip taps.
+  // Four tabs. Sean's coaching surfaces through the Message-from-Sean
+  // bubble at the top of /dashboard (tap it → opens /chat thread, no
+  // bottom-nav slot needed). RIVEN AI is the user ↔ AI assistant for
+  // voice meal logging + nutrition questions.
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/log", label: "Log", icon: "edit_note" },
+  { href: "/ai", label: "RIVEN AI", icon: "auto_awesome" },
   { href: "/profile", label: "Profile", icon: "person" },
 ];
 
