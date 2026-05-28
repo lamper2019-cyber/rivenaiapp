@@ -1,6 +1,6 @@
 # RIVEN — Session Handoff Context
 
-Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated 2026-05-17, end of the "post-launch polish" session (proactive Sean messaging engine, per-item meal breakdown, daily reset, streak celebrations).
+Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated 2026-05-27, end of the "unified Sean thread + village feel" sprint (delayed AI auto-replies on a single coach thread, 60s voice moments on monthly check-in, 3x/day proactive prompts with tap chips, time-aware dashboard ritual, presence indicator, peer wins broadcast, first names in the collective counter, coach messaging dashboard, dashboard / profile chill-pass).
 
 Also read `CLAUDE.md` at the repo root — it captures the design system and Sean-voice rules in a form that auto-loads into every Claude Code session.
 
@@ -13,6 +13,229 @@ Also read `CLAUDE.md` at the repo root — it captures the design system and Sea
 **Label options A / B / C / D.** Sean prefers comparing options by letter. Use `**Option A — short name**` then the wireframe, repeat for B/C/D. Keep one tradeoff line per option (Pro / Con) and a final recommendation in prose. Width: ~65–75 chars so wireframes render cleanly.
 
 This rule does NOT apply when he asks for a build directly (the visual is implied in the code being written) or for backend/architecture questions.
+
+---
+
+## Session updates (since 2026-05-23 — through 2026-05-27) — current
+
+Read this BEFORE the older sections below. A lot has shifted in the
+last week and the older sections reflect earlier behavior in places
+that contradict what's now live.
+
+### The headline shift: RIVEN AI retired as a destination → unified "Sean" thread
+
+The biggest mental-model change. Before this sprint: `/chat` was a streaming AI assistant, separate from `/messages` (Sean's proactive coach notes). Two surfaces, two voices.
+
+Now: `/chat` is **the Sean tab** — one unified thread. Bottom nav swapped "RIVEN AI" → "Sean" (icon `forum`). She sends, AI auto-replies in Sean's voice within ~2 minutes, and the bubbles read as "from Sean" with no AI label. Real Sean can drop in at any point via the new coach messaging dashboard, and his manual replies cancel the queued AI auto-reply so clients never get duplicates.
+
+The streaming route `/api/chat/stream` still exists in the codebase (log_meal tool is still wired) but is no longer called from the client. Can be retired in a future pass.
+
+### Schema additions (newest at top)
+
+```
+20260527160000_presence              -- User.lastDashboardSeenAt
+20260527150000_chat_chips            -- ChatMessage.chipOptions Json? + chipsRepliedAt
+20260527140000_voice_moments         -- VoiceMoment table + ChatMessage.audioUrl/audioDurationSec
+20260527120000_unified_sean_thread   -- PendingAiReply table + ChatMessage.aiGenerated
+20260526120000_add_daily_mood_cause  -- DailyMood.cause String?
+20260525140000_cheer_ceremony_seen   -- User.cheersLastSeenAt + firstCheerCeremonySeenAt
+20260525130000_sunday_prompt_formats -- SundayPrompt.kind + options; SundayPromptAnswer.choice + body nullable
+20260525120000_add_daily_mood        -- DailyMood table
+```
+
+New / extended models:
+
+- **`PendingAiReply`** — queue for delayed AI auto-replies on the Sean thread. Columns: id, userId, triggerMessageId, scheduledFor, status, sentAt, errorMessage, createdAt. Status values: `pending | sent | failed | cancelled`. Cancelled = Sean wrote back himself, so the AI reply was preempted from the coach dashboard.
+- **`VoiceMoment`** — queue for milestone voice-memo prompts. Currently only fires on monthly check-in submission. Columns: id, recipientUserId, triggerKind, triggerSourceId (unique with recipient + kind), status, audioUrl, durationSec, deliveredMessageId, createdAt, recordedAt. Status values: `queued | recorded | skipped`.
+- **`DailyMood`** — one-tap-a-day community pulse. Columns: id, userId, mood (tired|blah|good|fire), cause (sleep|food|stress|… per-mood vocab), centralDate, createdAt, updatedAt. Unique on (userId, centralDate).
+- **`ChatMessage` extensions**: `aiGenerated Boolean @default(false)` (marks AI-on-Sean's-behalf vs real-Sean), `audioUrl String?` + `audioDurationSec Int?` (voice memos), `chipOptions Json?` + `chipsRepliedAt DateTime?` (tap-reply chips on proactive prompts).
+- **`SundayPrompt` extensions**: `kind String @default("pulse")` + `options Json?`. Four format kinds: `pulse | this_or_that | is_this_you | open` (open = legacy written-answer; auto-rotation cycles the first three). **`SundayPromptAnswer` extensions**: `choice String?` (the option key tapped) + `body` made nullable. Reactions enum tightened from rose/strong/leaf → `heart | fire`.
+- **`User` extensions**: `cheersLastSeenAt DateTime?` (falling-roses ceremony state), `firstCheerCeremonySeenAt DateTime?` (welcome-banner-once flag), `lastDashboardSeenAt DateTime?` (presence indicator), `cheerLastPushAt DateTime?` (10-min push throttle for cheers, from earlier sprint).
+
+### Sean thread mechanics — delayed AI auto-reply
+
+When she sends Sean a message on `/chat`:
+
+1. Her message persists as a `ChatMessage` (kind=COACH role=USER) — kind=COACH because she's now writing into the coach thread, not the AI chat. Old `kind=AI` thread messages stay in the DB but don't render on the new tab.
+2. A `PendingAiReply` row is queued with `scheduledFor` randomized 90–130s in the future (skewed slightly toward the back of the window).
+3. The new cron at `/api/cron/process-ai-replies` polls every minute, picks up due rows, calls Claude with the same persona prompt + live context as the old `/chat/stream`, inserts the response as kind=COACH with `aiGenerated=true`, marks the row sent.
+4. Clients see "from Sean." No AI label. The `aiGenerated` flag is only surfaced on the coach side.
+
+The **"Sean's reading…" indicator** in the client UI does NOT appear immediately when she sends — it delays ~60 seconds, then shows for the rest of the wait. Her message sits alone for ~60s → indicator appears → reply lands ~60s later. Feels human; no bot tells.
+
+If real Sean writes back from `/coach/messages`, `sendCoachReply` flips any pending `PendingAiReply` to `status=cancelled` so clients never get the AI follow-up on top of his note.
+
+### Coach messaging dashboard at `/coach/messages`
+
+Three-column board, RIVEN brand tokens:
+
+- **Left**: client list (search + filter chips: All / Needs you / Last 24h). Rows show avatar initial, first name, last message preview, relative time. Gold dot when she's waiting on Sean. "N need you" pill in header. "Voice moments · N queued" gold pill below header when there are queued voice-memo triggers.
+- **Center**: active thread. Header with client name + email + "Auto-reply queued" chip when a PendingAiReply is in the queue. Bubbles: her side (cream surface, left), Sean side (charcoal, right). Sean bubbles show "you" or "◆ auto-reply" tag so he can spot which messages he authored. Reply input at bottom. Enter to send, shift+enter newline. Sending cancels the pending AI auto-reply.
+- **Right (desktop only)**: client context — current weight + start + goal + lbs lost / lbs to go, calorie target, protein floor, "Open full profile" CTA → `/coach/clients/[id]`.
+
+Auto-refreshes every 30s so new client messages land without manual reload. New top-level coach nav item between Clients and Leads.
+
+### Voice moments — 60-second voice memos on monthly check-in
+
+`/check-in/actions.ts` queues a `VoiceMoment` row after every successful monthly check-in submission (one per check-in, unique constraint prevents double-queue on re-submit). The "Voice moments · N queued" pill on `/coach/messages` opens a modal listing every queued trigger. Sean taps "Record" on a row → inline 60-second recorder using MediaRecorder API. Live countdown, auto-stops at 60s. Preview pane with native `<audio>` controls. "Re-record" or "Send to Maya" → upload to R2 (new `voice` scope, audio MIME types allowed, 10 MB cap) → `sendVoiceMoment` action persists a COACH ChatMessage with audioUrl + audioDurationSec → push fires "Sean recorded you a voice memo. Tap to listen." → any pending AI auto-reply is cancelled (voice memo is a stronger signal than text).
+
+Client side: when a `ChatMessage` has `audioUrl` set, `MessageBubble` renders a `VoicePlayer` instead of plain text. Custom controls: charcoal play/pause button, thin progress bar, duration label, "voice memo" sub-tag. iOS-safe `audio.play()` with exception handling.
+
+### Tap-reply chips — Sean's proactive daily prompts
+
+`ChatMessage.chipOptions` is a JSON array of `{label, value}`. When set + `chipsRepliedAt` is null, the bubble renders chip buttons below the text. Tap → sendToSean fires with the chip's value AND `chipMessageId`. Server stamps `chipsRepliedAt` on that row so chips collapse server-side. Same delayed-reply mechanic from there — AI auto-reply queued.
+
+### 3x/day Sean check-in cron routes
+
+Three new routes, each gated by `CRON_SECRET`:
+
+- `/api/cron/morning-checkin` ~8 AM CT (Railway cron: `13 0 * * *` UTC)
+- `/api/cron/midday-checkin` ~1 PM CT (`18 0 * * *` UTC) — only fires for clients with NO MealLog today
+- `/api/cron/evening-checkin` ~8 PM CT (`1 1 * * *` UTC)
+
+Shared logic in `src/lib/sean-daily-checkins.ts`:
+- Pulls active clients
+- 4-hour cooldown: skip if any COACH message landed in the last 4h (avoids piling pings on top of Monday batches / sean-messages crons)
+- Midday only: also skip if she already logged today
+- Picks today's variant from the message bank in `src/lib/sean-daily-prompts.ts` (4-5 variants per slot, deterministic-by-date rotation)
+- Creates a COACH `ChatMessage` with `chipOptions` set + `category="daily_checkin"`
+- Pushes the client
+
+Coexists with the existing `sean-messages` hourly cron and `monday-checkin` weekly cron. No conflict — the 4h cooldown protects against double-pings.
+
+### Time-aware dashboard ritual
+
+`/dashboard`'s first surface is now a time-aware card that adapts based on the current Central hour:
+
+- **Morning** (6-11 AM): "Good morning, Maya. Today's one thing: hit your protein floor." Focus picked from yesterday's data via `pickMorningFocus` (protein floor missed → protein focus; low steps → movement focus; else → "stack another clean day").
+- **Midday** (11 AM-5 PM): "Half the day, Maya." + calorie/protein progress bars + "Log a meal" CTA (only when no log today).
+- **Evening** (5-11 PM): "How'd today land, Maya?" — opens the close-out flow.
+- **Night** (11 PM-6 AM): quiet "Rest up, Maya. Tomorrow's the lock." — no ask.
+
+Logic in `src/lib/ritual-of-day.ts`. The old static greeting + day quote both retired — generic motivational quotes didn't earn the screen space.
+
+### Presence indicator
+
+Small pill below the ritual card: **"● Tracy and Adrienne are in RIVEN right now."** Reads `User.lastDashboardSeenAt` (stamped on every `loadDashboardData` call); active = stamped within the last 15 min. First names only. Self-hides when empty — never shows "you're alone." `src/lib/presence.ts` + `src/components/presence-indicator.tsx`.
+
+### First names everywhere in the collective counter
+
+`Together · this week` card was aggregate numbers (`"4,210g protein"`). Now reads as sentences with first names: `"Tracy, Maya, you + 4 others stacked 4,210g of protein this week."` Viewer's name swapped to "you" and moved to the end of the list. 4+ names truncate to first 3 + "N others." Same four stats (protein g, streak days combined, roses sent, steps walked). `src/lib/collective-counter.ts` returns contributor name lists in addition to aggregates.
+
+### Peer wins broadcast
+
+The mirror of cheer prompts. When a peer hits a milestone TODAY, every other active client sees a "Someone's crushing it" card with a one-tap 🌹 send button. Triggers in `src/lib/peer-wins.ts`:
+
+- `win_streak_30` / `win_streak_60` / `win_streak_90` — meal-log streak ending today hit one of those round numbers
+- `win_monthly_checkin` — she submitted her monthly check-in today
+
+`CheerReaction.context` accepts the new `win_*` values; the cheer Zod schema in `dashboard/cheer-action.ts` was extended. Hard-day cheers and win cheers coexist in the same table.
+
+### Falling-roses ceremony
+
+When a client opens `/dashboard` with unseen `CheerReaction` rows (created since her `cheersLastSeenAt`), a cinematic full-screen overlay plays:
+
+- First-ever ceremony: welcome banner — *"These RIVEN women are thinking about you. They're here with you."* (Holds ~2.8s.)
+- Then each rose falls from above, lands center-stage, the sender's first name fades in ("Tasha is thinking of you"), then both fade. ~2s per rose.
+- Cap at 6 roses with names; 7+ → overflow line *"…and N more this week from women you'll see in the room."*
+- "Lock it in" button at end → overlay dismisses → `markCheersAsSeen` action bumps `cheersLastSeenAt` and sets `firstCheerCeremonySeenAt` if null.
+- Tap anywhere mid-sequence → skip to dismiss button.
+
+`src/components/cheer-ceremony.tsx` + keyframes `riven-rose-fall` / `riven-rose-name` in globals.css.
+
+### Cheer mechanics — gating + softening
+
+- **No-log triggers gated to 2 / 4 / 6-day rungs** instead of continuous after 24h. The card only fires on those exact gaps. Single-day-late and 3/5/7+ day silence → no prompt. Logic in `src/lib/cheer.ts`.
+- **Way-over target now requires 3 days running** (not 1). A one-off heavy Saturday is normal life; a pattern earns peers the chance to send a 🌹.
+- **Card copy softened**: "Maya hasn't logged" (no "in 24 hours" timestamp). "Maya's been heavy 3 days running."
+- **Falling-roses sender copy**: each rose says "Tasha is thinking of you" — first name + present tense, warm.
+- **CheerReceivedCard subtitle** rotates context: "Sent because she saw you show up on a heavy day" / "she saw you come back" / "she saw you stay in it" / "she wanted you to know she's rooting for you." Reframes the subject as her SHOWING UP, not as the failure that triggered the rose.
+
+### Daily mood ribbon → "How's your day going?"
+
+Top community surface on `/dashboard`. Four emojis: 😤 tired / 🥱 blah / 🤩 good / 🔥 fire (good emoji was upgraded from 🙂 to 🤩 mid-sprint).
+
+Flow:
+1. Buttons visible until she taps. Heading: **"How's your day going?"**
+2. Tap → emoji floats up (`riven-float-up` keyframe) → ribbon collapses after ~600ms → Sean-voice coach line lands matched to her mood. Lines deterministic per (user, day, mood) so the surface doesn't shuffle on revisits. Bank in `src/lib/coach-mood-lines.ts` (5-6 lines per mood, 24 total).
+3. Follow-up tap: **"What's making it ___?"** with mood-specific chips:
+   - 😤 tired: sleep · period · stress · work
+   - 🥱 meh: motivation · sleep · weather · vibes
+   - 🤩 good: workout · food · a win · vibes
+   - 🔥 fire: workout · momentum · a win · locked in
+4. After she picks (or skips) the cause: **community poll bars** pop in, hold ~4 seconds, fade out. Shows the room's mood split as percentages ("50% said good"), her own bar in gold.
+
+Stored as `DailyMood` rows. `User.cause` enforces per-mood validation server-side in `setMyMoodCause` action. Mood history surfaces on `/profile` and the coach's `/coach/clients/[id]` Overview tab as a 30-day heatmap + tally + cause breakdown.
+
+### Sunday ritual — three rotating tap formats
+
+Retired the open written-answer prompt. New rotation:
+
+- **`pulse`** — 3 tap options, bar-chart fills with the room's split
+- **`this_or_that`** — 2 side-by-side cards, percentages reveal after pick
+- **`is_this_you`** — 1 relatable line + 3 confession-style reactions (e.g., 😤 me / 🙏 been there / 🌿 not anymore)
+- **`open`** — legacy free-text format, replay-only for historical prompts
+
+Auto-rotates per week (pulse → this_or_that → is_this_you). Sean can override per prompt in `/coach/profile` → Sunday prompt editor. Schema: `SundayPrompt.kind` + `options Json`. `SundayPromptAnswer.choice` (the option key tapped); `body` nullable for legacy.
+
+### Pulse feed → spontaneous toast pop-ups
+
+Persistent "Right Now in RIVEN" strip retired. New `PulseToasts` is a fixed-overlay toast at the top of `/dashboard` that surfaces one pulse event at a time, randomly while she's on the page: "Tracy just logged a meal" → fades 5s → next event ~60-120s later. Shopify "someone just bought" pattern. Pulse meal copy was also neutralized: no "late meal" framing, no food name in the toast, just "Tracy just logged a meal."
+
+### Monthly check-in cadence (was weekly)
+
+`/check-in` now stores month-start dates in `WeeklyCheckIn.weekStart` (column name is historical; renaming it would churn a lot). Fires on the 1st of each month. The `sunday-reminder` cron route was repurposed to fire only on the 1st (it no-ops every other day — schedule unchanged on Railway side). `lib/progress.ts` `countConsecutiveMonths` replaces the old `countConsecutiveWeeks`. `/profile` shows monthly check-in card; "checked in this month" replaces "checked in this week." Pricing copy, notification opt-in copy, tutorial slide all swapped.
+
+### Calorie estimation — buffer 20% + explicit numbers are gospel
+
+- Flat buffer dropped from 35% → **20%**.
+- Cultural food baselines in `anthropic.ts` + `chat-prompt.ts` recalculated to be 20%-cushioned (multiplied by 1.20/1.35, rounded clean).
+- **Explicit-number override removed.** When she states a specific calorie count, the AI uses that number 100% of the time. No buffer. No "implausibility override." She said the number — log it.
+
+### Meal log UX — chill, no red
+
+- Red exclamation icon removed from `MealRowItem` and the `ResultCard` "Heads up" card. The card stays but uses the same gold-tinted treatment as our reminder cards — soft, not alarmist.
+- `flagReason` cap tightened from 1 sentence / 60 words → **1-2 sentences / 40 words max**. Voice: "you might not wanna make this a daily thing" energy, not "STOP."
+
+### Chat UI polish
+
+- "Riven · Ask me anything" header → small Sean avatar chip + "Sean · Your coach" eyebrow.
+- "Message RIVEN…" placeholder → "Message Sean…"
+- Empty state copy rewritten in Sean's voice: *"Say what's on your mind. Quick question, meal you're unsure about, a hard day — Sean reads everything. He answers in a few minutes most of the time. Tap the photo icon to share a meal pic."*
+- Copy button on bubbles removed (texting Sean shouldn't have a copy affordance).
+- Suggested-prompts grid retired (was AI-specific; doesn't fit the unified thread).
+
+### Dashboard chill-pass (latest)
+
+- Day name + daily quote sub-line removed from `/dashboard` (was below the time-aware ritual; generic motivational quotes didn't earn the space).
+- Presence indicator promoted from inline italics to its own subtle pill below the ritual card.
+
+### Profile chill-pass (latest)
+
+`/profile` got significantly quieter:
+- **Removed**: phase indicator (Phase 1 · Active), weight trend sparkline, waist trend sparkline, streak protection card, "This week's prompt" content card.
+- **Kept**: Wins, photo timeline, mood history, monthly check-in card, notifications, billing, account.
+
+The streak-freezes data column (`Profile.streakFreezesAvailable`) still exists in the DB for future use; only the surface is gone.
+
+### Quiz fixes
+
+- **Q15 ("Anything else I should know?") textarea removed.** Was broken on mobile and unused downstream. Total question count 15 → 14. Q14 is now the last step; selecting an option reveals the "See my results" submit button. Schema field still accepted as `optional` for one release so stale clients don't 400.
+- **Back button moved up** from the bottom footer to directly below the answer area on every non-zero step. No more scrolling to correct a tap.
+- Tailwind tokens fixed: `display-md` and `display-sm` were used across multiple pages but never defined in tailwind config. Added the missing tokens (32px / 40px) plus a new `display-xl` (56px) for the dramatic `/quiz` hero. Hero on `/quiz` is now `text-display-md md:text-display-xl` and properly fills the screen on mobile.
+- **Coach `/coach/leads`** got a two-tap-confirm delete button per row (`DeleteLeadButton`).
+- `/quiz/results/[id]` next-step copy tightened across all three buckets (APP / COACH / DONE_FOR_YOU). All three now end on a curiosity hook — *"Twelve minutes will show you why / what's in it."*
+- **Voices section** on `/quiz` dropped the time taglines under each testimonial. Just first names now.
+
+### What Sean still needs to do manually
+
+- **Cron-job.org or Railway worker service for `/api/cron/process-ai-replies`** — fires every minute, drains the PendingAiReply queue. Without this, AI auto-replies on the Sean thread queue forever. Sean is leaning toward a Railway worker service (Option A in the most recent chat).
+- **3 new Railway cron services for the daily check-ins**:
+  - `morning-checkin` — `13 0 * * *` UTC → POST `/api/cron/morning-checkin`
+  - `midday-checkin` — `18 0 * * *` UTC → POST `/api/cron/midday-checkin`
+  - `evening-checkin` — `1 1 * * *` UTC → POST `/api/cron/evening-checkin`
+
+  Duplicate the `sunday-checkin` service pattern; reference `${{rivenaiapp.CRON_SECRET}}` for the secret.
 
 ---
 
@@ -88,7 +311,9 @@ Helpers: `src/lib/pulse.ts`, `src/lib/collective-counter.ts`, `src/lib/cheer.ts`
 
 **Sunday Daily Ritual.** Fourth community surface, also on /dashboard. Coach writes one weekly question at `/coach/profile`; appears at top of every active client's dashboard on Sunday with composer + others' answers + 🌹/💪/🌿 reactions. "Open" = today's Central day is Sunday; otherwise replay-only (UI disables buttons). Surface lingers on Mon-Sat if anyone participated. Helpers: `src/lib/sunday-ritual.ts`. Server actions: `src/app/(clerk)/(app)/dashboard/sunday-actions.ts` (`submitSundayAnswer`, `toggleSundayReaction`). Coach action: `setSundayPrompt` in `coach-actions.ts`.
 
-**RIVEN AI now reads live data + can write meals.** `/api/chat/stream` injects a fresh client context every turn (today's totals, recent meals, latest check-in, current streak). Claude has a `log_meal` tool — when she types "I had a chicken caesar salad," the tool fires, runs the same `analyzeMeal` pipeline as `/log` (shared in `src/lib/meal-pipeline.ts`), and persists the meal log + updates DailyTotals.
+**RIVEN AI used to read live data + write meals via tool use.** `/api/chat/stream` injected a fresh client context every turn (today's totals, recent meals, latest check-in, current streak). Claude had a `log_meal` tool that called `analyzeMeal` and persisted via the same pipeline as `/log`.
+
+**[SUPERSEDED 2026-05-27 — RIVEN AI as a destination is retired.]** `/chat` is now the unified Sean thread; the streaming route + log_meal tool still exist in the codebase but aren't called from the new client UI. Meal logging happens via `/log` only. The same Claude persona + live context now powers the delayed auto-reply scheduler (`src/lib/sean-auto-reply.ts`) instead of the live stream.
 
 **Streaks 14/30/60/90.** Variant banks added to `sean-message-variants.ts` (45 new lines + 28 new titles). Engine in `sean-messages.ts` picks the HIGHEST applicable milestone; window expanded from 30 → 100 days to support 90-day detection.
 
@@ -102,7 +327,7 @@ Helpers: `src/lib/pulse.ts`, `src/lib/collective-counter.ts`, `src/lib/cheer.ts`
 
 ### Meal logging behavior (current state)
 
-- **Flat 35% overestimation** above any inferred baseline (previously 20-30% range; tightened to a single number).
+- **Flat 35% overestimation** above any inferred baseline. **[SUPERSEDED 2026-05-27 — now 20%; see top-section calorie note.]**
 - **Explicit calorie numbers trusted as-is.** If she says "the label said 290 cal," log 290 with no buffer.
 - **Implausibility override.** If she claims "Big Mac at 100 cal," AI overrides with the honest number and a one-line "real talk, that's closer to 720."
 - **Incremental tightens only** ("medium fry next time," not "eat a salad"). NEVER cross food categories or use diet-culture moves.
@@ -215,7 +440,7 @@ Project: `bubbly-perception` / production.
 - `WeeklyCheckIn { userId, weekStart, weight, waist, photoFrontUrl, photoSideUrl, menuAdherence, sleepAvg, cycleStatus, stress, winsAndStruggles }` — unique on (userId, weekStart)
 - `ContentSubmission { userId, week, promptText, videoUrl, photoUrl, createdAt }`
 - `ChatMessage { userId, role: USER|ASSISTANT, kind: AI|COACH, senderUserId?, content, imageUrls[], createdAt }`
-  - `kind=AI` lands in `/chat` (RIVEN AI thread)
+  - `kind=AI` is the LEGACY AI-thread bucket — no longer rendered anywhere as of 2026-05-27. New auto-replies use `kind=COACH` with `aiGenerated=true`.
   - `kind=COACH` lands in `/messages` (coach inbox); fires push, triggers home-screen gold "Message from Sean" badge
 - `PushSubscription { userId, endpoint (unique), p256dh, auth, userAgent }`
 
@@ -244,11 +469,11 @@ Project: `bubbly-perception` / production.
 ### Client (CLIENT role)
 Gated by **paywall middleware** in `(app)/layout.tsx`: redirects to `/pricing` unless `subscriptionStatus` is `trialing | active | comped`. Coaches bypass entirely.
 
-- `/dashboard` — home: today's cal/protein/steps, rotating "Ask RIVEN" prompts, Sunday check-in card (sage when done, pulse when locked), weekly content prompt card (gold when submitted), PWA install banner, notification opt-in card, **time-aware meal-pacing reminder card** (only when she's behind for the hour), **"Message from Sean" liquid-glass chip top-right with gold breath halo when unread** (charcoal-pill monogram "S" — no photo), **sticky "Log a meal" pill floating above the bottom nav** (charcoal when on track, gold + soft pulse when behind on logging).
+- `/dashboard` — home. **[CURRENT 2026-05-27]** Time-aware ritual card at top (morning/midday/evening/night, see top-section notes), presence indicator pill, daily mood ribbon, Sunday ritual (Sundays only, rotating tap formats), cheer received card with rotating context line, peer wins, cheer prompts, pulse toasts (overlay), collective counter with first names, today's progress cards, sticky log pill. Coach-message chip stays top-right. **[RETIRED]** Rotating "Ask RIVEN" prompts hero, weekly Sunday check-in card, weekly content prompt card — all removed. Day name + daily quote sub-line — removed.
 - `/log` — voice-first meal logging. Mic hero (big charcoal circle with mic icon) at the top; text input demoted into an "Or type it instead" disclosure. Tap mic → record → tap stop → Whisper transcribes → fills textarea → tap Log to submit. Result card includes a **soft-red "Heads up" pill with flagReason** when the meal contains processed/refined food, plus per-item pills showing how Claude split the meal. **Today section** below shows current Central-day meals — each card has a header (combined label + total cals + ⚠ icon if flagged) AND a row of per-item pills underneath; tap the header to re-log the whole combo, tap a pill to re-log just that food. Mic stream is reused across recordings in one session to reduce permission re-prompts. No more Frequent or Earlier-this-week sections — kept the UI focused on the current day (Sean's call).
-- `/chat` — RIVEN AI (filtered to `kind: "AI"` — coach messages do NOT appear here)
+- `/chat` — **the unified Sean thread**. Renders all `kind: "COACH"` messages chronologically. USER-role rows = her side, ASSISTANT-role rows = Sean side (whether real Sean or AI auto-reply; `aiGenerated` flag is invisible to clients). **[SUPERSEDED 2026-05-27]** — was previously the RIVEN AI chat filtered to `kind: "AI"`. Legacy `kind: "AI"` messages stay in the DB but no longer render here.
 - `/messages` — coach inbox (kind: "COACH" only, 30-day window, marks seen on visit by writing `Date.now()` to `riven_seen_coach_msg_at` in localStorage)
-- `/check-in` — Sunday weekly check-in form (locks except Sunday)
+- `/check-in` — **monthly** check-in form, keyed to month-start. Same 8-field shape (weight, waist, photos, sleep, cycle, menu adherence, stress, wins/struggles). Submitting queues a `VoiceMoment` for Sean to record a 60s voice memo. **[SUPERSEDED 2026-05-26]** — was previously weekly, Sunday-locked.
 - `/content` — weekly content prompt + video/photo upload to R2 (500 MB)
 - `/profile` — wins, weight/waist sparklines, photo timeline, weekly cards mirror dashboard "done" states, push subscribe toggle, **"Manage billing" link → Stripe Customer Portal** (only renders if `stripeCustomerId` is set), sign out, delete account
 
@@ -264,7 +489,9 @@ Auto-redirects from any `(app)` route. Bottom nav: Clients / Profile.
 - `/api/r2/sign` — presigned PUT URL
 - `/api/coach/download` — coach-only, returns signed R2 URL with `Content-Disposition: attachment`; HEAD-verifies first and falls back to public URL if signing 404s
 - `/api/push/subscribe`, `/api/push/unsubscribe`
-- `/api/cron/sunday-reminder` — POST, CRON_SECRET-gated. Pushes check-in reminder to clients who haven't submitted yet for current week.
+- `/api/cron/sunday-reminder` — **[REPURPOSED 2026-05-26]** Now a monthly reminder. Route name is historical (kept so Sean doesn't have to rewire the Railway cron). Date guard: no-ops every day except the 1st of the Central-time month. On the 1st, pushes check-in reminder to clients who haven't submitted yet for this month.
+- `/api/cron/process-ai-replies` — POST, CRON_SECRET-gated. Drains the `PendingAiReply` queue. Designed to fire every 1 minute. Sean is leaning toward a Railway worker service (one always-on service running `setInterval(60_000)`); cron-job.org is the cheap external alternative.
+- `/api/cron/morning-checkin` / `midday-checkin` / `evening-checkin` — POST, CRON_SECRET-gated. Sean's proactive 3x/day prompts with tap-reply chips. See top-section daily cron note.
 - `/api/cron/monday-checkin` — POST, CRON_SECRET-gated. **Processes 5 clients in parallel** (was sequential, hit the route maxDuration on lists >20). `maxDuration` bumped to 800s as a safety net. Generates personalized Sean-voice check-ins via Claude (uses last 7 days of meal logs + chat history + profile) and posts as COACH messages with push notification. Same batch is also reachable from the coach profile button via a Clerk+role-gated server action.
 - `/api/stripe/webhook` — signature-verified by `STRIPE_WEBHOOK_SECRET`. Listens for `customer.subscription.created/updated/deleted` and mirrors state into the User row. Never overwrites `subscriptionStatus="comped"`. Added to middleware's public route allowlist.
 - `/api/stripe/portal` — auth-gated. Creates a Stripe Customer Portal session for the signed-in user and 303-redirects there. Called by the "Manage billing" form on /profile.
@@ -275,7 +502,7 @@ Auto-redirects from any `(app)` route. Bottom nav: Clients / Profile.
 
 ## Architecture decisions worth knowing
 
-1. **Coach messages and AI messages are isolated.** `/chat` query filters `kind: "AI"`. Coach messages live in `/messages`. Gold styling, fires push, triggers home-screen "Message from Sean" badge with localStorage-tracked seen state. 30-day visibility window for the badge.
+1. **[SUPERSEDED 2026-05-27]** Coach messages and AI messages used to be isolated — `/chat` filtered `kind: "AI"`, `/messages` filtered `kind: "COACH"`. Now `/chat` is the unified Sean thread (kind=COACH only); legacy AI rows stay in the DB but don't render. The "Message from Sean" home-screen badge with the 30-day visibility window still works the same way.
 
 2. **Sean's name is hardcoded.** `senderName` for any COACH-kind message is always `"Sean"`, never `Profile.name`. Prevents stale Profile.name (e.g. "Dean" from when Sean tested a client account) from leaking into client chats.
 
