@@ -129,16 +129,18 @@ async function sendCheckInTo(
     },
   });
 
-  // Push notification — same tag per client so a stale notification
-  // gets replaced rather than stacking.
+  // Push notification — deep-links to /dashboard so she lands directly
+  // on the new SeanPromptHeadline at the top of the page rather than
+  // having to find the Sean tab. Same tag per client so a stale
+  // notification gets replaced rather than stacking.
   try {
     await sendPushToUser(clientUserId, {
       title: "Sean wrote you",
       body: variant.text.slice(0, 140),
-      url: "/chat",
+      url: "/dashboard",
       tag: `daily-checkin-${clientUserId}`,
     });
   } catch {
-    /* push failure is fine — the message still lands when she opens /chat */
+    /* push failure is fine — the message still lands when she opens the app */
   }
 }

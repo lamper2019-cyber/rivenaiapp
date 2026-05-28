@@ -7,7 +7,10 @@ import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
 // The helper still exists in @/lib/daily-quotes for any future surface.
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import { NotificationOptIn } from "@/components/notification-opt-in";
-import { CoachMessageBadge } from "@/components/coach-message-badge";
+// CoachMessageBadge removed from /dashboard — the new SeanPromptHeadline
+// at the top of the page replaces the top-right chip. The component
+// itself stays in src/components/coach-message-badge.tsx for any future
+// reuse (e.g., on /coach/clients/[id] if Sean wants a per-client view).
 import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
 import { getMealPacing, type MealPacingTier } from "@/lib/meal-pacing";
 import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
@@ -22,6 +25,7 @@ import { getDailyMoodSnapshot, MOOD_KINDS, type MoodKind } from "@/lib/daily-moo
 import { pickCoachLineForMood } from "@/lib/coach-mood-lines";
 import { TimeAwareRitual } from "@/components/time-aware-ritual";
 import { PresenceIndicator } from "@/components/presence-indicator";
+import { SeanPromptHeadline } from "@/components/sean-prompt-headline";
 import { PulseToasts } from "@/components/pulse-toasts";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
@@ -83,7 +87,7 @@ export default async function DashboardPage() {
     ritualSlot,
     morningFocus,
     presentNames,
-    recentCoachMessages,
+    latestSeanPrompt,
   } = data;
 
   // Ambient community trio + Sunday ritual snapshot. Best-effort: each
@@ -162,31 +166,36 @@ export default async function DashboardPage() {
         />
       )}
 
-      {recentCoachMessages.length > 0 && (
-        <CoachMessageBadge messages={recentCoachMessages} />
-      )}
+      {/* Top-right coach message chip retired in favor of the new
+          SeanPromptHeadline below. recentCoachMessages is still fetched
+          server-side for analytics + future reuse. */}
 
-      {/* Time-aware ritual is the FIRST surface — adapts based on
-          Central time. Morning: today's focus. Midday: meal pacing
-          + Log CTA. Evening: end-of-day mood + tomorrow's focus.
-          Night: quiet rest moment. */}
+      {/* PRIME REAL ESTATE: "Today with Sean" headline. The most
+          recent Sean message in the last 24h is the first thing she
+          sees — chips when there's an unanswered chip-prompt, text
+          preview when she's already replied, audio CTA when it's a
+          voice memo. Falls back to the time-aware ritual when Sean
+          hasn't messaged in 24h (new clients on day 1, or quiet days
+          before the daily cron fires). Pulls her straight into the
+          conversation without making her hunt for the Sean tab. */}
       <div className="space-y-4">
-        <TimeAwareRitual
-          slot={ritualSlot}
-          firstName={profile.name.split(/\s+/)[0]}
-          morningFocus={morningFocus}
-          todayCalories={todayTotals.calories}
-          todayProtein={todayTotals.protein}
-          cutCalorieTarget={getTodayCalorieTarget(profile)}
-          proteinFloorG={profile.proteinFloor}
-          hasLoggedToday={todayTotals.calories > 0}
-        />
-        {/* Presence chip — now sized up so it actually reads as a
-            community signal instead of disappearing under the ritual.
-            Bumped to label-md + dropped onto its own subtle pill so
-            she sees who else is in RIVEN with her. Self-hides on a
-            quiet morning. The day quote was removed entirely per Sean —
-            generic motivational lines didn't earn the screen space. */}
+        {latestSeanPrompt ? (
+          <SeanPromptHeadline prompt={latestSeanPrompt} />
+        ) : (
+          <TimeAwareRitual
+            slot={ritualSlot}
+            firstName={profile.name.split(/\s+/)[0]}
+            morningFocus={morningFocus}
+            todayCalories={todayTotals.calories}
+            todayProtein={todayTotals.protein}
+            cutCalorieTarget={getTodayCalorieTarget(profile)}
+            proteinFloorG={profile.proteinFloor}
+            hasLoggedToday={todayTotals.calories > 0}
+          />
+        )}
+        {/* Presence chip — sits below the headline so she sees who
+            else is in RIVEN with her right now. Self-hides on a
+            quiet morning. */}
         {presentNames.length > 0 && (
           <div className="rounded-full bg-surface-container-lowest border border-outline-variant/60 px-4 py-2 inline-flex">
             <PresenceIndicator names={presentNames} />
