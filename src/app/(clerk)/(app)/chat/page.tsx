@@ -46,6 +46,8 @@ export default async function ChatPage() {
               aiGenerated: true,
               audioUrl: true,
               audioDurationSec: true,
+              chipOptions: true,
+              chipsRepliedAt: true,
             },
           }),
           // Is there a pending AI reply queued for her? Drives the
@@ -66,6 +68,10 @@ export default async function ChatPage() {
           senderName: undefined,
           audioUrl: m.audioUrl,
           audioDurationSec: m.audioDurationSec,
+          chipOptions: parseChipOptions(m.chipOptions),
+          chipsRepliedAt: m.chipsRepliedAt
+            ? m.chipsRepliedAt.toISOString()
+            : null,
         }));
         pendingReplyId = pending?.id ?? null;
       }
@@ -106,4 +112,27 @@ export default async function ChatPage() {
       <div className="fixed top-[20%] right-[-15%] w-[40%] h-[30%] bg-sage/5 blur-[120px] rounded-full pointer-events-none -z-10" />
     </main>
   );
+}
+
+/** Parse the JSON chipOptions column into a typed array. Returns []
+ *  on null/malformed so render code can just check length. */
+function parseChipOptions(
+  raw: unknown,
+): Array<{ label: string; value: string }> {
+  if (!Array.isArray(raw)) return [];
+  const out: Array<{ label: string; value: string }> = [];
+  for (const item of raw) {
+    if (
+      item &&
+      typeof item === "object" &&
+      typeof (item as Record<string, unknown>).label === "string" &&
+      typeof (item as Record<string, unknown>).value === "string"
+    ) {
+      out.push({
+        label: (item as { label: string }).label,
+        value: (item as { value: string }).value,
+      });
+    }
+  }
+  return out;
 }

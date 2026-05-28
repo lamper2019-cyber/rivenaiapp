@@ -9,18 +9,17 @@ import { scheduleAiReply } from "@/lib/sean-auto-reply";
 /**
  * Client-side action: she sends Sean a message on the unified thread.
  *
- * Flow:
- *   1. Persist her message as a USER-kind ChatMessage on her thread.
- *   2. Schedule an AI auto-reply (PendingAiReply row with a randomized
- *      delay 1.5-15 min, skewed toward 1-5). The cron picks it up
- *      and writes a COACH ChatMessage that looks indistinguishable
- *      from real Sean.
- *   3. Real Sean can still drop into the same thread manually from the
- *      coach messaging dashboard — his replies go in as COACH with
- *      aiGenerated=false.
+ * Two flows go through this single action:
  *
- * Returns the message id + the scheduled-reply id so the client can
- * show "Sean is typing..." or similar UI affordances if we add them.
+ *   - Free-text / voice transcript: pass `message` only.
+ *   - Tap-reply chip: pass `message` (the chip's value) + chipMessageId
+ *     (the Sean-side message whose chips she tapped). Action marks
+ *     that row's chipsRepliedAt so the chips collapse server-side.
+ *
+ * Either way the effect is the same downstream:
+ *   1. Persist her USER message (kind=COACH).
+ *   2. Schedule an AI auto-reply (~90-130s delay).
+ *   3. Optionally cancel any earlier pending reply if she's mid-thread.
  */
 
 const SendSchema = z.object({
@@ -34,6 +33,9 @@ const SendSchema = z.object({
     .max(4, "At most 4 images per message")
     .optional()
     .default([]),
+  /** The Sean message whose chips she tapped. Used to mark chipsRepliedAt
+   *  so the chips don't re-render. Only set when this is a chip reply. */
+  chipMessageId: z.string().optional(),
 });
 
 export type SendToSeanResult =
@@ -73,12 +75,9 @@ export async function sendToSean(
     return { ok: false, error: "Complete onboarding before messaging Sean." };
   }
 
-  // 1. Persist her message on the unified Sean thread. We use
-  //    kind=COACH (= the coach thread) + role=USER (= her side of
-  //    the conversation); the existing ChatMessageKind enum has only
-  //    {AI, COACH}, so the role column carries the directional
-  //    information. Auto-reply + manual Sean reply both come back as
-  //    kind=COACH role=ASSISTANT, differentiated by aiGenerated.
+  // 1. Persist her message. Always kind=COACH role=USER on the unified
+  //    thread — the existing ChatMessageKind enum has only {AI, COACH},
+  //    so the role column carries direction.
   const userMessage = await prisma.chatMessage.create({
     data: {
       userId: user.id,
@@ -90,8 +89,22 @@ export async function sendToSean(
     select: { id: true },
   });
 
-  // 2. Schedule the AI auto-reply. The cron at /api/cron/process-ai-
-  //    replies handles the rest.
+  // 1b. If this is a chip-reply, stamp chipsRepliedAt on the Sean
+  //     message so the chips collapse on next render. Defensive update
+  //     gated to that user's own messages so a stale client can't
+  //     mark someone else's row.
+  if (parsed.data.chipMessageId) {
+    await prisma.chatMessage.updateMany({
+      where: {
+        id: parsed.data.chipMessageId,
+        userId: user.id,
+        chipsRepliedAt: null,
+      },
+      data: { chipsRepliedAt: new Date() },
+    });
+  }
+
+  // 2. Schedule the AI auto-reply.
   const pending = await scheduleAiReply({
     userId: user.id,
     triggerMessageId: userMessage.id,

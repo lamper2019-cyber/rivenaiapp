@@ -18,6 +18,12 @@ export type ChatMessage = {
    *  this case). Only set on assistant/COACH messages. */
   audioUrl?: string | null;
   audioDurationSec?: number | null;
+  /** Tap-reply chips for Sean's proactive daily prompts. When set +
+   *  chipsRepliedAt is null, the bubble renders chip buttons below
+   *  the text. Tapping a chip fires sendToSean and stamps
+   *  chipsRepliedAt so the chips disappear on next render. */
+  chipOptions?: Array<{ label: string; value: string }>;
+  chipsRepliedAt?: string | null;
 };
 
 type PendingAttachment = {
@@ -215,7 +221,13 @@ export function ChatUI({
   // empty-state elements have visually finished leaving.
   const EMPTY_EXIT_MS = 380;
 
-  async function send(text: string) {
+  /** Single send pipeline. opts.chipMessageId is set when the source
+   *  is a chip tap on a Sean message — server stamps that row's
+   *  chipsRepliedAt so the chips collapse. */
+  async function send(
+    text: string,
+    opts?: { chipMessageId?: string },
+  ) {
     const trimmed = text.trim();
     const uploadedImages = attachments
       .filter((a) => a.status === "uploaded" && a.publicUrl)
@@ -245,7 +257,21 @@ export function ChatUI({
       content: trimmed,
       imageUrls: uploadedImages,
     };
-    setMessages((prev) => [...prev, userMsg]);
+    // Optimistic: if this is a chip tap, also stamp chipsRepliedAt
+    // locally so the chips collapse immediately. The server confirms
+    // on the next router.refresh.
+    setMessages((prev) => {
+      const next = [...prev, userMsg];
+      if (opts?.chipMessageId) {
+        const nowIso = new Date().toISOString();
+        for (let i = 0; i < next.length; i++) {
+          if (next[i].id === opts.chipMessageId && !next[i].chipsRepliedAt) {
+            next[i] = { ...next[i], chipsRepliedAt: nowIso };
+          }
+        }
+      }
+      return next;
+    });
     setAttachments([]);
     setSending(true);
     setEmptyExiting(false);
@@ -254,6 +280,7 @@ export function ChatUI({
       const r = await sendToSean({
         message: trimmed || "(image)",
         imageUrls: uploadedImages,
+        chipMessageId: opts?.chipMessageId,
       });
       if (!r.ok) throw new Error(r.error);
       setHasPendingReply(true);
@@ -409,7 +436,13 @@ export function ChatUI({
         ) : (
           <ul className="space-y-6 py-4">
             {messages.map((m) => (
-              <MessageBubble key={m.id} message={m} />
+              <MessageBubble
+                key={m.id}
+                message={m}
+                onChipTap={(value, chipMessageId) =>
+                  void send(value, { chipMessageId })
+                }
+              />
             ))}
             {/* "Sean's reading..." indicator. Doesn't appear until
                 ~60s after she sends (see showReadingIndicator effect
@@ -581,8 +614,12 @@ export function ChatUI({
 
 function MessageBubble({
   message,
+  onChipTap,
 }: {
   message: ChatMessage;
+  /** Tap handler for the chip-reply buttons. Provided by parent so
+   *  the bubble doesn't have to know about the action wiring. */
+  onChipTap?: (chipValue: string, chipMessageId: string) => void;
 }) {
   const isUser = message.role === "user";
   const isCoach = message.kind === "COACH" && !isUser;
@@ -661,6 +698,26 @@ function MessageBubble({
             {message.content}
           </p>
         )}
+        {/* Chip-reply buttons. Render only when chipOptions is set
+            AND she hasn't tapped yet (chipsRepliedAt null). Once
+            tapped, the bubble keeps the text but the chips collapse. */}
+        {message.chipOptions &&
+          message.chipOptions.length > 0 &&
+          !message.chipsRepliedAt &&
+          onChipTap && (
+            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gold/20">
+              {message.chipOptions.map((chip) => (
+                <button
+                  key={chip.value}
+                  type="button"
+                  onClick={() => onChipTap(chip.value, message.id)}
+                  className="inline-flex items-center px-4 py-1.5 rounded-full bg-cream border border-charcoal/40 font-body text-label-sm text-charcoal hover:border-charcoal hover:bg-surface-container active:scale-95 transition-all"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          )}
       </div>
     </li>
   );

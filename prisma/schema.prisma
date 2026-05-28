@@ -306,6 +306,15 @@ model ChatMessage {
   audioUrl        String?
   audioDurationSec Int?
 
+  // Tap-reply chips for Sean's proactive daily check-ins. Shape:
+  // [{ label: "walk", value: "walk" }, ...]. When set + chipsRepliedAt
+  // is null, the chat bubble renders the chip buttons below the
+  // message text. Tapping a chip fires sendToSean with the chip's
+  // value, persists her USER reply, schedules the AI auto-reply,
+  // and stamps chipsRepliedAt on this row so the chips collapse.
+  chipOptions     Json?
+  chipsRepliedAt  DateTime?
+
   createdAt DateTime @default(now())
 
   // Back-relation: if this message was delivered as part of a voice
