@@ -18,6 +18,8 @@ import { getCheerCeremonyState } from "@/lib/cheer-ceremony";
 import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
 import { getDailyMoodSnapshot, MOOD_KINDS, type MoodKind } from "@/lib/daily-mood";
 import { pickCoachLineForMood } from "@/lib/coach-mood-lines";
+import { TimeAwareRitual } from "@/components/time-aware-ritual";
+import { PresenceIndicator } from "@/components/presence-indicator";
 import { PulseToasts } from "@/components/pulse-toasts";
 import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
@@ -76,6 +78,9 @@ export default async function DashboardPage() {
     profile,
     todayTotals,
     dayName,
+    ritualSlot,
+    morningFocus,
+    presentNames,
     recentCoachMessages,
   } = data;
 
@@ -124,7 +129,9 @@ export default async function DashboardPage() {
   const proteinRemaining = profile.proteinFloor - todayTotals.protein;
   const stepRemaining = STEP_GOAL - todayTotals.steps;
 
-  const greeting = pickGreeting(profile.name);
+  // pickGreeting() was used by the old static "Good morning, name." block;
+  // the time-aware ritual now handles greeting + intent based on hour.
+  // Helper kept at the bottom of the file in case we want it elsewhere.
   const dailyQuote = pickQuoteForDate(new Date());
 
   // Meal-pacing — drives the reminder card AND tints the sticky log pill
@@ -156,17 +163,31 @@ export default async function DashboardPage() {
         <CoachMessageBadge messages={recentCoachMessages} />
       )}
 
-      <header className="space-y-2">
-        <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-          {dayName}
+      {/* Time-aware ritual is the FIRST surface — adapts based on
+          Central time. Morning: today's focus. Midday: meal pacing
+          + Log CTA. Evening: end-of-day mood + tomorrow's focus.
+          Night: quiet rest moment. Replaces the old static greeting +
+          day quote (which felt generic at any hour). */}
+      <div className="space-y-3">
+        <TimeAwareRitual
+          slot={ritualSlot}
+          firstName={profile.name.split(/\s+/)[0]}
+          morningFocus={morningFocus}
+          todayCalories={todayTotals.calories}
+          todayProtein={todayTotals.protein}
+          cutCalorieTarget={getTodayCalorieTarget(profile)}
+          proteinFloorG={profile.proteinFloor}
+          hasLoggedToday={todayTotals.calories > 0}
+        />
+        {/* Quiet presence chip — only renders when someone else is
+            actively in RIVEN. Self-hides on a quiet morning. */}
+        <PresenceIndicator names={presentNames} />
+        {/* Day name + daily quote moved here so they're context, not
+            the headline. */}
+        <p className="font-body text-label-sm text-on-surface-variant/70 italic max-w-md">
+          {dayName} · {dailyQuote}
         </p>
-        <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal text-balance">
-          {greeting}
-        </h1>
-        <p className="font-body text-body-md text-on-surface-variant italic max-w-md">
-          {dailyQuote}
-        </p>
-      </header>
+      </div>
 
       {/* Self-hides if already installed as PWA or dismissed. */}
       <PwaInstallBanner />
@@ -363,23 +384,8 @@ function UnauthedPlaceholder({ children }: { children: React.ReactNode }) {
   );
 }
 
-function pickGreeting(name: string): string {
-  // Compute the hour in Central time. The server runs UTC on Railway, so
-  // `new Date().getHours()` would say it's 1 AM when the user opens the
-  // app at 8 PM CDT — wrong greeting, broken brand voice.
-  const hour = parseInt(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Chicago",
-      hour: "numeric",
-      hour12: false,
-    }).format(new Date()),
-    10,
-  );
-  if (hour < 5) return `Up early, ${name}.`;
-  if (hour < 12) return `Good morning, ${name}.`;
-  if (hour < 18) return `Afternoon, ${name}.`;
-  return `Evening, ${name}.`;
-}
+// pickGreeting() removed — the time-aware ritual card now provides the
+// greeting + per-slot copy. Recoverable from git if needed.
 
 function MealReminderCard({ tier }: { tier: MealPacingTier }) {
   const { eyebrow, body } = reminderCopyFor(tier);

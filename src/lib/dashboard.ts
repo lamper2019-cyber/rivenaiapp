@@ -1,14 +1,24 @@
 import { prisma } from "@/lib/prisma";
 import { startOfCentralDay } from "@/lib/dates";
+import {
+  getOtherClientsPresent,
+  markUserPresent,
+} from "@/lib/presence";
+import {
+  currentRitualSlot,
+  pickMorningFocus,
+  type MorningFocus,
+  type RitualSlot,
+} from "@/lib/ritual-of-day";
 
 /**
- * Dashboard data loader. Only returns what /dashboard actually renders.
+ * Dashboard data loader. Returns just what /dashboard renders.
  *
- * Recent cleanup: this used to fetch the weekly check-in row, the weekly
- * content prompt, and the daily-quote prompt for the Quick-Actions hero —
- * none of those surfaces live on the dashboard anymore (mood ribbon +
- * Sunday ritual + cheer card replaced them). Pruned accordingly so we
- * don't query four tables for data the UI doesn't read.
+ * As of the time-aware ritual change, this also:
+ *   - Stamps User.lastDashboardSeenAt (presence ping)
+ *   - Reads other active clients' presence (who's here right now)
+ *   - Picks the morning focus from yesterday's data
+ *   - Returns the current ritual slot (morning/midday/evening/night)
  */
 export async function loadDashboardData(clerkId: string) {
   const user = await prisma.user.findUnique({
@@ -18,10 +28,23 @@ export async function loadDashboardData(clerkId: string) {
   if (!user || !user.profile) return null;
 
   const today = startOfCentralDay();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
 
-  const [todayTotals, recentCoachMessages] = await Promise.all([
+  // Stamp presence (best-effort, never blocks the dashboard).
+  await markUserPresent(user.id);
+
+  const [
+    todayTotals,
+    yesterdayTotals,
+    recentCoachMessages,
+    presentNames,
+  ] = await Promise.all([
     prisma.dailyTotals.findUnique({
       where: { userId_date: { userId: user.id, date: today } },
+    }),
+    prisma.dailyTotals.findUnique({
+      where: { userId_date: { userId: user.id, date: yesterday } },
     }),
     // COACH messages from the last 30 days — drives the persistent "Message
     // from Sean" chip on the home screen. The chip stays visible regardless
@@ -37,11 +60,23 @@ export async function loadDashboardData(clerkId: string) {
         select: { id: true, createdAt: true },
       });
     })(),
+    getOtherClientsPresent(user.id),
   ]);
 
   const dayName = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     timeZone: "America/Chicago",
+  });
+
+  const ritualSlot: RitualSlot = currentRitualSlot();
+
+  // Morning focus uses yesterday's data. Defaults to "not hit" if she
+  // didn't log so the prompt nudges her toward today's protein.
+  const morningFocus: MorningFocus = pickMorningFocus({
+    yesterdayProteinHit:
+      (yesterdayTotals?.totalProtein ?? 0) >= user.profile.proteinFloor,
+    yesterdayStepsK: (yesterdayTotals?.totalSteps ?? 0) / 1000,
+    proteinFloorG: user.profile.proteinFloor,
   });
 
   return {
@@ -55,6 +90,9 @@ export async function loadDashboardData(clerkId: string) {
       steps: todayTotals?.totalSteps ?? 0,
     },
     dayName,
+    ritualSlot,
+    morningFocus,
+    presentNames,
     recentCoachMessages: recentCoachMessages.map((m) => ({
       id: m.id,
       // Serialize Date → ISO so the value crosses the server/client boundary.

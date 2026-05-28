@@ -90,6 +90,12 @@ model User {
   cheersLastSeenAt             DateTime?
   firstCheerCeremonySeenAt     DateTime?
 
+  // Presence: stamped every time she opens /dashboard. The
+  // PresenceIndicator surfaces "Tracy and Adrienne are in RIVEN
+  // right now" by querying active clients with lastDashboardSeenAt
+  // within the last 15 min. Cheap; doesn't drive any business logic.
+  lastDashboardSeenAt          DateTime?
+
   profile           Profile?
   mealLogs          MealLog[]
   dailyTotals       DailyTotals[]
