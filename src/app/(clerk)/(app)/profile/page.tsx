@@ -2,30 +2,17 @@ import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import {
-  computeWins,
-  toWeightSeries,
-  toWaistSeries,
-  type Win,
-} from "@/lib/progress";
-import { Sparkline } from "@/components/sparkline";
+import { computeWins, type Win } from "@/lib/progress";
 import { PushSubscribeButton } from "@/components/push-subscribe-button";
-import { startOfIsoWeek } from "@/lib/week";
 import { startOfCentralMonth } from "@/lib/dates";
-import {
-  getClientWeekNumber,
-  getPromptForClientWeek,
-} from "@/lib/content-prompts";
 import { DeleteAccountButton } from "./delete-account-button";
 import { getMyMoodHistory, type MoodHistoryEntry } from "@/lib/daily-mood";
 import { MoodHistory } from "@/components/mood-history";
 
-const PHASE_LABEL: Record<string, string> = {
-  PHASE_1: "Phase 1 · Active",
-  PHASE_2: "Phase 2",
-  PHASE_3: "Phase 3",
-  PHASE_4: "Phase 4",
-};
+// Phase label, sparkline series, and weekly content prompt helpers
+// removed alongside the surfaces that consumed them — see comments
+// below in the JSX. Wins still compute (used in the "Wins" section)
+// and pull start/goal weight off Profile directly.
 
 export default async function ProfilePage() {
   const { userId } = auth();
@@ -44,15 +31,8 @@ export default async function ProfilePage() {
     weight: number;
     waist: number;
   } | null = null;
-  let weekContent: {
-    id: string;
-    videoUrl: string | null;
-    photoUrl: string | null;
-    promptText: string;
-  } | null = null;
   let moodHistory: MoodHistoryEntry[] = [];
 
-  const weekStart = startOfIsoWeek(new Date());
   const monthStart = startOfCentralMonth();
 
   if (userId) {
@@ -66,7 +46,7 @@ export default async function ProfilePage() {
       subscriptionStatus = user?.subscriptionStatus ?? null;
 
       if (user) {
-        [checkIns, monthCheckIn, weekContent, moodHistory] = await Promise.all([
+        [checkIns, monthCheckIn, moodHistory] = await Promise.all([
           prisma.weeklyCheckIn.findMany({
             where: { userId: user.id },
             orderBy: { weekStart: "asc" },
@@ -77,16 +57,6 @@ export default async function ProfilePage() {
           prisma.weeklyCheckIn.findUnique({
             where: { userId_weekStart: { userId: user.id, weekStart: monthStart } },
             select: { id: true, weight: true, waist: true },
-          }),
-          prisma.contentSubmission.findFirst({
-            where: { userId: user.id, week: weekStart },
-            orderBy: { createdAt: "desc" },
-            select: {
-              id: true,
-              videoUrl: true,
-              photoUrl: true,
-              promptText: true,
-            },
           }),
           getMyMoodHistory(user.id, 30),
         ]);
@@ -100,14 +70,10 @@ export default async function ProfilePage() {
     }
   }
 
-  const prompt = profile
-    ? getPromptForClientWeek(getClientWeekNumber(profile.onboardedAt))
-    : null;
-
-  const weightSeries = toWeightSeries(checkIns);
-  const waistSeries = toWaistSeries(checkIns);
+  // Photo timeline is the one survivor of the trend-chart cleanup —
+  // visual progress without the sparkline vibe.
   const photoCheckIns = checkIns.filter(
-    (c) => c.photoFrontUrl || c.photoSideUrl
+    (c) => c.photoFrontUrl || c.photoSideUrl,
   );
 
   return (
@@ -119,12 +85,9 @@ export default async function ProfilePage() {
         <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal">
           {profile?.name ?? "Your transformation"}
         </h1>
-        {profile && (
-          <p className="font-body text-body-md text-on-surface-variant">
-            {PHASE_LABEL[profile.phase] ?? profile.phase} ·{" "}
-            {profile.startWeight} lbs → goal {profile.goalWeight} lbs
-          </p>
-        )}
+        {/* Phase indicator removed per Sean — the four protocol phases
+            weren't being actively progressed against, so showing
+            "Phase 1 · Active" felt aspirational rather than honest. */}
       </header>
 
       {wins.length > 0 && (
@@ -140,36 +103,11 @@ export default async function ProfilePage() {
         </section>
       )}
 
-      {profile && (
-        <>
-          <section className="space-y-3">
-            <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-              Weight trend
-            </h2>
-            <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter shadow-elevation-1 text-charcoal">
-              <Sparkline
-                data={weightSeries}
-                unit="lbs"
-                target={profile.goalWeight}
-              />
-              {profile.goalWeight && weightSeries.length > 0 && (
-                <p className="font-body text-label-sm text-on-surface-variant/70 mt-2">
-                  Dashed line = goal weight ({profile.goalWeight} lbs)
-                </p>
-              )}
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-              Waist trend
-            </h2>
-            <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter shadow-elevation-1 text-sage">
-              <Sparkline data={waistSeries} unit="″" stroke="currentColor" />
-            </div>
-          </section>
-        </>
-      )}
+      {/* Weight trend, waist trend, and streak-protection blocks were
+          removed per Sean — too much "tracking app" energy on a screen
+          that should feel chill. Trends still live in the coach view;
+          streak data still feeds the Sean thread proactive logic.
+          Photo timeline stays — visual progress without the chart vibe. */}
 
       {photoCheckIns.length > 0 && (
         <section className="space-y-3">
@@ -177,46 +115,6 @@ export default async function ProfilePage() {
             Photo timeline
           </h2>
           <PhotoTimeline checkIns={photoCheckIns} />
-        </section>
-      )}
-
-      {profile && (
-        <section className="space-y-3">
-          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-            Streak protection
-          </h2>
-          <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-4 shadow-elevation-1">
-            <div className="flex items-start gap-4">
-              <div className="shrink-0 flex items-center gap-1">
-                {Array.from({ length: Math.max(1, profile.streakFreezesAvailable) }).map(
-                  (_, i) => (
-                    <span
-                      key={i}
-                      className={`inline-block w-3.5 h-3.5 rounded-sm ${
-                        i < profile.streakFreezesAvailable
-                          ? "bg-gold"
-                          : "bg-outline-variant/40"
-                      }`}
-                      aria-hidden
-                    />
-                  ),
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-display text-headline-sm text-charcoal">
-                  {profile.streakFreezesAvailable === 0
-                    ? "No streak freezes left"
-                    : `${profile.streakFreezesAvailable} streak freeze${
-                        profile.streakFreezesAvailable === 1 ? "" : "s"
-                      } available`}
-                </p>
-                <p className="font-body text-body-md text-on-surface-variant mt-1 leading-relaxed">
-                  If you miss a day mid-streak, a freeze keeps the run alive
-                  instead of resetting you to zero. One day, one freeze.
-                </p>
-              </div>
-            </div>
-          </div>
         </section>
       )}
 
@@ -259,39 +157,10 @@ export default async function ProfilePage() {
           </Link>
         )}
 
-        {weekContent ? (
-          <div className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-4 shadow-elevation-1">
-            <p className="font-body text-label-md tracking-widest uppercase text-on-secondary-container">
-              Submitted this week
-              {prompt ? ` · ${prompt.title}` : ""}
-            </p>
-            <Link
-              href="/content"
-              className="font-body text-body-md text-charcoal underline underline-offset-4 mt-2 inline-block"
-            >
-              Re-record →
-            </Link>
-          </div>
-        ) : (
-          <Link
-            href="/content"
-            className="block rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-4 hover:border-gold transition-colors shadow-elevation-1"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="font-display text-headline-md text-charcoal">
-                  This week&apos;s prompt
-                </p>
-                <p className="font-body text-body-md text-on-surface-variant mt-1">
-                  {prompt ? prompt.title : "Record a 60-90 second answer."}
-                </p>
-              </div>
-              <span className="material-symbols-outlined text-on-surface-variant">
-                videocam
-              </span>
-            </div>
-          </Link>
-        )}
+        {/* "This week's prompt" content card removed per Sean — same
+            spirit as the dashboard cleanup. The /content route still
+            exists for anyone who lands there directly, but the profile
+            doesn't surface it anymore. */}
       </section>
 
       <section className="space-y-3">

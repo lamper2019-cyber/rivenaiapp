@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
 import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
-import { pickQuoteForDate } from "@/lib/daily-quotes";
+// pickQuoteForDate dropped along with the day-quote line per Sean.
+// The helper still exists in @/lib/daily-quotes for any future surface.
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import { NotificationOptIn } from "@/components/notification-opt-in";
 import { CoachMessageBadge } from "@/components/coach-message-badge";
@@ -79,7 +80,6 @@ export default async function DashboardPage() {
     userId: clientUserId,
     profile,
     todayTotals,
-    dayName,
     ritualSlot,
     morningFocus,
     presentNames,
@@ -133,10 +133,9 @@ export default async function DashboardPage() {
   const proteinRemaining = profile.proteinFloor - todayTotals.protein;
   const stepRemaining = STEP_GOAL - todayTotals.steps;
 
-  // pickGreeting() was used by the old static "Good morning, name." block;
-  // the time-aware ritual now handles greeting + intent based on hour.
-  // Helper kept at the bottom of the file in case we want it elsewhere.
-  const dailyQuote = pickQuoteForDate(new Date());
+  // pickGreeting() and the day-quote line both retired — the time-aware
+  // ritual card carries the greeting + intent based on hour, and the
+  // generic motivational quote didn't earn the screen space.
 
   // Meal-pacing — drives the reminder card AND tints the sticky log pill
   // when she's behind. Best-effort; if it fails we still render the page.
@@ -170,9 +169,8 @@ export default async function DashboardPage() {
       {/* Time-aware ritual is the FIRST surface — adapts based on
           Central time. Morning: today's focus. Midday: meal pacing
           + Log CTA. Evening: end-of-day mood + tomorrow's focus.
-          Night: quiet rest moment. Replaces the old static greeting +
-          day quote (which felt generic at any hour). */}
-      <div className="space-y-3">
+          Night: quiet rest moment. */}
+      <div className="space-y-4">
         <TimeAwareRitual
           slot={ritualSlot}
           firstName={profile.name.split(/\s+/)[0]}
@@ -183,14 +181,17 @@ export default async function DashboardPage() {
           proteinFloorG={profile.proteinFloor}
           hasLoggedToday={todayTotals.calories > 0}
         />
-        {/* Quiet presence chip — only renders when someone else is
-            actively in RIVEN. Self-hides on a quiet morning. */}
-        <PresenceIndicator names={presentNames} />
-        {/* Day name + daily quote moved here so they're context, not
-            the headline. */}
-        <p className="font-body text-label-sm text-on-surface-variant/70 italic max-w-md">
-          {dayName} · {dailyQuote}
-        </p>
+        {/* Presence chip — now sized up so it actually reads as a
+            community signal instead of disappearing under the ritual.
+            Bumped to label-md + dropped onto its own subtle pill so
+            she sees who else is in RIVEN with her. Self-hides on a
+            quiet morning. The day quote was removed entirely per Sean —
+            generic motivational lines didn't earn the screen space. */}
+        {presentNames.length > 0 && (
+          <div className="rounded-full bg-surface-container-lowest border border-outline-variant/60 px-4 py-2 inline-flex">
+            <PresenceIndicator names={presentNames} />
+          </div>
+        )}
       </div>
 
       {/* Self-hides if already installed as PWA or dismissed. */}
