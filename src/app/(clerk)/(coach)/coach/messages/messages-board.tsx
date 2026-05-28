@@ -3,9 +3,11 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { sendCoachReply } from "./actions";
+import { VoiceQueueChip } from "./voice-queue";
 import type {
   ActiveThreadDetail,
   ClientThreadSummary,
+  QueuedVoiceMoment,
 } from "@/lib/coach-messages";
 
 /**
@@ -32,9 +34,11 @@ import type {
 export function MessagesBoard({
   threads,
   active,
+  voiceQueue,
 }: {
   threads: ClientThreadSummary[];
   active: ActiveThreadDetail | null;
+  voiceQueue: QueuedVoiceMoment[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -90,7 +94,7 @@ export function MessagesBoard({
       {/* LEFT — client list */}
       <aside className="w-80 md:w-96 shrink-0 border-r border-outline-variant/40 bg-cream flex flex-col">
         <div className="p-gutter space-y-3 border-b border-outline-variant/40">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between gap-2 flex-wrap">
             <h1 className="font-display text-headline-md text-charcoal">
               Messages
             </h1>
@@ -100,6 +104,9 @@ export function MessagesBoard({
               </span>
             )}
           </div>
+          {/* Voice moments queue chip — only renders when there are
+              queued milestones to record. Tap opens the recorder modal. */}
+          <VoiceQueueChip queue={voiceQueue} />
           {/* Search */}
           <div className="relative">
             <span

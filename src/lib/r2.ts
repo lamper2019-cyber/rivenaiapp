@@ -79,7 +79,7 @@ export async function presignUpload(args: {
  * Format: <scope>/<userId>/<timestamp>-<random>.<ext>
  */
 export function buildR2Key(args: {
-  scope: "checkin-front" | "checkin-side" | "content" | "chat";
+  scope: "checkin-front" | "checkin-side" | "content" | "chat" | "voice";
   userId: string;
   fileName: string;
 }): string {

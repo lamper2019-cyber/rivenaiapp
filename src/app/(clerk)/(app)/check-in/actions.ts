@@ -100,7 +100,7 @@ export async function submitCheckIn(
   // key now that the cadence is monthly.
   const monthStart = startOfCentralMonth();
 
-  await prisma.weeklyCheckIn.upsert({
+  const checkIn = await prisma.weeklyCheckIn.upsert({
     where: { userId_weekStart: { userId: user.id, weekStart: monthStart } },
     update: {
       weight: data.weight,
@@ -127,6 +127,25 @@ export async function submitCheckIn(
       winsAndStruggles: data.winsAndStruggles,
     },
   });
+
+  // Voice moment trigger — queue a 60-second voice-memo prompt for
+  // Sean on every monthly check-in submission. The unique constraint
+  // on (recipient, kind, source) means re-submitting the same month's
+  // check-in doesn't double-queue (the createMany skipDuplicates pattern
+  // is unnecessary). Try/catch swallowed because a queue failure
+  // shouldn't block the check-in itself.
+  try {
+    await prisma.voiceMoment.create({
+      data: {
+        recipientUserId: user.id,
+        triggerKind: "monthly_check_in",
+        triggerSourceId: checkIn.id,
+        status: "queued",
+      },
+    });
+  } catch {
+    /* unique constraint hit on re-submit — already queued, no-op */
+  }
 
   // Profile.currentWeight reflects the latest check-in weight.
   await prisma.profile.update({

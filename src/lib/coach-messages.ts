@@ -129,6 +129,56 @@ export async function listClientThreads(): Promise<ClientThreadSummary[]> {
   return rows;
 }
 
+/**
+ * Queued voice moments waiting for Sean to record. Each row maps to
+ * one client + one trigger event (a monthly check-in submission so
+ * far). Sorted oldest-first so the queue drains FIFO.
+ */
+export type QueuedVoiceMoment = {
+  id: string;
+  recipientUserId: string;
+  firstName: string;
+  triggerKind: string;
+  triggerLabel: string;
+  /** Human-readable timing info for the trigger event ("submitted 2
+   *  hours ago" / "yesterday"). */
+  triggerWhen: Date;
+};
+
+export async function listQueuedVoiceMoments(): Promise<QueuedVoiceMoment[]> {
+  const rows = await prisma.voiceMoment.findMany({
+    where: { status: "queued" },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      recipientUserId: true,
+      triggerKind: true,
+      createdAt: true,
+      recipient: {
+        select: { profile: { select: { name: true } } },
+      },
+    },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    recipientUserId: r.recipientUserId,
+    firstName:
+      (r.recipient.profile?.name ?? "").trim().split(/\s+/)[0] || "Client",
+    triggerKind: r.triggerKind,
+    triggerLabel: labelForTrigger(r.triggerKind),
+    triggerWhen: r.createdAt,
+  }));
+}
+
+function labelForTrigger(kind: string): string {
+  switch (kind) {
+    case "monthly_check_in":
+      return "Monthly check-in";
+    default:
+      return kind.replace(/_/g, " ");
+  }
+}
+
 /** Full thread + context for the actively-selected client. */
 export async function getThreadDetail(
   clientUserId: string,

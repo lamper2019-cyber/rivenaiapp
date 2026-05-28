@@ -104,6 +104,7 @@ model User {
   sundayReactions  SundayPromptReaction[]
   dailyMoods       DailyMood[]
   pendingAiReplies PendingAiReply[]
+  voiceMoments     VoiceMoment[]
 }
 
 model Profile {
@@ -297,7 +298,20 @@ model ChatMessage {
   // want to follow up on.
   aiGenerated Boolean  @default(false)
 
+  // Voice moments: when Sean records a 60-second voice memo for a
+  // milestone (currently: every monthly check-in submission), the
+  // audio file URL + duration land here. The chat bubble for messages
+  // with audioUrl set renders an HTML5 audio player instead of the
+  // plain-text bubble. Real Sean only — never set by AI auto-replies.
+  audioUrl        String?
+  audioDurationSec Int?
+
   createdAt DateTime @default(now())
+
+  // Back-relation: if this message was delivered as part of a voice
+  // moment, this is the link back to the queue row. Used for the
+  // coach dashboard to tell which messages came from the voice queue.
+  voiceMoment VoiceMoment? @relation("VoiceMomentMessage")
 
   @@index([userId, createdAt])
   @@index([senderUserId])
@@ -458,6 +472,46 @@ model SundayPromptReaction {
 
   @@unique([answerId, userId, kind])
   @@index([answerId])
+}
+
+// Voice moments — Sean's personal voice memos triggered by client
+// milestones. Currently only fires on monthly check-in submission;
+// future triggers (streak, goal weight) live as separate triggerKind
+// values without enum migration.
+//
+// Lifecycle:
+//   queued    → Created when the trigger event fires (e.g. monthly
+//               check-in submitted). Shows up in the coach voice
+//               queue for Sean to record.
+//   recorded  → Sean recorded + sent. audioUrl + deliveredMessageId
+//               are set. Client sees the audio bubble in the thread.
+//   skipped   → Sean opted not to record for this trigger. Doesn't
+//               surface to the client; tracked so the queue clears.
+model VoiceMoment {
+  id              String   @id @default(cuid())
+  recipientUserId String
+  recipient       User     @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  // What kind of milestone triggered this prompt. Currently only
+  // "monthly_check_in" is wired; future kinds can be added without
+  // schema changes.
+  triggerKind     String
+  // Specific event id (e.g. WeeklyCheckIn.id for monthly_check_in).
+  // The unique constraint on (recipient, kind, source) means re-
+  // submitting the same check-in doesn't double-queue.
+  triggerSourceId String
+  status          String   @default("queued")
+  audioUrl        String?
+  durationSec     Int?
+  // The delivered ChatMessage row. Set when status flips to "recorded";
+  // links the queue entry to the audio bubble the client sees.
+  deliveredMessageId String?  @unique
+  deliveredMessage   ChatMessage? @relation("VoiceMomentMessage", fields: [deliveredMessageId], references: [id])
+
+  createdAt   DateTime @default(now())
+  recordedAt  DateTime?
+
+  @@unique([recipientUserId, triggerKind, triggerSourceId])
+  @@index([status, createdAt])
 }
 
 // Daily mood ribbon — one-tap-a-day community pulse. Each client taps one

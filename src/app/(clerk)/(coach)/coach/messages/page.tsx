@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import {
   getThreadDetail,
   listClientThreads,
+  listQueuedVoiceMoments,
   type ActiveThreadDetail,
 } from "@/lib/coach-messages";
 import { MessagesBoard } from "./messages-board";
@@ -31,7 +32,10 @@ export default async function CoachMessagesPage({
   const { userId } = auth();
   if (!userId) redirect("/sign-in");
 
-  const threads = await listClientThreads().catch(() => []);
+  const [threads, voiceQueue] = await Promise.all([
+    listClientThreads().catch(() => []),
+    listQueuedVoiceMoments().catch(() => []),
+  ]);
 
   // Pick active thread: explicit ?clientId= wins, else first row
   // (which is already sorted "waiting on Sean" first, then by recency).
@@ -46,5 +50,7 @@ export default async function CoachMessagesPage({
     active = await getThreadDetail(selectedId).catch(() => null);
   }
 
-  return <MessagesBoard threads={threads} active={active} />;
+  return (
+    <MessagesBoard threads={threads} active={active} voiceQueue={voiceQueue} />
+  );
 }
