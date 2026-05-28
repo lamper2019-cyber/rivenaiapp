@@ -129,7 +129,7 @@ When building something similar, match these — don't invent new patterns.
 
 7. **AI-message vs coach-message isolation.** `/chat` filters `kind: "AI"`. `/messages` filters `kind: "COACH"`. Don't show both in the same view.
 
-8. **Calorie estimates always overestimate 20-30%.** Honest, conservative data beats flattering numbers. This is in `src/lib/anthropic.ts` and `src/lib/chat-prompt.ts` — never relax it.
+8. **Calorie estimates overestimate 20% by default. Stated numbers from the client are gospel.** When she names a specific calorie count ("the label said 290") the AI uses that number 100% of the time — no buffer, no implausibility override. Otherwise the +20% flat buffer applies. Rules in `src/lib/anthropic.ts` and `src/lib/chat-prompt.ts`; the cultural food baselines in both files are already pre-cushioned at the 20% level.
 
 ---
 
