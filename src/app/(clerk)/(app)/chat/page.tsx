@@ -44,6 +44,8 @@ export default async function ChatPage() {
               content: true,
               imageUrls: true,
               aiGenerated: true,
+              audioUrl: true,
+              audioDurationSec: true,
             },
           }),
           // Is there a pending AI reply queued for her? Drives the
@@ -62,6 +64,8 @@ export default async function ChatPage() {
           content: m.content,
           imageUrls: m.imageUrls,
           senderName: undefined,
+          audioUrl: m.audioUrl,
+          audioDurationSec: m.audioDurationSec,
         }));
         pendingReplyId = pending?.id ?? null;
       }

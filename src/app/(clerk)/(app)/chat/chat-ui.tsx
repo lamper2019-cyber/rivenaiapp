@@ -13,6 +13,11 @@ export type ChatMessage = {
   content: string;
   imageUrls?: string[];
   senderName?: string;
+  /** Voice memo from Sean. When present, the bubble renders an audio
+   *  player instead of the plain-text bubble (content is empty in
+   *  this case). Only set on assistant/COACH messages. */
+  audioUrl?: string | null;
+  audioDurationSec?: number | null;
 };
 
 type PendingAttachment = {
@@ -619,6 +624,7 @@ function MessageBubble({
   }
 
   // Assistant — Sean (real or auto-reply, indistinguishable here).
+  const isVoice = !!message.audioUrl;
   return (
     <li className="flex justify-start">
       <div
@@ -638,12 +644,125 @@ function MessageBubble({
           <span className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
             {isCoach ? "Sean" : "Riven"}
           </span>
+          {isVoice && (
+            <span className="inline-flex items-center gap-1 font-body text-label-sm text-on-surface-variant/80">
+              <span aria-hidden>·</span>
+              voice memo
+            </span>
+          )}
         </div>
-        <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
-          {message.content}
-        </p>
+        {isVoice ? (
+          <VoicePlayer
+            url={message.audioUrl as string}
+            durationSec={message.audioDurationSec ?? 0}
+          />
+        ) : (
+          <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">
+            {message.content}
+          </p>
+        )}
       </div>
     </li>
+  );
+}
+
+/**
+ * Inline audio player for voice memos from Sean. Custom controls so
+ * the bubble matches the brand instead of the chrome of native
+ * <audio controls>. Tap play → audio plays through to the end. Tap
+ * again to pause. Progress bar reflects playback position.
+ */
+function VoicePlayer({
+  url,
+  durationSec,
+}: {
+  url: string;
+  durationSec: number;
+}) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  // Use the actual audio element's duration once it loads; fall back
+  // to the server-recorded durationSec until then so the UI doesn't
+  // show 0:00 on first paint.
+  const [actualDuration, setActualDuration] = useState<number>(
+    durationSec || 0,
+  );
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const onTime = () => setPosition(a.currentTime);
+    const onMeta = () => {
+      if (Number.isFinite(a.duration) && a.duration > 0) {
+        setActualDuration(a.duration);
+      }
+    };
+    const onEnd = () => {
+      setPlaying(false);
+      setPosition(0);
+    };
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("loadedmetadata", onMeta);
+    a.addEventListener("ended", onEnd);
+    return () => {
+      a.removeEventListener("timeupdate", onTime);
+      a.removeEventListener("loadedmetadata", onMeta);
+      a.removeEventListener("ended", onEnd);
+    };
+  }, []);
+
+  async function toggle() {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) {
+      a.pause();
+      setPlaying(false);
+    } else {
+      try {
+        await a.play();
+        setPlaying(true);
+      } catch {
+        /* user-gesture issue or unsupported codec — fall back to native */
+      }
+    }
+  }
+
+  const pct = actualDuration > 0 ? (position / actualDuration) * 100 : 0;
+
+  return (
+    <div className="flex items-center gap-3 min-w-[14rem]">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={playing ? "Pause voice memo" : "Play voice memo"}
+        className="shrink-0 w-10 h-10 rounded-full bg-charcoal text-cream flex items-center justify-center active:scale-95 hover:opacity-90 transition-all"
+      >
+        <span className="material-symbols-outlined text-[20px] filled" aria-hidden>
+          {playing ? "pause" : "play_arrow"}
+        </span>
+      </button>
+      <div className="flex-1 min-w-0">
+        <div
+          className="h-1.5 rounded-full bg-charcoal/15 overflow-hidden"
+          aria-hidden
+        >
+          <div
+            className="h-full bg-charcoal transition-[width] duration-150"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="font-body text-label-sm text-on-surface-variant/80 tabular-nums mt-1.5">
+          {formatDuration(Math.round((playing ? position : actualDuration) * 1000))}
+        </p>
+      </div>
+      <audio
+        ref={audioRef}
+        src={url}
+        preload="metadata"
+        className="hidden"
+      />
+    </div>
   );
 }
 
