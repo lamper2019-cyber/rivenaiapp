@@ -93,6 +93,55 @@ export async function analyzeMeal(args: {
 }
 
 /**
+ * Sum today's MealLog rows for a user — the source-of-truth read used by
+ * every user-facing surface that shows "calories today" / "protein today."
+ *
+ * Why we don't read from `DailyTotals` for display:
+ *   That row is a denormalized cache. Historically it drifted from the
+ *   actual MealLog sum (TZ-bucket migrations, race conditions, manual DB
+ *   edits during testing). Sean caught a drift where /dashboard showed
+ *   2,000 while /log showed 1,915 — same field on both pages — because
+ *   one read the stale cache and the other was operating on local state.
+ *
+ *   The MealLog table has a (userId, createdAt) index, and a typical day
+ *   has under 20 rows. Direct sum is cheap and bulletproof. `DailyTotals`
+ *   is still maintained by the write paths and is fine for analytics /
+ *   coach views; we just don't use it for the client's headline number.
+ *
+ * Returns calories + protein + fat + carbs. Steps still live on
+ * DailyTotals.totalSteps because they have a single non-meal write path
+ * (logSteps in /dashboard/actions.ts) and don't suffer the same drift.
+ */
+export async function sumTodayMealMacros(userId: string): Promise<{
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+}> {
+  const today = startOfCentralDay();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const rows = await prisma.mealLog.findMany({
+    where: {
+      userId,
+      createdAt: { gte: today, lt: tomorrow },
+    },
+    select: { calories: true, protein: true, fat: true, carbs: true },
+  });
+
+  return rows.reduce(
+    (acc, m) => ({
+      calories: acc.calories + m.calories,
+      protein: acc.protein + m.protein,
+      fat: acc.fat + m.fat,
+      carbs: acc.carbs + m.carbs,
+    }),
+    { calories: 0, protein: 0, fat: 0, carbs: 0 },
+  );
+}
+
+/**
  * Persist a MealLog row + recompute the day's totals from MealLog source-of-
  * truth. Mirrors the transaction in /log/actions.ts so the chat log path and
  * the structured log path produce identical DB state.

@@ -89,10 +89,14 @@ export function LogForm({
       if (res.ok) {
         setDescription("");
         if (totals) {
+          // Always use the server's recomputed truth (res.totals) — NOT
+          // local arithmetic. Adding analysis.calories to local state was
+          // how the /log display drifted away from /dashboard's reading
+          // and Sean caught a 2000-vs-1915 mismatch. server-truth = bulletproof.
           setTotals({
             ...totals,
-            caloriesToday: totals.caloriesToday + res.analysis.calories,
-            proteinToday: totals.proteinToday + res.analysis.protein,
+            caloriesToday: res.totals.calories,
+            proteinToday: res.totals.protein,
           });
         }
       }

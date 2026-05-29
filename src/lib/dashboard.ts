@@ -10,6 +10,7 @@ import {
   type MorningFocus,
   type RitualSlot,
 } from "@/lib/ritual-of-day";
+import { sumTodayMealMacros } from "@/lib/meal-pipeline";
 
 /**
  * Dashboard data loader. Returns just what /dashboard renders.
@@ -42,14 +43,22 @@ export async function loadDashboardData(clerkId: string) {
   seanPromptWindow.setHours(seanPromptWindow.getHours() - 24);
 
   const [
-    todayTotals,
+    todayMealMacros,
+    todayStepsRow,
     yesterdayTotals,
     recentCoachMessages,
     latestSeanPrompt,
     presentNames,
   ] = await Promise.all([
+    // SOURCE OF TRUTH for the user's "calories today / protein today"
+    // headline numbers — direct sum of today's MealLog rows. Matches what
+    // /log shows so the two pages never drift.
+    sumTodayMealMacros(user.id),
+    // Steps still come off DailyTotals because they have a single non-meal
+    // write path and don't suffer the cache-drift problem.
     prisma.dailyTotals.findUnique({
       where: { userId_date: { userId: user.id, date: today } },
+      select: { totalSteps: true },
     }),
     prisma.dailyTotals.findUnique({
       where: { userId_date: { userId: user.id, date: yesterday } },
@@ -118,11 +127,11 @@ export async function loadDashboardData(clerkId: string) {
     userId: user.id,
     profile: user.profile,
     todayTotals: {
-      calories: todayTotals?.totalCalories ?? 0,
-      protein: todayTotals?.totalProtein ?? 0,
-      fat: todayTotals?.totalFat ?? 0,
-      carbs: todayTotals?.totalCarbs ?? 0,
-      steps: todayTotals?.totalSteps ?? 0,
+      calories: todayMealMacros.calories,
+      protein: todayMealMacros.protein,
+      fat: todayMealMacros.fat,
+      carbs: todayMealMacros.carbs,
+      steps: todayStepsRow?.totalSteps ?? 0,
     },
     dayName,
     ritualSlot,

@@ -9,6 +9,7 @@ import { isAnthropicConfigured } from "@/lib/anthropic";
 import {
   analyzeMeal,
   persistMealLog,
+  sumTodayMealMacros,
   type MealAnalysis,
 } from "@/lib/meal-pipeline";
 import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
@@ -434,15 +435,16 @@ export async function getTodayTotals() {
       include: { profile: { select: { cutCalories: true, proteinFloor: true } } },
     });
     if (!user || !user.profile) return null;
-    const today = startOfCentralDay();
-    const totals = await prisma.dailyTotals.findUnique({
-      where: { userId_date: { userId: user.id, date: today } },
-    });
+    // Read direct from MealLog rows — same source as /dashboard, so the
+    // two pages never disagree on the headline calorie / protein number.
+    // See note in src/lib/meal-pipeline.ts#sumTodayMealMacros for why we
+    // don't trust the DailyTotals cache for user-facing display.
+    const totals = await sumTodayMealMacros(user.id);
     return {
       cutCalories: user.profile.cutCalories,
       proteinFloor: user.profile.proteinFloor,
-      caloriesToday: totals?.totalCalories ?? 0,
-      proteinToday: totals?.totalProtein ?? 0,
+      caloriesToday: totals.calories,
+      proteinToday: totals.protein,
     };
   } catch {
     return null;
