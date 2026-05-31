@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { setClientCalorieSchedule } from "@/lib/coach-actions";
-import { DAY_KEYS, type DayKey } from "@/lib/calorie-schedule";
+import {
+  DAY_KEYS,
+  type DayKey,
+  weeklyAverageOf,
+  shiftToAverage,
+  MIN_DAY_CAL,
+  MAX_DAY_CAL,
+} from "@/lib/calorie-schedule";
 
 type DayValues = Record<DayKey, number>;
 
@@ -36,11 +43,38 @@ export function CalorieScheduleForm({
   // the new state without a full page refresh.
   const [isActive, setIsActive] = useState(initialSchedule !== null);
 
+  // The weekly average Sean is aiming this client at. On a cut the WEEK is
+  // what matters, not any single day — she sets the target here, builds a
+  // high/low pattern in the day inputs, then snaps the week onto it.
+  const [targetAvg, setTargetAvg] = useState<number>(() =>
+    initialSchedule ? weeklyAverageOf(initialSchedule) : defaultCalories,
+  );
+
+  // Live mean of the seven inputs and how far it sits from the target.
+  const currentAvg = weeklyAverageOf(values);
+  const diff = currentAvg - targetAvg;
+  const onTarget = Math.abs(diff) <= 15;
+
   function update(day: DayKey, raw: string) {
     setError(null);
     setSaved(null);
     const n = parseInt(raw, 10);
     setValues((v) => ({ ...v, [day]: Number.isFinite(n) ? n : 0 }));
+  }
+
+  function updateTarget(raw: string) {
+    setSaved(null);
+    const n = parseInt(raw, 10);
+    setTargetAvg(Number.isFinite(n) ? n : 0);
+  }
+
+  // Slide the whole week up/down so its mean lands on targetAvg, keeping the
+  // high/low shape the coach already built. Pure client-side preview — she
+  // still has to hit Save to persist.
+  function snapToAverage() {
+    setError(null);
+    setSaved(null);
+    setValues((v) => shiftToAverage(v, targetAvg));
   }
 
   function save() {
@@ -92,9 +126,37 @@ export function CalorieScheduleForm({
       </div>
       <p className="font-body text-body-md text-on-surface-variant leading-relaxed">
         Set a per-day-of-week calorie target for clients on a cycling protocol
-        (lift / rest / refeed days). Leave every day at the same number to keep
-        her on a flat cut — or hit Clear below.
+        (lift / rest / refeed days). Pick the weekly average she should land on,
+        build the high/low pattern below, then snap the week onto that average.
+        Leave every day at the same number to keep her on a flat cut — or hit
+        Clear below.
       </p>
+
+      {/* Weekly-average anchor — the number that actually matters on a cut. */}
+      <div className="flex items-end gap-3 flex-wrap rounded-md bg-surface-container-lowest border border-outline-variant/50 p-gutter">
+        <label className="flex flex-col gap-1.5">
+          <span className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
+            Weekly average / day
+          </span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={MIN_DAY_CAL}
+            max={MAX_DAY_CAL}
+            step={10}
+            value={targetAvg}
+            onChange={(e) => updateTarget(e.target.value)}
+            className="w-28 rounded-md border border-outline-variant/60 bg-cream/50 px-3 py-2 text-center font-body text-body-md text-charcoal focus:border-charcoal focus:outline-none transition-colors"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={snapToAverage}
+          className="border border-charcoal/60 text-charcoal px-4 py-2 rounded-full font-body text-label-sm tracking-widest uppercase hover:bg-charcoal/5 active:scale-95 transition-all"
+        >
+          Snap week to average
+        </button>
+      </div>
 
       <div className="grid grid-cols-7 gap-2">
         {DAY_KEYS.map((day) => (
@@ -115,6 +177,21 @@ export function CalorieScheduleForm({
           </label>
         ))}
       </div>
+
+      {/* Live running average vs. the target she set above. */}
+      <p
+        className={`font-body text-label-sm ${
+          onTarget ? "text-sage" : "text-gold"
+        }`}
+      >
+        {onTarget
+          ? `Averaging ${currentAvg.toLocaleString()}/day — locked on her ${targetAvg.toLocaleString()} target.`
+          : `Averaging ${currentAvg.toLocaleString()}/day — ${Math.abs(
+              diff,
+            ).toLocaleString()} ${
+              diff > 0 ? "over" : "under"
+            } her ${targetAvg.toLocaleString()} target.`}
+      </p>
 
       {error && (
         <p className="font-body text-label-sm text-soft-red">{error}</p>

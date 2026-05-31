@@ -23,6 +23,12 @@ export type DayKey = (typeof DAY_KEYS)[number];
 
 export type DailyCalorieSchedule = Record<DayKey, number>;
 
+/** Per-day floor / ceiling. Matches the coach form inputs and the Zod
+ *  validation in coach-actions.ts (ScheduleDaysSchema). Keep these three
+ *  in sync if the range ever changes. */
+export const MIN_DAY_CAL = 800;
+export const MAX_DAY_CAL = 5000;
+
 /**
  * Resolve today's calorie target for a given profile in Central time.
  * Falls back to flat cutCalories when the schedule is unset OR if the
@@ -51,6 +57,42 @@ export function parseSchedule(raw: unknown): DailyCalorieSchedule | null {
     out[key] = v;
   }
   return out as DailyCalorieSchedule;
+}
+
+/**
+ * The mean of a 7-day cycle, rounded to the nearest 5 (brand rounding rule).
+ *
+ * This is the number that actually matters on a cut: RIVEN coaches the
+ * WEEKLY average, not any single day. The coach builds a high/low pattern
+ * (low weekdays, higher weekends) and this tells her where the week lands.
+ */
+export function weeklyAverageOf(schedule: DailyCalorieSchedule): number {
+  const sum = DAY_KEYS.reduce((acc, k) => acc + schedule[k], 0);
+  return Math.round(sum / 7 / 5) * 5;
+}
+
+/**
+ * Slide the whole week up or down by an equal amount so its mean lands on
+ * `targetAverage`, KEEPING the high/low shape intact. Set your pattern
+ * first (Sat high, Mon low), then snap it onto the average you want.
+ *
+ * Each day is rounded to the nearest 5 and clamped to [MIN_DAY_CAL,
+ * MAX_DAY_CAL]. When a day hits a clamp the resulting mean drifts slightly
+ * off target — that's intentional and honest; the live readout in the form
+ * shows the real average so the coach can nudge from there. Never throws.
+ */
+export function shiftToAverage(
+  schedule: DailyCalorieSchedule,
+  targetAverage: number,
+): DailyCalorieSchedule {
+  const current = DAY_KEYS.reduce((acc, k) => acc + schedule[k], 0) / 7;
+  const delta = targetAverage - current;
+  const out = {} as DailyCalorieSchedule;
+  for (const k of DAY_KEYS) {
+    const shifted = Math.round((schedule[k] + delta) / 5) * 5;
+    out[k] = Math.min(MAX_DAY_CAL, Math.max(MIN_DAY_CAL, shifted));
+  }
+  return out;
 }
 
 /** Central-time short weekday for a Date — "Sun", "Mon", ..., "Sat". */
