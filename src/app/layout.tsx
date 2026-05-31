@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Serif_Display, Plus_Jakarta_Sans } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+import { Plausible } from "@/components/plausible";
 import "./globals.css";
 
 const dmSerif = DM_Serif_Display({
@@ -141,6 +142,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-cream text-charcoal font-body antialiased">
         {children}
         <ServiceWorkerRegister />
+        <Plausible />
       </body>
     </html>
   );
