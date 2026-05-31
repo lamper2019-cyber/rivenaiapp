@@ -953,4 +953,33 @@ The following keys have appeared in chat history at various points during build 
 
 ---
 
+## Session recap (2026-05-31)
+
+Three things landed this session. Pick up here:
+
+### 1. Bug fixes — calorie target + meal-parse crash (commit `80208c8`)
+
+- **Home vs Log showed different daily targets** (e.g. 2,000 vs 1,915) for calorie-cycling clients. `log/actions.ts` → `getTodayTotals()` was reading the flat `Profile.cutCalories`; the dashboard reads `getTodayCalorieTarget()` (schedule-aware). Both now use `getTodayCalorieTarget()`, so every surface agrees. (Sean should hard-refresh / reinstall the PWA to clear the old cached screen.)
+- **Meal log crashed with a raw Zod blob** (`items.2.calories: too_small`) when the model emitted a *negative* number from arithmetic the client typed ("subtract 140 cal"). Fix is two-part: (a) a prompt rule in `src/lib/anthropic.ts` (under ESTIMATION RULES → "NEVER RETURN NEGATIVE NUMBERS") forbidding negative per-item/total values and telling the model to net the math into a non-negative result; (b) the catch in `log/actions.ts` now logs the real error server-side and returns a clean Sean-voice message — parse failures get "Couldn't read that one. Skip the math — just name what you ate and how much…". This was a code/schema bug, **not** a model-intelligence problem — meal logging stays on `claude-sonnet-4-6`.
+
+### 2. Weekly-average calorie anchoring (commit `4a570b5`)
+
+RIVEN coaches the **weekly average**, not any single day. Calorie cycling already existed (`Profile.dailyCalorieSchedule` JSONB, 7 day→cal values, resolved by `getTodayCalorieTarget()`), but there was no way to anchor the week to a target mean.
+
+- **`src/lib/calorie-schedule.ts`** gained `weeklyAverageOf(schedule)` (mean rounded to 5), `shiftToAverage(schedule, target)` (slides every day equally so the mean lands on the target while keeping the high/low *shape*; clamps each day to `[MIN_DAY_CAL, MAX_DAY_CAL]` = 800/5000), and the exported `MIN_DAY_CAL` / `MAX_DAY_CAL` constants (kept in sync with the coach form inputs and `ScheduleDaysSchema` in `coach-actions.ts`).
+- **Coach editor** (`/coach/clients/[id]` → `calorie-schedule-form.tsx`) now has a "Weekly average / day" input, a "Snap week to average" button, and a live readout that's **sage when the seven days land on her target** and **gold (with the over/under gap)** when they don't.
+- **No schema change** — the seven stored day values remain the source of truth; the average is just the lens the coach sets them through.
+- **Open follow-up Sean floated:** letting *clients* self-set their own weekly average (currently coach-only). Deliberately not built — clients freely changing their own deficit cuts against the coaching model. If Sean wants it, it's a new client-facing route + its own auth'd action; flag it as a product decision, not a quick add.
+
+### 3. PostHog — where it actually stands
+
+Analytics are fully wired and verified inlined in the live bundle (Plausible + PostHog). Engineering side is **done**. The funnel Sean built in the UI was "Pageview → Pageview" (any page → any page = meaningless 33%). What's left is purely PostHog-UI config, no code:
+
+- Build **one real funnel** using the custom events we already emit: anonymous landing → `quiz`/VSL pageviews → `/pricing` → **`subscription_started`** (fires on the Stripe `success_url` `/dashboard?subscribed=1` via `SubscribedTracker`, under the identified person thanks to `PostHogIdentify`). Steps should be *distinct* events/URLs, not the same one twice.
+- Session replay is ON (all inputs masked); set `NEXT_PUBLIC_POSTHOG_REPLAY=0` on Vercel to kill it.
+- Empty dashboards are almost always an **ad blocker / Brave** blocking `posthog.com` / `plausible.io` — verify on a clean browser before assuming breakage.
+- Real funnels need real traffic — let it collect for a few days before reading conversion rates.
+
+---
+
 End of handoff. Coding agent: read this top to bottom before suggesting changes. Ask if anything is ambiguous before editing. **Read `CLAUDE.md` too** — it has the design + voice rules that aren't repeated here.
