@@ -127,8 +127,20 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
       recentFlagReasons,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    return { ok: false, error: `Claude API error: ${msg}` };
+    const raw = err instanceof Error ? err.message : "Unknown error";
+    // Log the real error server-side for debugging; never leak the raw
+    // Zod/SDK blob to the client.
+    console.error("[log] analyzeMeal failed:", raw);
+    // A parse failure means the model returned something the schema
+    // rejected (e.g. a negative calorie from arithmetic she typed). That's
+    // not a server outage — it's a "say it plainer" moment.
+    const isParseFailure = /parse structured output|too_small|too_big|invalid/i.test(
+      raw,
+    );
+    const error = isParseFailure
+      ? "Couldn't read that one. Skip the math — just name what you ate and how much, and I'll handle the numbers."
+      : "RIVEN couldn't log that just now. Give it another shot.";
+    return { ok: false, error };
   }
 
   const { mealLogId, sums } = await persistMealLog({
@@ -432,7 +444,20 @@ export async function getTodayTotals() {
   try {
     const user = await prisma.user.findUnique({
       where: { clerkId: userId },
-      include: { profile: { select: { cutCalories: true, proteinFloor: true } } },
+      include: {
+        profile: {
+          select: {
+            cutCalories: true,
+            proteinFloor: true,
+            // Needed so the target below honors per-day calorie cycling —
+            // /dashboard already does this via getTodayCalorieTarget. Without
+            // it, Log showed the flat cutCalories while Home showed today's
+            // scheduled number, so the two pages disagreed (e.g. 2,000 vs
+            // 1,915) for calorie-cycling clients.
+            dailyCalorieSchedule: true,
+          },
+        },
+      },
     });
     if (!user || !user.profile) return null;
     // Read direct from MealLog rows — same source as /dashboard, so the
@@ -441,7 +466,10 @@ export async function getTodayTotals() {
     // don't trust the DailyTotals cache for user-facing display.
     const totals = await sumTodayMealMacros(user.id);
     return {
-      cutCalories: user.profile.cutCalories,
+      // getTodayCalorieTarget honors Profile.dailyCalorieSchedule and falls
+      // back to flat cutCalories — same call /dashboard uses, so the target
+      // matches across both pages.
+      cutCalories: getTodayCalorieTarget(user.profile),
       proteinFloor: user.profile.proteinFloor,
       caloriesToday: totals.calories,
       proteinToday: totals.protein,

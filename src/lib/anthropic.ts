@@ -62,6 +62,11 @@ PORTIONS AND ROUNDING
 - When ambiguous, assume a standard restaurant or home portion (these are usually larger than people guess).
 - Round final calories to the nearest 5; round macros to whole grams.
 
+NEVER RETURN NEGATIVE NUMBERS
+- Every calorie and macro value — per item AND total — must be zero or positive. Never output a negative number.
+- If the client writes arithmetic ("subtract 140 cal", "minus the bun", "I only ate half", "took out the rice"), do the math yourself and return the NET result as a normal positive number. Example: "bowl was 600 but I left half" → log ~300, not "600 minus 300". The math happens in your head; the output is the final non-negative number.
+- If subtracting would drop an item to zero or below, set that item to a small positive estimate of what was actually eaten, or drop the item from the array entirely — never log it as a negative.
+
 The cultural food baselines below are already pre-cushioned at the +20% level — when you use them, USE THEM DIRECTLY. Do NOT add another 20% on top.
 
 CULTURAL FOOD KNOWLEDGE
