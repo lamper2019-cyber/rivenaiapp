@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
@@ -30,6 +31,7 @@ import { CheerCeremony } from "@/components/cheer-ceremony";
 import { SundayRitual } from "@/components/sunday-ritual";
 import { MonthlyWeightCheckinCard } from "@/components/monthly-weight-checkin-card";
 import { getMonthlyWeightSnapshot } from "@/lib/monthly-weight-checkin";
+import { SubscribedTracker } from "@/components/subscribed-tracker";
 
 // Force a fresh server render on every request. The page reads `auth()` so
 // it's already implicitly dynamic, but pinning it explicitly is belt-and-
@@ -151,6 +153,14 @@ export default async function DashboardPage() {
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-3xl mx-auto py-12 space-y-section-gap">
       <RefreshOnDayChange />
+
+      {/* Fires the PostHog "subscription_started" funnel event once when a
+          new subscriber lands here from Stripe Checkout (?subscribed=1),
+          then cleans the URL. Suspense-wrapped because it reads
+          useSearchParams(). */}
+      <Suspense fallback={null}>
+        <SubscribedTracker />
+      </Suspense>
 
       {/* Falling-roses ceremony: fires if she opens /dashboard with any
           unseen 🌹 from peers. Renders as a fixed full-screen overlay so

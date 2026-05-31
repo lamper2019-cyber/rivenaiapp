@@ -47,16 +47,25 @@ export function PostHogInit() {
           // History-change handles Next.js App Router client-side nav
           // automatically — no usePathname listener needed.
           capture_pageview: "history_change",
-          // Anonymous visitors stay anonymous until we identify them.
-          // Drops dashboard noise + keeps the monthly event quota for
-          // real users.
+          // Anonymous visitors stay anonymous until we identify them
+          // (PostHogIdentify in the clerk layout calls identify() on
+          // sign-in, which also merges the anonymous pre-signup journey
+          // — landing → quiz → VSL → pricing — onto the real person so
+          // the sales funnel connects across the sign-up boundary).
           person_profiles: "identified_only",
-          // Session replay is the headline PostHog feature. Off by
-          // default in this file — turn on via env later if you want
-          // it (NEXT_PUBLIC_POSTHOG_REPLAY=1). Sessions are heavier
-          // than pageviews on quota.
+          // Session replay is ON by default — Sean wants to watch real
+          // sessions of people moving through the quiz/pricing. If it
+          // ever eats too much monthly quota, set NEXT_PUBLIC_POSTHOG_REPLAY=0
+          // to kill it without a code change.
           disable_session_recording:
-            process.env.NEXT_PUBLIC_POSTHOG_REPLAY !== "1",
+            process.env.NEXT_PUBLIC_POSTHOG_REPLAY === "0",
+          session_recording: {
+            // Never record what someone types — weights, food notes,
+            // emails, anything in an input or textarea is masked to dots.
+            // We still capture taps, scrolls, and navigation, which is
+            // all the funnel/UX analysis actually needs.
+            maskAllInputs: true,
+          },
         });
         posthogInitialized = true;
       } catch {
