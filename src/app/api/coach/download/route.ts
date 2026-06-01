@@ -67,35 +67,79 @@ export async function GET(req: NextRequest) {
   const ext = guessExtension(sourceUrl, kind);
   const filename = `riven-${clientName}-${dateLabel}.${ext}`;
 
-  // Try the signed-URL path first (gives us the proper attachment filename),
-  // but verify it actually resolves before sending the browser there.
-  // Background: R2 has returned NoSuchKey in production for some submissions,
-  // most likely because R2_PUBLIC_URL and R2_BUCKET_NAME on Railway don't
-  // match what was used when the file was uploaded — so our extracted key
-  // doesn't exist in the bucket we're signing against. The public CDN URL
-  // (sourceUrl) still works because R2's public host serves whatever path
-  // resolves there. If signing or HEAD verification fails, fall back so the
-  // coach still gets the file.
+  // Three-step fallback to handle the "R2 returns 404" case gracefully:
+  //   1. Try signing — proper filename, attachment header. HEAD-verify.
+  //   2. If that fails, HEAD-check the stored public URL.
+  //   3. If BOTH 404 (file is genuinely missing in R2), serve a branded
+  //      "file not available" page instead of redirecting to R2's robot 404.
   let signedUrl: string | null = null;
+  let signedStatus: number | null = null;
   try {
     signedUrl = await presignDownload({ publicUrl: sourceUrl, filename });
     const head = await fetch(signedUrl, { method: "HEAD" });
-    if (!head.ok) {
-      console.error(
-        `[coach/download] signed URL returned ${head.status} for submission ${submissionId}; falling back to public URL.`
-      );
-      signedUrl = null;
-    }
+    signedStatus = head.status;
+    if (!head.ok) signedUrl = null;
   } catch (err) {
     console.error("[coach/download] presignDownload threw:", err);
     signedUrl = null;
   }
 
-  // 302 to whichever URL we trust. Signed URL has Content-Disposition:
-  // attachment baked in (preferred). Fallback public URL downloads with
-  // R2's default Content-Disposition (usually inline) — coach can still
-  // save-as in the browser.
-  return NextResponse.redirect(signedUrl ?? sourceUrl, 302);
+  if (signedUrl) return NextResponse.redirect(signedUrl, 302);
+
+  // Signed path failed — try the public URL as fallback. If it 200s,
+  // redirect there (no custom filename, but file downloads).
+  let publicStatus: number | null = null;
+  try {
+    const head = await fetch(sourceUrl, { method: "HEAD" });
+    publicStatus = head.status;
+    if (head.ok) return NextResponse.redirect(sourceUrl, 302);
+  } catch (err) {
+    console.error("[coach/download] public URL HEAD threw:", err);
+  }
+
+  // Both paths failed → the file is genuinely missing from R2. Log what we
+  // know so it can be diagnosed (env mismatch vs. broken upload vs. wiped
+  // bucket) and show the coach a branded explanation, not R2's robot page.
+  console.error(
+    `[coach/download] both URLs returned non-2xx for submission ${submissionId} (signed=${signedStatus}, public=${publicStatus}). Source: ${sourceUrl}`
+  );
+
+  return new Response(buildMissingFileHtml(), {
+    status: 404,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+function buildMissingFileHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light" />
+<title>RIVEN — File not available</title>
+<style>
+  body { background:#FAF7F2; color:#1A1A1A; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; min-height:100vh; margin:0; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .card { max-width:420px; text-align:left; }
+  .eyebrow { font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:#4A4744; margin:0 0 12px; }
+  h1 { font-family:Georgia,"Times New Roman",serif; font-size:28px; line-height:1.2; margin:0 0 12px; font-weight:400; }
+  p { font-size:16px; line-height:1.5; color:#4A4744; margin:0 0 12px; }
+  .meta { font-size:13px; color:#4A4744; opacity:.7; margin-top:24px; padding-top:16px; border-top:1px solid #D4CFC6; }
+  .actions { margin-top:24px; }
+  a.btn { display:inline-block; background:#1A1A1A; color:#FAF7F2; padding:14px 28px; text-decoration:none; border-radius:999px; font-size:13px; letter-spacing:.18em; text-transform:uppercase; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <p class="eyebrow">Content submission</p>
+    <h1>This recording isn't available.</h1>
+    <p>The file isn't in storage — either the upload didn't finish, or the bucket's public access was rotated since this was submitted.</p>
+    <p>Ask the client to re-record this week's prompt. The new upload will land cleanly.</p>
+    <div class="actions"><a class="btn" href="javascript:history.back()">Back</a></div>
+    <p class="meta">If this happens on every download, your R2 public URL config likely changed since old uploads were stored.</p>
+  </div>
+</body>
+</html>`;
 }
 
 function guessExtension(url: string, kind: string): string {
