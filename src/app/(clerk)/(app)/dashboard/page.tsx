@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
-import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
+import { resolveTodayCalorieTarget } from "@/lib/calorie-banking";
 import { pickQuoteForDate } from "@/lib/daily-quotes";
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import { NotificationOptIn } from "@/components/notification-opt-in";
@@ -129,10 +129,13 @@ export default async function DashboardPage() {
       sundaySnapshot.myAnswer !== null ||
       sundaySnapshot.others.length > 0);
 
-  // Honors per-day calorie cycling (Rora et al.); falls back to flat
-  // cutCalories when no schedule is set, so every other client sees the
-  // same number they always have.
-  const calorieTarget = getTodayCalorieTarget(profile);
+  // Honors the calorie-banking lever first (smooth-my-week clients), then
+  // per-day cycling (Rora et al.), then flat cutCalories. So every client
+  // sees the number that actually applies to her today. `banked.banked` is
+  // true only when banking moved today's number off her base cut — drives
+  // the explainer line under the ring.
+  const banked = await resolveTodayCalorieTarget(clientUserId, profile);
+  const calorieTarget = banked.target;
   const calorieRemaining = calorieTarget - todayTotals.calories;
   const proteinRemaining = profile.proteinFloor - todayTotals.protein;
   const stepRemaining = STEP_GOAL - todayTotals.steps;
@@ -271,6 +274,31 @@ export default async function DashboardPage() {
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
           Today
         </h2>
+        {/* Smooth-my-week explainer. Only shows when banking actually moved
+            today's number off her base cut — tells her WHY the target looks
+            different so it never feels like a glitch. */}
+        {banked.banked && (
+          <p className="font-body text-label-sm text-on-surface-variant leading-relaxed">
+            {calorieTarget > banked.base ? (
+              <>
+                Smoothing your week — you banked{" "}
+                <span className="text-gold">
+                  {(calorieTarget - banked.base).toLocaleString()} cal
+                </span>{" "}
+                from earlier, so today&apos;s target is up to{" "}
+                {calorieTarget.toLocaleString()}.
+              </>
+            ) : (
+              <>
+                Smoothing your week — you ran over earlier, so today trims{" "}
+                <span className="text-gold">
+                  {(banked.base - calorieTarget).toLocaleString()} cal
+                </span>{" "}
+                down to {calorieTarget.toLocaleString()}.
+              </>
+            )}
+          </p>
+        )}
         <div className="grid gap-3">
           <ProgressCard
             label="Calories"

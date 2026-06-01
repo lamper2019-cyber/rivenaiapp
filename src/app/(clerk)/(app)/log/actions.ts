@@ -12,7 +12,7 @@ import {
   sumTodayMealMacros,
   type MealAnalysis,
 } from "@/lib/meal-pipeline";
-import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
+import { resolveTodayCalorieTarget } from "@/lib/calorie-banking";
 
 const MEAL_DESCRIPTION_MAX = 500;
 
@@ -110,6 +110,14 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
     .map((r) => r.flagReason)
     .filter((s): s is string => !!s);
 
+  // Today's target — honors the banking lever, then per-day cycling, then
+  // flat cutCalories. Same resolver /dashboard uses so the meal-analyzer's
+  // "remaining" framing matches what she sees on Home.
+  const { target: todayCalorieTarget } = await resolveTodayCalorieTarget(
+    user.id,
+    profile,
+  );
+
   // Analyze + persist via the shared pipeline (also used by the RIVEN AI
   // chat tool — both paths land in the same MealLog + DailyTotals state).
   let analysis: MealAnalysis;
@@ -117,9 +125,7 @@ export async function logMeal(formData: FormData): Promise<LogMealResult> {
     analysis = await analyzeMeal({
       profile: {
         name: profile.name,
-        // Today's target — honors per-day calorie cycling when the
-        // client has a schedule set; falls back to flat cutCalories.
-        cutCalories: getTodayCalorieTarget(profile),
+        cutCalories: todayCalorieTarget,
         proteinFloor: profile.proteinFloor,
       },
       todayTotals: currentTotals,
@@ -455,6 +461,9 @@ export async function getTodayTotals() {
             // scheduled number, so the two pages disagreed (e.g. 2,000 vs
             // 1,915) for calorie-cycling clients.
             dailyCalorieSchedule: true,
+            // Same reason — the banking lever has to resolve here too, or
+            // Log and Home would drift for smooth-my-week clients.
+            calorieBankingEnabled: true,
           },
         },
       },
@@ -465,11 +474,12 @@ export async function getTodayTotals() {
     // See note in src/lib/meal-pipeline.ts#sumTodayMealMacros for why we
     // don't trust the DailyTotals cache for user-facing display.
     const totals = await sumTodayMealMacros(user.id);
+    // resolveTodayCalorieTarget honors banking → per-day cycling → flat
+    // cutCalories — the exact same call /dashboard uses, so the target
+    // matches across both pages.
+    const { target } = await resolveTodayCalorieTarget(user.id, user.profile);
     return {
-      // getTodayCalorieTarget honors Profile.dailyCalorieSchedule and falls
-      // back to flat cutCalories — same call /dashboard uses, so the target
-      // matches across both pages.
-      cutCalories: getTodayCalorieTarget(user.profile),
+      cutCalories: target,
       proteinFloor: user.profile.proteinFloor,
       caloriesToday: totals.calories,
       proteinToday: totals.protein,

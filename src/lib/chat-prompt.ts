@@ -173,8 +173,15 @@ export function buildLiveContext(args: {
   recentMeals: ChatContextMeal[];
   latestCheckIn: ChatContextCheckIn | null;
   streakDays: number;
+  /** Pre-resolved target (banking/cycling aware). When omitted, the context
+   *  falls back to the per-day-schedule / flat cutCalories from the profile. */
+  todayCalorieTarget?: number;
 }): string {
-  const baseContext = buildClientContext(args.profile, args.todayTotals);
+  const baseContext = buildClientContext(
+    args.profile,
+    args.todayTotals,
+    args.todayCalorieTarget,
+  );
   const extra: string[] = [];
 
   if (args.recentMeals.length > 0) {
@@ -226,14 +233,20 @@ export function buildLiveContext(args: {
   return baseContext + "\n" + extra.join("\n");
 }
 
-export function buildClientContext(profile: Profile, todayTotals: {
-  calories: number;
-  protein: number;
-} | null): string {
-  // Today's target — pulls from per-day schedule when set, falls back to
-  // flat cutCalories. So calorie-cycling clients see the right number
-  // here without changing every consumer in the function body.
-  const todayCalorieTarget = getTodayCalorieTarget(profile);
+export function buildClientContext(
+  profile: Profile,
+  todayTotals: {
+    calories: number;
+    protein: number;
+  } | null,
+  // Pre-resolved target from the banking/cycling resolver. When the caller
+  // has it (e.g. the chat stream route already read the week), pass it in so
+  // the AI quotes the exact number she sees on Home. Falls back to the
+  // per-day schedule / flat cutCalories otherwise.
+  todayCalorieTargetOverride?: number,
+): string {
+  const todayCalorieTarget =
+    todayCalorieTargetOverride ?? getTodayCalorieTarget(profile);
   const lostSinceStart = profile.startWeight - profile.currentWeight;
   const remainingToGoal = profile.currentWeight - profile.goalWeight;
 
@@ -271,7 +284,7 @@ export function buildClientContext(profile: Profile, todayTotals: {
     `- Maintenance calories: ${profile.maintenanceCalories}`,
     `- Cut calories (today): ${todayCalorieTarget}${
       todayCalorieTarget !== profile.cutCalories
-        ? ` (cycled — base ${profile.cutCalories})`
+        ? ` (adjusted for cycling/banking — base ${profile.cutCalories})`
         : ""
     }`,
     `- Protein floor: ${profile.proteinFloor}g`,

@@ -7,6 +7,7 @@ import { PushSubscribeButton } from "@/components/push-subscribe-button";
 import { Sparkline } from "@/components/sparkline";
 import { startOfCentralMonth } from "@/lib/dates";
 import { DeleteAccountButton } from "./delete-account-button";
+import { CalorieBankingToggle } from "./calorie-banking-toggle";
 import { getMyMoodHistory, type MoodHistoryEntry } from "@/lib/daily-mood";
 import { MoodHistory } from "@/components/mood-history";
 
@@ -140,6 +141,20 @@ export default async function ProfilePage() {
       {/* Mood history — last 30 days. Self-hides on empty data (new
           clients without enough taps yet). */}
       <MoodHistory entries={moodHistory} />
+
+      {/* Calorie banking lever — client-controlled. Smooths her daily target
+          across the week without touching the weekly average Sean coaches. */}
+      {profile && (
+        <section className="space-y-3">
+          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+            Calories
+          </h2>
+          <CalorieBankingToggle
+            initialEnabled={profile.calorieBankingEnabled}
+            dailyTarget={profile.cutCalories}
+          />
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">

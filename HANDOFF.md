@@ -980,6 +980,25 @@ Analytics are fully wired and verified inlined in the live bundle (Plausible + P
 - Empty dashboards are almost always an **ad blocker / Brave** blocking `posthog.com` / `plausible.io` — verify on a clean browser before assuming breakage.
 - Real funnels need real traffic — let it collect for a few days before reading conversion rates.
 
+### 4. Calorie banking — client-controlled "Smooth my week" lever
+
+A self-serve lever on `/profile` (under a new **Calories** section). Default **OFF**; every existing client is unaffected. When she turns it on, today's target = her daily cut + whatever she banked or owed, rolled forward from the start of the week.
+
+- **Model:** "carry to the very next day." Each completed day's leftover (`target − actual`) rolls into the next day. Undereat → tomorrow goes up; overeat → tomorrow goes down. Compounds correctly across the week but is always applied to the single next day, never spread. **Sunday is a clean reset** (target = base). Her **weekly average — the number Sean coaches — never changes**; only how the calories sit across the days does. Protein floor never moves.
+- **Clamp:** today's number is held to `cutCalories ± 600` (`BANK_FLOOR_DELTA` / `BANK_CEILING_DELTA` in `calorie-schedule.ts`). Excess beyond the clamp is intentionally forgiven — one big under-eat can't become a 4,000-cal day, one blowout can't starve her tomorrow.
+- **No-log days are neutral**, not zero. We can't tell a fast from a forgotten log, so a day with zero logged calories neither banks nor owes — the running bank just passes through. This closes the obvious footgun (forgetting to log ≠ free +600 tomorrow).
+- **The coach sets the average, the client smooths it** (the two product decisions Sean locked). Banking uses the existing `cutCalories` as the base — **no new "average" field**. When banking is ON it **overrides** `dailyCalorieSchedule` (the per-day cycling schedule).
+
+**Files:**
+- `prisma/schema.prisma` + migration `20260531120000_add_calorie_banking` — one additive column `Profile.calorieBankingEnabled Boolean @default(false)`.
+- `src/lib/calorie-schedule.ts` — pure `bankedTargetForToday({ base, priorActuals })` + the two clamp-delta constants. No DB, unit-testable.
+- `src/lib/calorie-banking.ts` (new) — `getWeekDailyCalories(userId, now)` (per-day MealLog sums, Sun→yesterday, Central-time bucketed) and `resolveTodayCalorieTarget(userId, profile, now)` → `{ target, base, carryIn, banked }`. **This is the one call every read path should use now** — it honors banking → per-day cycling → flat cut, and never throws.
+- **Wired into** `/dashboard` (the ring + a gold explainer line under "Today" when banking moved the number), `/log` (`getTodayTotals` + the meal-analyzer's "remaining" framing — so Home and Log never drift, same as the bug #1 fix), and the RIVEN AI chat (`buildClientContext` / `buildLiveContext` take an optional pre-resolved target; the stream route resolves it once and threads it in).
+- `src/app/(clerk)/(app)/profile/calorie-banking-actions.ts` + `calorie-banking-toggle.tsx` — client-scoped server action (`updateMany` keyed on `clerkId`, can't touch another row) + an optimistic pill toggle in Sean's voice.
+- Coach sees a read-only **"Smoothing: on/off"** field on `/coach/clients/[id]` → Profile grid.
+
+**v2 candidates (deliberately not built):** a feast-day picker (pre-allocate Saturday high); weekly-budget spread instead of next-day-only; only banking from days with a *minimum* logged threshold (the no-log guard handles the worst case, but a 200-cal "I only logged a snack" day still banks ~+600 — consistent with the app's trust-her-logs model, but worth revisiting). All would be additive.
+
 ---
 
 End of handoff. Coding agent: read this top to bottom before suggesting changes. Ask if anything is ambiguous before editing. **Read `CLAUDE.md` too** — it has the design + voice rules that aren't repeated here.

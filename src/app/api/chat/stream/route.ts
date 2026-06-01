@@ -12,7 +12,7 @@ import {
   type ChatContextCheckIn,
 } from "@/lib/chat-prompt";
 import { analyzeMeal, persistMealLog } from "@/lib/meal-pipeline";
-import { getTodayCalorieTarget } from "@/lib/calorie-schedule";
+import { resolveTodayCalorieTarget } from "@/lib/calorie-banking";
 import type { ChatRole } from "@prisma/client";
 import type Anthropic from "@anthropic-ai/sdk";
 
@@ -103,6 +103,14 @@ export async function POST(req: Request) {
   // Local non-null reference so the streaming closure below doesn't lose
   // the narrowing TypeScript got from the guard above.
   const profile = user.profile;
+
+  // Resolve today's calorie target once (banking → cycling → flat cut), then
+  // thread it through the context builder AND the log_meal tool so the AI
+  // quotes the exact number she sees on Home / Log.
+  const { target: todayCalorieTarget } = await resolveTodayCalorieTarget(
+    user.id,
+    profile,
+  );
 
   // Pull recent history (oldest → newest order for the API).
   const historyDesc = await prisma.chatMessage.findMany({
@@ -200,6 +208,7 @@ export async function POST(req: Request) {
     recentMeals,
     latestCheckIn,
     streakDays,
+    todayCalorieTarget,
   });
 
   // Save the user's message before kicking off the model call so it persists
@@ -298,6 +307,7 @@ export async function POST(req: Request) {
                 userId: user.id,
                 profile,
                 todayTotals,
+                todayCalorieTarget,
               });
               toolResults.push({
                 type: "tool_result",
@@ -390,6 +400,9 @@ async function runChatTool(args: {
     dailyCalorieSchedule: unknown;
   };
   todayTotals: { calories: number; protein: number } | null;
+  /** Pre-resolved target (banking/cycling aware) — passed in so the analyzer
+   *  frames "remaining" against the same number she sees on Home. */
+  todayCalorieTarget: number;
 }) {
   if (args.name !== "log_meal") {
     throw new Error(`Unknown tool: ${args.name}`);
@@ -434,8 +447,8 @@ async function runChatTool(args: {
   const analysis = await analyzeMeal({
     profile: {
       name: args.profile.name,
-      // Honors per-day calorie cycling when set; flat cutCalories otherwise.
-      cutCalories: getTodayCalorieTarget(args.profile),
+      // Banking/cycling-aware target resolved once up in the handler.
+      cutCalories: args.todayCalorieTarget,
       proteinFloor: args.profile.proteinFloor,
     },
     todayTotals: todayBuckets,

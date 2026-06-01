@@ -158,6 +158,16 @@ model Profile {
   // (rest / lift / refeed days) on advanced clients like Rora. The
   // helper in src/lib/calorie-schedule.ts handles parse + fallback.
   dailyCalorieSchedule   Json?
+
+  // Client-controlled "smooth my week" lever (calorie banking). When ON,
+  // today's target = cutCalories + whatever she banked/owed yesterday,
+  // replayed from Sunday and clamped to cutCalories ± 600. Undereat one
+  // day → the leftover rolls to the next day; overeat → it's docked the
+  // next day. Protein floor never moves. Defaults OFF so every existing
+  // client is unaffected. When ON it overrides dailyCalorieSchedule.
+  // Logic lives in src/lib/calorie-schedule.ts (pure) + calorie-banking.ts
+  // (DB-aware resolver).
+  calorieBankingEnabled  Boolean       @default(false)
 }
 
 // Peer-to-peer cheer reactions. When a client is having a hard day (no log

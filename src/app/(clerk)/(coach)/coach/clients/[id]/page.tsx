@@ -241,6 +241,12 @@ export default async function CoachClientDetailPage({
             />
             <Field label="Cycle status" value={profile.cycleStatus.toLowerCase()} />
             <Field label="Age" value={`${profile.age}`} />
+            {/* Read-only — the client owns this toggle from her /profile.
+                Shows Sean whether she's banking calories across the week. */}
+            <Field
+              label="Smoothing"
+              value={profile.calorieBankingEnabled ? "on" : "off"}
+            />
           </div>
           <EditTargetsForm
             clientUserId={client.id}
