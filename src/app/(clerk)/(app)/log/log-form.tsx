@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { logMeal, undoLastMeal, type LogMealResult } from "./actions";
+import { captureEvent } from "@/components/posthog";
 
 type MealItem = {
   name: string;
@@ -87,6 +88,16 @@ export function LogForm({
       const res = await logMeal(fd);
       setResult(res);
       if (res.ok) {
+        // PostHog activation event — fires only on a confirmed server-side
+        // log. This is the "first meal logged" step of the activation funnel,
+        // so keep it a real custom event rather than relying on autocapturing
+        // the "Log it" button text (which would break if we ever rename it).
+        // Props are meal-level numbers only — no description text (PII / masked).
+        void captureEvent("meal_logged", {
+          calories: res.analysis.calories,
+          protein: res.analysis.protein,
+          processed: res.analysis.processedFlag,
+        });
         setDescription("");
         if (totals) {
           // Always use the server's recomputed truth (res.totals) — NOT

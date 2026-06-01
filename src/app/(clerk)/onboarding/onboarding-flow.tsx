@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createProfile, type ProfileFormState } from "./actions";
+import { captureEvent } from "@/components/posthog";
 import { calculateTargets } from "@/lib/calculations";
 import type { QuizLeadSummary } from "./page";
 
@@ -149,6 +150,16 @@ export function OnboardingFlow({
     fd.set("cycleStatus", state.cycleStatus);
 
     startTransition(async () => {
+      // PostHog activation event — the "finished onboarding" funnel step.
+      // createProfile redirects to /tutorial on success, so the client never
+      // sees an ok:true result to fire on afterward. We fire here instead,
+      // right before the call: the form already passed client-side validation
+      // (the "Lock it in" button is gated on canContinue), so the only way
+      // this over-counts is a rare server auth/DB failure — acceptable noise
+      // for a funnel step. Props are non-PII only (activity tier, no name).
+      void captureEvent("onboarding_completed", {
+        activity_level: state.activityLevel,
+      });
       const initial: ProfileFormState = { ok: false };
       const result = await createProfile(initial, fd);
       // createProfile redirects on success; we only fall through here on
