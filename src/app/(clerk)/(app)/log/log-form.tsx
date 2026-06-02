@@ -497,6 +497,18 @@ function TotalCard({
 }) {
   const pct = target > 0 ? Math.min((value / target) * 100, 110) : 0;
   const overTarget = value > target;
+  // Remaining readout — mirrors the dashboard ("51 remaining"). Protein is a
+  // floor (count UP to it); calories are a ceiling (count DOWN from it).
+  const remaining = target - value;
+  const isProtein = unit === "g";
+  const remainingLabel =
+    remaining > 0
+      ? isProtein
+        ? `${remaining}g still to floor`
+        : `${remaining} remaining`
+      : isProtein
+        ? "floor hit"
+        : `${Math.abs(remaining)} over`;
   return (
     <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 p-gutter shadow-elevation-1">
       <p className="font-body text-label-sm tracking-wide uppercase text-on-surface-variant/80">
@@ -510,6 +522,11 @@ function TotalCard({
           / {target}
           {unit}
         </span>
+      </p>
+      <p
+        className={`font-body text-label-sm mt-1 ${overTarget ? "text-soft-red" : "text-on-surface-variant"}`}
+      >
+        {remainingLabel}
       </p>
       <div className="mt-3 h-1.5 bg-surface-container rounded-full overflow-hidden">
         <div

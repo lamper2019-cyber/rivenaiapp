@@ -163,11 +163,11 @@ model Profile {
   // today's target = cutCalories + whatever she banked/owed yesterday,
   // replayed from Sunday and clamped to cutCalories ± 600. Undereat one
   // day → the leftover rolls to the next day; overeat → it's docked the
-  // next day. Protein floor never moves. Defaults OFF so every existing
-  // client is unaffected. When ON it overrides dailyCalorieSchedule.
-  // Logic lives in src/lib/calorie-schedule.ts (pure) + calorie-banking.ts
-  // (DB-aware resolver).
-  calorieBankingEnabled Boolean @default(false)
+  // next day. Protein floor never moves. Defaults ON for everyone (Sean's
+  // call 2026-06-01) — clients can opt out via the /profile toggle. When ON
+  // it overrides dailyCalorieSchedule. Logic lives in
+  // src/lib/calorie-schedule.ts (pure) + calorie-banking.ts (DB-aware resolver).
+  calorieBankingEnabled Boolean @default(true)
 }
 
 // Peer-to-peer cheer reactions. When a client is having a hard day (no log
