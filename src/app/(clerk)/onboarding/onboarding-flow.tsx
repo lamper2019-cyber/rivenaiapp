@@ -314,17 +314,17 @@ function Header({ step, onBack }: { step: number; onBack: () => void }) {
 }
 
 /* ──────────────────────────────────────────────────────────── */
-/* Sean's speech bubble                                         */
+/* RIVEN voice bubble (brand-led — no named coach in onboarding)*/
 /* ──────────────────────────────────────────────────────────── */
 
-function SeanSays({ children }: { children: React.ReactNode }) {
+function RivenSays({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3 mb-8">
       <span
         aria-hidden
-        className="flex w-12 h-12 rounded-full bg-charcoal text-gold items-center justify-center font-display text-[28px] leading-none shrink-0 shadow-elevation-1"
+        className="flex w-12 h-12 rounded-full bg-charcoal text-gold items-center justify-center font-display text-[20px] leading-none shrink-0 shadow-elevation-1"
       >
-        S
+        ◆
       </span>
       <div className="flex-1 relative rounded-2xl rounded-tl-sm bg-secondary-container/40 border border-gold/40 px-4 py-3 shadow-elevation-1">
         <p className="font-body text-body-md text-charcoal leading-relaxed">
@@ -342,7 +342,7 @@ function SeanSays({ children }: { children: React.ReactNode }) {
 function NameStep({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <SeanSays>Real quick — what should I call you?</SeanSays>
+      <RivenSays>Real quick — what should I call you?</RivenSays>
       <input
         type="text"
         value={value}
@@ -368,7 +368,7 @@ function AgeStep({
 }) {
   return (
     <div>
-      <SeanSays>{name ? `Good to meet you, ${name}.` : "Good to meet you."} How old are you?</SeanSays>
+      <RivenSays>{name ? `Good to meet you, ${name}.` : "Good to meet you."} How old are you?</RivenSays>
       <BigNumberDisplay value={value} unit="years" />
       <RangeSlider value={value} min={18} max={80} step={1} onChange={onChange} />
     </div>
@@ -388,7 +388,7 @@ function HeightStep({
 }) {
   return (
     <div>
-      <SeanSays>How tall are we working with?</SeanSays>
+      <RivenSays>How tall are we working with?</RivenSays>
       <div className="flex items-end justify-center gap-8 mt-4">
         <Stepper
           label="ft"
@@ -412,7 +412,7 @@ function HeightStep({
 function WeightStep({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
     <div>
-      <SeanSays>Where are you starting? No judgment — just the number.</SeanSays>
+      <RivenSays>Where are you starting? No judgment — just the number.</RivenSays>
       <BigNumberDisplay value={value} unit="lbs" />
       <RangeSlider value={value} min={90} max={400} step={1} onChange={onChange} />
     </div>
@@ -437,7 +437,7 @@ function GoalWeightStep({
         : `Gain ${delta} lbs`;
   return (
     <div>
-      <SeanSays>And where do you want to land?</SeanSays>
+      <RivenSays>And where do you want to land?</RivenSays>
       <BigNumberDisplay value={value} unit="lbs" />
       <p className="text-center font-body text-label-md tracking-widest uppercase text-on-surface-variant mt-2">
         {deltaLabel}
@@ -456,7 +456,7 @@ function ActivityStep({
 }) {
   return (
     <div>
-      <SeanSays>How do you move on a regular week?</SeanSays>
+      <RivenSays>How do you move on a regular week?</RivenSays>
       <div className="space-y-2">
         {ACTIVITY_OPTIONS.map((opt) => {
           const selected = value === opt.value;
@@ -508,10 +508,10 @@ function CycleStep({
 }) {
   return (
     <div>
-      <SeanSays>
+      <RivenSays>
         Last one — what&apos;s your cycle situation? This tunes your weekly
         check-in and protein floor.
-      </SeanSays>
+      </RivenSays>
       <div className="space-y-2">
         {CYCLE_OPTIONS.map((opt) => {
           const selected = value === opt.value;
@@ -581,9 +581,9 @@ function PlanRevealStep({ state, submitError }: { state: State; submitError: str
 
   return (
     <div>
-      <SeanSays>
+      <RivenSays>
         Here&apos;s your plan{state.name ? `, ${state.name}` : ""}.
-      </SeanSays>
+      </RivenSays>
 
       {/* The reveal — animated weight curve from today to the goal date. */}
       {targets && (
@@ -605,10 +605,10 @@ function PlanRevealStep({ state, submitError }: { state: State; submitError: str
         </div>
       )}
 
-      <SeanSays>
+      <RivenSays>
         Built from your numbers — sustainable, not a crash. We fine-tune it
         week by week. Steady wins.
-      </SeanSays>
+      </RivenSays>
 
       {submitError && (
         <div className="rounded-md border border-soft-red/40 bg-soft-red/10 px-gutter py-3 mt-4">
