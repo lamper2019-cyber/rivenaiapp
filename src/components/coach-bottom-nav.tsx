@@ -29,6 +29,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: "person_search",
     matches: (p) => p.startsWith("/coach/leads"),
   },
+  {
+    href: "/coach/insights",
+    label: "Insights",
+    icon: "insights",
+    matches: (p) => p.startsWith("/coach/insights"),
+  },
   { href: "/coach/profile", label: "Profile", icon: "person" },
 ];
 

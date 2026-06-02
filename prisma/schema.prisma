@@ -79,7 +79,7 @@ model User {
   // is null or > 10 min ago, send a push and update this timestamp.
   // Subsequent cheers inside the same 10-min window skip the push to
   // avoid buzz-buzz-buzz — the dashboard card surfaces them instead.
-  cheerLastPushAt              DateTime?
+  cheerLastPushAt DateTime?
 
   // Falling-roses ceremony state. The animated overlay fires on
   // /dashboard whenever there are CheerReactions newer than this
@@ -87,46 +87,46 @@ model User {
   // the animation. firstCheerCeremonySeenAt records when the welcome
   // banner played — fires once per user, ever; subsequent ceremonies
   // skip straight to the rose drop.
-  cheersLastSeenAt             DateTime?
-  firstCheerCeremonySeenAt     DateTime?
+  cheersLastSeenAt         DateTime?
+  firstCheerCeremonySeenAt DateTime?
 
   // Presence: stamped every time she opens /dashboard. The
   // PresenceIndicator surfaces "Tracy and Adrienne are in RIVEN
   // right now" by querying active clients with lastDashboardSeenAt
   // within the last 15 min. Cheap; doesn't drive any business logic.
-  lastDashboardSeenAt          DateTime?
+  lastDashboardSeenAt DateTime?
 
-  profile           Profile?
-  mealLogs          MealLog[]
-  dailyTotals       DailyTotals[]
-  weeklyCheckIns    WeeklyCheckIn[]
+  profile            Profile?
+  mealLogs           MealLog[]
+  dailyTotals        DailyTotals[]
+  weeklyCheckIns     WeeklyCheckIn[]
   contentSubmissions ContentSubmission[]
-  chatMessages      ChatMessage[]      @relation("ChatRecipient")
-  sentChatMessages  ChatMessage[]      @relation("ChatSender")
-  pushSubscriptions PushSubscription[]
-  cheersReceived   CheerReaction[]    @relation("CheersReceived")
-  cheersSent       CheerReaction[]    @relation("CheersSent")
-  sundayAnswers    SundayPromptAnswer[]
-  sundayReactions  SundayPromptReaction[]
-  dailyMoods       DailyMood[]
-  pendingAiReplies PendingAiReply[]
-  voiceMoments     VoiceMoment[]
+  chatMessages       ChatMessage[]          @relation("ChatRecipient")
+  sentChatMessages   ChatMessage[]          @relation("ChatSender")
+  pushSubscriptions  PushSubscription[]
+  cheersReceived     CheerReaction[]        @relation("CheersReceived")
+  cheersSent         CheerReaction[]        @relation("CheersSent")
+  sundayAnswers      SundayPromptAnswer[]
+  sundayReactions    SundayPromptReaction[]
+  dailyMoods         DailyMood[]
+  pendingAiReplies   PendingAiReply[]
+  voiceMoments       VoiceMoment[]
 }
 
 model Profile {
-  id                  String        @id @default(cuid())
-  userId              String        @unique
-  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name                String
-  age                 Int
-  heightInches        Float
-  startWeight         Float
-  goalWeight          Float
-  currentWeight       Float
-  activityLevel       ActivityLevel
-  cycleStatus         CycleStatus
-  phase               Phase         @default(PHASE_1)
+  name          String
+  age           Int
+  heightInches  Float
+  startWeight   Float
+  goalWeight    Float
+  currentWeight Float
+  activityLevel ActivityLevel
+  cycleStatus   CycleStatus
+  phase         Phase         @default(PHASE_1)
 
   // Calculated targets (Mifflin-St Jeor + RIVEN protocol)
   maintenanceCalories Int
@@ -134,14 +134,14 @@ model Profile {
   weeklyBudget        Int
   proteinFloor        Int
 
-  onboardedAt         DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  onboardedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Post-profile tutorial walkthrough. 0–4 = currently on that slide,
   // 5+ = completed (or skipped). Default 5 so existing rows from before
   // this column existed don't get marched through the tutorial; new
   // profile rows from onboarding/actions.ts explicitly set tutorialStep: 0.
-  tutorialStep        Int           @default(5)
+  tutorialStep Int @default(5)
 
   // Duolingo-style streak protection. Each client starts with one freeze;
   // when she misses a day mid-streak the engine can spend a freeze to keep
@@ -149,7 +149,7 @@ model Profile {
   // ships the foundation (column + UI visibility); the auto-spend logic
   // in sean-messages lands in a follow-up so the behavior can be tested
   // in isolation before going live on the cron path.
-  streakFreezesAvailable Int        @default(1)
+  streakFreezesAvailable Int @default(1)
 
   // Per-day-of-week calorie schedule. NULL = use the flat cutCalories
   // for every day (default behavior for almost every client). When set,
@@ -157,7 +157,7 @@ model Profile {
   // Central-time day-of-week label. Used for calorie-cycling protocols
   // (rest / lift / refeed days) on advanced clients like Rora. The
   // helper in src/lib/calorie-schedule.ts handles parse + fallback.
-  dailyCalorieSchedule   Json?
+  dailyCalorieSchedule Json?
 
   // Client-controlled "smooth my week" lever (calorie banking). When ON,
   // today's target = cutCalories + whatever she banked/owed yesterday,
@@ -167,7 +167,7 @@ model Profile {
   // client is unaffected. When ON it overrides dailyCalorieSchedule.
   // Logic lives in src/lib/calorie-schedule.ts (pure) + calorie-banking.ts
   // (DB-aware resolver).
-  calorieBankingEnabled  Boolean       @default(false)
+  calorieBankingEnabled Boolean @default(false)
 }
 
 // Peer-to-peer cheer reactions. When a client is having a hard day (no log
@@ -180,7 +180,7 @@ model CheerReaction {
   recipientUserId String
   recipient       User     @relation("CheersReceived", fields: [recipientUserId], references: [id], onDelete: Cascade)
   senderUserId    String
-  sender          User     @relation("CheersSent",     fields: [senderUserId],    references: [id], onDelete: Cascade)
+  sender          User     @relation("CheersSent", fields: [senderUserId], references: [id], onDelete: Cascade)
   // "no_log_24h" | "broke_streak" | "way_over_target" | "manual"
   context         String
   createdAt       DateTime @default(now())
@@ -191,9 +191,9 @@ model CheerReaction {
 }
 
 model MealLog {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   description String
   // 3-5 word AI-generated label for compact display ("Eggs, bacon, toast").
@@ -204,13 +204,13 @@ model MealLog {
   protein     Int
   fat         Int
   carbs       Int
-  aiResponse  String   @db.Text
+  aiResponse  String  @db.Text
 
   // AI-extracted per-item breakdown. Each item is { name, calories, protein,
   // fat, carbs }. Lets the UI render individual food chips (Big Mac, fries,
   // chips) instead of forcing the whole combo as a single tappable unit.
   // Nullable for legacy rows; new logs always include at least one item.
-  items       Json?
+  items Json?
 
   // Heads-up flag for ultra-processed / refined / seed-oil / sugary content.
   // The "why" is in flagReason — surfaced in the response card to teach,
@@ -218,15 +218,15 @@ model MealLog {
   processedFlag Boolean @default(false)
   flagReason    String? @db.Text
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
 }
 
 model DailyTotals {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   date          DateTime @db.Date
   totalCalories Int      @default(0)
@@ -235,61 +235,61 @@ model DailyTotals {
   totalCarbs    Int      @default(0)
   totalSteps    Int      @default(0)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, date])
   @@index([userId, date])
 }
 
 model WeeklyCheckIn {
-  id                String         @id @default(cuid())
-  userId            String
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  weekStart         DateTime       @db.Date
-  weight            Float
-  waist             Float
-  photoFrontUrl     String?
-  photoSideUrl      String?
-  menuAdherence     MenuAdherence
-  sleepAvg          Float
-  cycleStatus       CheckInCycle
-  stress            Int
-  winsAndStruggles  String         @db.Text
+  weekStart        DateTime      @db.Date
+  weight           Float
+  waist            Float
+  photoFrontUrl    String?
+  photoSideUrl     String?
+  menuAdherence    MenuAdherence
+  sleepAvg         Float
+  cycleStatus      CheckInCycle
+  stress           Int
+  winsAndStruggles String        @db.Text
 
-  createdAt         DateTime       @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([userId, weekStart])
   @@index([userId, weekStart])
 }
 
 model ContentSubmission {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   week       DateTime @db.Date
   promptText String
   videoUrl   String?
   photoUrl   String?
 
-  createdAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId, week])
 }
 
 model ChatMessage {
-  id        String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Whose chat thread this message belongs to (always the client).
-  userId    String
-  user      User     @relation("ChatRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation("ChatRecipient", fields: [userId], references: [id], onDelete: Cascade)
 
-  role      ChatRole
+  role ChatRole
   // AI = generated by Claude. COACH = written by Sean from the coach dashboard.
   // USER messages are always AI-bound (the client typing into the AI chat).
-  kind      ChatMessageKind @default(AI)
+  kind ChatMessageKind @default(AI)
 
   // Only set for kind = COACH messages — Sean's User.id.
   senderUserId String?
@@ -304,7 +304,7 @@ model ChatMessage {
   // "behavioral_24h" when the Sean-messages tick fires a templated nudge.
   // Used for cooldown enforcement (same category can't fire twice in 48h)
   // and daily-cap counting (max 3 proactive sends per client per day).
-  category  String?
+  category String?
 
   // Marks COACH messages that were generated by AI as an auto-reply on
   // behalf of Sean (vs ones Sean wrote himself from the coach dashboard).
@@ -312,14 +312,14 @@ model ChatMessage {
   // The coach-side messaging dashboard uses this to show Sean which of
   // her recent replies he authored vs which were auto-replies he might
   // want to follow up on.
-  aiGenerated Boolean  @default(false)
+  aiGenerated Boolean @default(false)
 
   // Voice moments: when Sean records a 60-second voice memo for a
   // milestone (currently: every monthly check-in submission), the
   // audio file URL + duration land here. The chat bubble for messages
   // with audioUrl set renders an HTML5 audio player instead of the
   // plain-text bubble. Real Sean only — never set by AI auto-replies.
-  audioUrl        String?
+  audioUrl         String?
   audioDurationSec Int?
 
   // Tap-reply chips for Sean's proactive daily check-ins. Shape:
@@ -328,8 +328,8 @@ model ChatMessage {
   // message text. Tapping a chip fires sendToSean with the chip's
   // value, persists her USER reply, schedules the AI auto-reply,
   // and stamps chipsRepliedAt on this row so the chips collapse.
-  chipOptions     Json?
-  chipsRepliedAt  DateTime?
+  chipOptions    Json?
+  chipsRepliedAt DateTime?
 
   createdAt DateTime @default(now())
 
@@ -353,40 +353,40 @@ model ChatMessage {
 // Real Sean can still write replies manually from the coach dashboard
 // — those go straight into ChatMessage with aiGenerated=false.
 model PendingAiReply {
-  id              String   @id @default(cuid())
+  id               String    @id @default(cuid())
   // Client whose thread this reply belongs to.
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   // The user-side ChatMessage that triggered this reply. Used for
   // building the Claude prompt context — we read recent history anyway,
   // but keeping the trigger explicit makes debugging easier.
   triggerMessageId String
   // When the cron should fire this reply. Stored as UTC instant; the
   // cron picks up anything with scheduledFor <= now() AND status="pending".
-  scheduledFor    DateTime
+  scheduledFor     DateTime
   // "pending" | "sent" | "failed" | "cancelled" — rows are kept after
   // firing for analytics + debugging. Cancelled rows are queued
   // replies Sean overrode by writing back himself from the coach
   // messaging dashboard. Sent/failed/cancelled rows can be purged later.
-  status          String   @default("pending")
+  status           String    @default("pending")
   // Populated by the cron route on send or failure.
-  sentAt          DateTime?
-  errorMessage    String?
-  createdAt       DateTime @default(now())
+  sentAt           DateTime?
+  errorMessage     String?
+  createdAt        DateTime  @default(now())
 
   @@index([status, scheduledFor])
   @@index([userId])
 }
 
 model PushSubscription {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Web Push API fields. The endpoint is unique per browser+device.
-  endpoint  String   @unique
-  p256dh    String   // base64url-encoded ECDH public key
-  auth      String   // base64url-encoded auth secret
+  endpoint  String  @unique
+  p256dh    String // base64url-encoded ECDH public key
+  auth      String // base64url-encoded auth secret
   userAgent String?
 
   createdAt DateTime @default(now())
@@ -401,32 +401,32 @@ model PushSubscription {
 // convertedToUserId is loosely linked (no FK relation) so deleting a
 // User doesn't cascade and lose marketing history.
 model Lead {
-  id                String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Captured on the contact step before questions start.
-  firstName         String
-  email             String
-  phone             String?
+  firstName String
+  email     String
+  phone     String?
 
   // Auto-captured at submit time.
-  ipAddress         String?
-  country           String?
+  ipAddress String?
+  country   String?
 
   // Full answer set. Shape: Record<string, string | string[] | boolean>
   // Keyed by question id (q1..q15). q1–q10 are "yes"/"no", q11–q14 are
   // option keys, q15 is free text. Schema enforced by zod at the API edge.
-  answers           Json
+  answers Json
 
   // Derived once at submit. Stored so the results page doesn't recompute
   // and Sean can sort/filter the dashboard later without re-scoring.
-  score             Int      // 0–10, count of "yes" in q1–q10
-  budgetTier        String   // FREE | APP | COACH | DONE_FOR_YOU — from q14
+  score      Int // 0–10, count of "yes" in q1–q10
+  budgetTier String // FREE | APP | COACH | DONE_FOR_YOU — from q14
 
   // If she later signs up, we stamp her User.id here so Sean can see
   // who converted. Plain String (no FK) on purpose — see model comment.
   convertedToUserId String?
 
-  createdAt         DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([email])
   @@index([createdAt])
@@ -443,42 +443,42 @@ model Lead {
 // window the surface renders as replay-only.
 
 model SundayPrompt {
-  id        String   @id @default(cuid())
+  id        String               @id @default(cuid())
   // ISO-week Monday — one SundayPrompt per week. The Sunday surface looks
   // up this week's prompt by this key.
-  weekStart DateTime @unique
+  weekStart DateTime             @unique
   question  String
   // Format kind. "pulse" = 3-tap bar poll, "this_or_that" = binary card,
   // "is_this_you" = relatable + 3 confession reactions, "open" = legacy
   // free-text answer (historical only — new prompts auto-rotate through
   // the three tap formats). The coach editor can override the auto-picked
   // kind per week.
-  kind      String   @default("pulse")
+  kind      String               @default("pulse")
   // Options for tap formats. Shape depends on kind:
   //   pulse:        [{ key: "discipline", label: "discipline" }, ...]  (3 entries)
   //   this_or_that: [{ key: "left", label: "I'll start Monday" }, ...] (2 entries)
   //   is_this_you:  [{ key: "me", label: "😤 me" }, ...]               (3 entries)
   //   open:         null (use SundayPromptAnswer.body)
   options   Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
   answers   SundayPromptAnswer[]
 }
 
 model SundayPromptAnswer {
-  id        String   @id @default(cuid())
+  id        String                 @id @default(cuid())
   promptId  String
-  prompt    SundayPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  prompt    SundayPrompt           @relation(fields: [promptId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Option key she tapped for tap-format prompts (pulse / this_or_that /
   // is_this_you). Null on legacy "open" answers, which use body instead.
   choice    String?
   // Free-text answer. Nullable now — only legacy "open" prompts populate
   // this field. New tap-format answers leave body null.
-  body      String?  @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  body      String?                @db.Text
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
   reactions SundayPromptReaction[]
 
   @@unique([promptId, userId])
@@ -486,14 +486,14 @@ model SundayPromptAnswer {
 }
 
 model SundayPromptReaction {
-  id        String   @id @default(cuid())
+  id        String             @id @default(cuid())
   answerId  String
   answer    SundayPromptAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   // "rose" 🌹 (peaceful) | "strong" 💪 (encouragement) | "leaf" 🌿 (steady)
   kind      String
-  createdAt DateTime @default(now())
+  createdAt DateTime           @default(now())
 
   @@unique([answerId, userId, kind])
   @@index([answerId])
@@ -513,27 +513,27 @@ model SundayPromptReaction {
 //   skipped   → Sean opted not to record for this trigger. Doesn't
 //               surface to the client; tracked so the queue clears.
 model VoiceMoment {
-  id              String   @id @default(cuid())
-  recipientUserId String
-  recipient       User     @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  id                 String       @id @default(cuid())
+  recipientUserId    String
+  recipient          User         @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
   // What kind of milestone triggered this prompt. Currently only
   // "monthly_check_in" is wired; future kinds can be added without
   // schema changes.
-  triggerKind     String
+  triggerKind        String
   // Specific event id (e.g. WeeklyCheckIn.id for monthly_check_in).
   // The unique constraint on (recipient, kind, source) means re-
   // submitting the same check-in doesn't double-queue.
-  triggerSourceId String
-  status          String   @default("queued")
-  audioUrl        String?
-  durationSec     Int?
+  triggerSourceId    String
+  status             String       @default("queued")
+  audioUrl           String?
+  durationSec        Int?
   // The delivered ChatMessage row. Set when status flips to "recorded";
   // links the queue entry to the audio bubble the client sees.
-  deliveredMessageId String?  @unique
+  deliveredMessageId String?      @unique
   deliveredMessage   ChatMessage? @relation("VoiceMomentMessage", fields: [deliveredMessageId], references: [id])
 
-  createdAt   DateTime @default(now())
-  recordedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  recordedAt DateTime?
 
   @@unique([recipientUserId, triggerKind, triggerSourceId])
   @@index([status, createdAt])
@@ -562,4 +562,97 @@ model DailyMood {
 
   @@unique([userId, centralDate])
   @@index([centralDate])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CONTENT COMMAND CENTER (/coach/insights)
+//
+// Auto-pulled Instagram performance joined to the RIVEN funnel. The point
+// is to rank Sean's posts by what actually drove the business (link taps →
+// quiz starts → trials), not by vanity reach. Powered by:
+//   - Instagram Graph API  (his own Creator account)  → src/lib/instagram.ts
+//   - PostHog Query API     (project 448237 funnel)    → src/lib/posthog-insights.ts
+//
+// We snapshot IG metrics daily via /api/cron/sync-instagram because Meta's
+// per-media insights expire (~24 months) and reach/plays keep moving for
+// days after publish. Storing snapshots gives us history + a stable read.
+// ─────────────────────────────────────────────────────────────────────────
+
+// One row per Instagram post (reel, image, carousel) we've ever synced.
+// `igId` is Meta's media id — the stable key we upsert against.
+model IgPost {
+  id           String   @id @default(cuid())
+  igId         String   @unique // Meta media id
+  mediaType    String // "REELS" | "IMAGE" | "CAROUSEL_ALBUM" | "VIDEO"
+  permalink    String?
+  caption      String?  @db.Text
+  thumbnailUrl String?
+  mediaUrl     String? // video/image source — used by Phase 3 reel transcription
+  publishedAt  DateTime
+
+  // Phase 3: Whisper transcript of the reel audio + the extracted hook
+  // (first line / opening claim). Lets the pattern engine correlate hook
+  // STYLE with performance instead of guessing. Null until transcribed.
+  transcript String? @db.Text
+  hook       String?
+
+  // UTM tag we attach to this post's link (Story sticker / per-post bio
+  // swap) so PostHog can attribute funnel events to it precisely. When
+  // null we fall back to publish-time correlation. Convention:
+  // utm_content = "ig_<igId>".
+  utmContent String?
+
+  metrics IgPostMetric[]
+
+  @@index([publishedAt])
+}
+
+// A point-in-time snapshot of a post's metrics. We keep the latest per post
+// for display and the series for "is this still climbing?" reads. Funnel
+// numbers (quizStarts/trials) are stamped here at sync time from PostHog so
+// the page renders without a live cross-service call on every load.
+model IgPostMetric {
+  id     String @id @default(cuid())
+  postId String
+  post   IgPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // From Instagram Graph API media insights.
+  reach            Int?
+  impressions      Int?
+  likes            Int?
+  comments         Int?
+  saved            Int? // "saves" — algorithm gold
+  shares           Int?
+  // Reels-only.
+  plays            Int?
+  avgWatchTimeMs   Int? // ig_reels_avg_watch_time (milliseconds)
+  totalWatchTimeMs Int?
+  // Profile/link actions attributed to the post by IG.
+  profileVisits    Int?
+  linkTaps         Int?
+
+  // From PostHog, joined by utmContent (or publish-time window fallback).
+  quizStarts Int?
+  trials     Int?
+
+  capturedAt DateTime @default(now())
+
+  @@index([postId, capturedAt])
+}
+
+// Daily account-level snapshot — followers + reach trend so the "THIS WEEK"
+// header has real period-over-period numbers and we can chart follower
+// growth against posting cadence.
+model IgAccountSnapshot {
+  id               String   @id @default(cuid())
+  followers        Int?
+  reach7d          Int?
+  profileVisits7d  Int?
+  // Manual until IG messaging access is approved (heavy review): count of
+  // DMs/comments showing buying intent ("how do I work with you?"). Sean
+  // taps a number in the UI; this is the highest-signal metric we track.
+  qualifiedDmsWeek Int?
+  capturedAt       DateTime @default(now())
+
+  @@index([capturedAt])
 }
