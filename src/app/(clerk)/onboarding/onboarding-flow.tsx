@@ -703,27 +703,6 @@ function PlanStat({ label, value, unit }: { label: string; value: string; unit: 
   );
 }
 
-function PlanRow({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span
-        className={`font-body text-label-md tracking-widest uppercase ${
-          muted ? "text-on-surface-variant/70" : "text-on-surface-variant"
-        }`}
-      >
-        {label}
-      </span>
-      <span
-        className={`font-display ${
-          muted ? "text-body-lg text-charcoal/70" : "text-headline-md text-charcoal"
-        }`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
 /* ──────────────────────────────────────────────────────────── */
 /* Inputs                                                       */
 /* ──────────────────────────────────────────────────────────── */
