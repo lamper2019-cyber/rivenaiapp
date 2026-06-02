@@ -9,7 +9,7 @@ import { startOfCentralDay } from "@/lib/dates";
  * activity out so the feed reads as "OTHER women in here" — that's the
  * dopamine, not seeing your own log echoed back.
  *
- * First names always per Sean's privacy answer (small community, names
+ * First names always per RIVEN's privacy answer (small community, names
  * ARE the brand). Comped + trialing + active subs only — paywalled or
  * canceled clients are invisible to each other.
  */
@@ -103,7 +103,7 @@ export async function getRecentPulseEvents(
   for (const m of meals) {
     const first = firstNameFor(m.user.profile?.name);
     if (!first) continue;
-    // Sean explicitly asked to strip the meal time-of-day + the food name
+    // RIVEN explicitly asked to strip the meal time-of-day + the food name
     // off the pulse feed — "late meal" framing felt judgey, and surfacing
     // what someone ate to other clients adds zero value. Neutral copy now.
     events.push({

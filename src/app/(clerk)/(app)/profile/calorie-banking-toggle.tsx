@@ -8,7 +8,7 @@ import { BANK_FLOOR_DELTA, BANK_CEILING_DELTA } from "@/lib/calorie-schedule";
  * "Smooth my week" lever on /profile. Flips Profile.calorieBankingEnabled for
  * the signed-in client. When ON, the resolver rolls yesterday's leftover (or
  * overage) into today's target, clamped to her daily cut ± 600. Her weekly
- * average — the number Sean actually coaches — never changes; only how the
+ * average — the number RIVEN actually coaches — never changes; only how the
  * calories sit across the days does.
  *
  * Optimistic: the switch flips immediately, and reverts only if the server

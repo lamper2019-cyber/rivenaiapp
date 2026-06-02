@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { MessagesInbox, type CoachMessage } from "./messages-inbox";
 
 /**
- * Client-facing inbox for coach (Sean) messages. Kept entirely separate from
- * RIVEN Ai (/chat) — that thread is user ↔ AI only. The "Message from Sean"
+ * Client-facing inbox for coach (RIVEN) messages. Kept entirely separate from
+ * RIVEN Ai (/chat) — that thread is user ↔ AI only. The "Message from RIVEN"
  * pulsing badge on the dashboard links here; visiting clears the unread glow
  * by writing the latest coach message id to localStorage.
  */
@@ -59,7 +59,7 @@ export default async function MessagesPage() {
           Inbox
         </p>
         <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal">
-          Messages from Sean
+          Messages from RIVEN
         </h1>
         <p className="font-body text-body-md text-on-surface-variant">
           Personal notes from your coach. The last 30 days live here.
@@ -73,7 +73,7 @@ export default async function MessagesPage() {
       ) : messages.length === 0 ? (
         <div className="rounded-md bg-surface-container/40 border border-outline-variant/40 px-gutter py-8 text-center">
           <p className="font-body text-body-md text-on-surface-variant">
-            No messages from Sean yet. When he sends one, it lands here and
+            No messages from RIVEN yet. When he sends one, it lands here and
             your dashboard chip will glow.
           </p>
         </div>

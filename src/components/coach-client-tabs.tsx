@@ -39,7 +39,7 @@ export function CoachClientTabs({
     const sp = new URLSearchParams(params.toString());
     sp.set("tab", next);
     startTransition(() => {
-      // scroll: false keeps Sean's eye on the tab bar instead of yanking him
+      // scroll: false keeps RIVEN's eye on the tab bar instead of yanking him
       // back to the top of the page on every tab switch.
       router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
     });

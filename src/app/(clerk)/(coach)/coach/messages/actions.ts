@@ -7,16 +7,16 @@ import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 
 /**
- * Sean replies to a client thread from the messaging dashboard. The
+ * RIVEN replies to a client thread from the messaging dashboard. The
  * reply:
  *   1. Inserts a COACH-kind ChatMessage with aiGenerated=false +
- *      senderUserId = Sean's User.id
- *   2. Cancels any queued PendingAiReply for this client — Sean
+ *      senderUserId = RIVEN's User.id
+ *   2. Cancels any queued PendingAiReply for this client — RIVEN
  *      answered, no need for the AI to also chime in 3 minutes from
  *      now (would be confusing for the client to get two replies)
  *   3. Pushes the client so she gets the notification immediately
  *
- * Gated to COACH role. Coach name is hardcoded "Sean" on the client
+ * Gated to COACH role. Coach name is hardcoded "RIVEN" on the client
  * side (CLAUDE.md rule); we don't surface senderUserId in the client
  * UI, just store it for audit.
  */
@@ -89,7 +89,7 @@ export async function sendCoachReply(
     select: { id: true },
   });
 
-  // Cancel any queued AI auto-reply for this client — Sean wrote back
+  // Cancel any queued AI auto-reply for this client — RIVEN wrote back
   // himself, the AI doesn't also need to chime in. Mark as "cancelled"
   // so the cron skips it but we keep the row for analytics.
   await prisma.pendingAiReply.updateMany({
@@ -103,7 +103,7 @@ export async function sendCoachReply(
   // /dashboard.
   try {
     await sendPushToUser(parsed.data.clientUserId, {
-      title: "Sean wrote you",
+      title: "RIVEN wrote you",
       body: parsed.data.message.slice(0, 140),
       url: "/dashboard",
       tag: `sean-${parsed.data.clientUserId}`,

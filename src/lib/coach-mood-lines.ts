@@ -1,7 +1,7 @@
 import type { MoodKind } from "@/lib/daily-mood";
 
 /**
- * Sean-voice coaching lines that fire after she taps her mood on the
+ * RIVEN-voice coaching lines that fire after she taps her mood on the
  * dashboard. The float-up animation handles the "send" gesture; the
  * ribbon collapses; this line is what replaces it.
  *
@@ -11,7 +11,7 @@ import type { MoodKind } from "@/lib/daily-mood";
  * doesn't change if she re-opens the app mid-afternoon.
  *
  * Voice rules (per CLAUDE.md + BRAND.md): direct, warm, no preamble,
- * no therapy clichés, no clean-eating moralizing. Sean talks like a
+ * no therapy clichés, no clean-eating moralizing. RIVEN talks like a
  * smart older brother, not a cheerleader. Peaceful discipline.
  */
 export const COACH_MOOD_LINES: Record<MoodKind, readonly string[]> = {

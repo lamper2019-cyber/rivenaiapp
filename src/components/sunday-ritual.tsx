@@ -273,7 +273,7 @@ function ThisOrThat({
   if (options.length < 2) {
     return (
       <p className="font-body text-body-md text-on-surface-variant">
-        This prompt is missing its two options. Sean will fix it shortly.
+        This prompt is missing its two options. RIVEN will fix it shortly.
       </p>
     );
   }

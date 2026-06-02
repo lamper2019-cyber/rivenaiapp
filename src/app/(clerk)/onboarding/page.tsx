@@ -71,7 +71,7 @@ export default async function OnboardingPage() {
     }
   }
 
-  // The flow handles its own layout / header / progress dots / Sean voice
+  // The flow handles its own layout / header / progress dots / RIVEN voice
   // — no outer wrapper so each step owns the full screen.
   return <OnboardingFlow quizLead={quizLead} />;
 }

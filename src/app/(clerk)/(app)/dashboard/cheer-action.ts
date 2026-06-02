@@ -79,7 +79,7 @@ export async function sendCheer(
     !sender.subscriptionStatus ||
     !okStatuses.includes(sender.subscriptionStatus)
   ) {
-    // Coaches can also cheer — Sean sending roses is a feature, not a bug.
+    // Coaches can also cheer — RIVEN sending roses is a feature, not a bug.
     if (sender.role !== "COACH") {
       return { ok: false, error: "Only active members can send cheers." };
     }

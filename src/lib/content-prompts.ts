@@ -1,5 +1,5 @@
 /**
- * Weekly content prompts — Sean's full 52-prompt library, categorized.
+ * Weekly content prompts — RIVEN's full 52-prompt library, categorized.
  * Time-independent: any prompt works for a client at any stage of her journey.
  * Designed for 60-second video answers; doubles as a marketing-content well.
  *

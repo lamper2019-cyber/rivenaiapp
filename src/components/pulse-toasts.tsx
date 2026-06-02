@@ -7,7 +7,7 @@ import type { PulseEvent } from "@/lib/pulse";
  * Spontaneous activity toast pop-ups. One event at a time, fades in,
  * holds, fades out, waits, picks the next event from the bank, repeats.
  *
- * Replaces the persistent "Right Now in RIVEN" PulseStrip per Sean —
+ * Replaces the persistent "Right Now in RIVEN" PulseStrip per RIVEN —
  * the strip read like a leaderboard. This reads like the Shopify
  * "someone just ordered" trick: ambient proof that other women are in
  * here moving, surfacing one at a time so it stays alive without ever

@@ -29,7 +29,7 @@ export type CheerCandidate = {
   recipientUserId: string;
   firstName: string;
   context: CheerContext;
-  /** Plain-language reason shown to the cheerer. Already in Sean's voice. */
+  /** Plain-language reason shown to the cheerer. Already in RIVEN's voice. */
   reason: string;
   /** Number of cheers already sent to this recipient for this context.
    *  Used to render "3 women are rooting for her" beside the button. */
@@ -63,7 +63,7 @@ export async function getCheerCandidates(viewerUserId: string): Promise<CheerCan
   // Pull every active client (minus the viewer) with the data we need to
   // evaluate each hard-day rule. For the way-over-target check we now
   // need the LAST 3 daily totals (yesterday, day-2, day-3) so we can
-  // detect a 3-in-a-row pattern instead of a single bad day — Sean's
+  // detect a 3-in-a-row pattern instead of a single bad day — RIVEN's
   // call: a one-off heavy day doesn't earn a community cheer prompt;
   // a pattern does.
   const threeDaysAgo = new Date(today);
@@ -182,7 +182,7 @@ export async function getCheerCandidates(viewerUserId: string): Promise<CheerCan
     }
 
     // ── rule 3: way over target for 3 days in a row ─────────────────
-    // Sean's call: a one-off heavy day doesn't earn a community cheer
+    // RIVEN's call: a one-off heavy day doesn't earn a community cheer
     // prompt — that's a normal Saturday. Three in a row is a pattern,
     // and a pattern earns peers the chance to send a 🌹. Requires all
     // three of the last 3 daily totals to exceed target × 1.5; missing

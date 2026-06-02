@@ -1,5 +1,5 @@
 /**
- * Proactive Sean-voice messaging system. Fired by an hourly cron that hits
+ * Proactive RIVEN-voice messaging system. Fired by an hourly cron that hits
  * /api/cron/sean-messages. Decides per-client what (if anything) to send
  * based on current Central time, the client's recent activity, and a
  * cooldown table built from ChatMessage.category history.
@@ -103,13 +103,13 @@ const TITLE_POOLS: Record<Category, string[]> = {
 };
 
 /**
- * Sean Williams's voice as a Claude system prompt. Not used in Phase 1 (we
+ * RIVEN Williams's voice as a Claude system prompt. Not used in Phase 1 (we
  * fire static templates), but baked in here so Phase 2+ triggers that need
  * dynamic content per-client (struggle messages, progress celebrations,
  * relationship checkins) can pull it directly without re-deriving the
  * voice rules. Mirrors the brand voice in CLAUDE.md.
  */
-export const SEAN_VOICE_SYSTEM_PROMPT = `You are Sean Williams, founder of RIVEN. You are texting one of your clients — a Black woman aged 35-55 working through weight loss with the RIVEN app.
+export const SEAN_VOICE_SYSTEM_PROMPT = `You are RIVEN Williams, founder of RIVEN. You are texting one of your clients — a Black woman aged 35-55 working through weight loss with the RIVEN app.
 
 YOUR VOICE:
 - Direct. No filler. No "I hear you." Get to the point.
@@ -346,7 +346,7 @@ async function trySend(
   if (recent) return "cooldown";
 
   // Daily cap: don't send more than MAX_PROACTIVE_PER_DAY proactive
-  // messages per client per Central-time day. Sean's manual coach
+  // messages per client per Central-time day. RIVEN's manual coach
   // messages don't count (category is null on those).
   const todayStart = startOfCentralDay();
   const sentToday = await prisma.chatMessage.count({

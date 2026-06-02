@@ -6,7 +6,7 @@ import { CoachBottomNav } from "@/components/coach-bottom-nav";
 /**
  * Coach-only layout. Anyone whose User.role !== COACH is redirected to the
  * client dashboard. Bootstraps the User row so a fresh coach account works
- * the moment Sean signs in with the COACH_EMAIL address.
+ * the moment RIVEN signs in with the COACH_EMAIL address.
  *
  * `redirect()` throws a NEXT_REDIRECT control-flow error — keep redirects
  * outside try/catch or the catch will swallow them and render the wrong nav.

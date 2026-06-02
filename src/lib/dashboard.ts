@@ -35,10 +35,10 @@ export async function loadDashboardData(clerkId: string) {
   // Stamp presence (best-effort, never blocks the dashboard).
   await markUserPresent(user.id);
 
-  // Window for the "latest Sean prompt" headline on the dashboard. Looks
+  // Window for the "latest RIVEN prompt" headline on the dashboard. Looks
   // back 24 hours so the morning prompt is still surfaced at 9 PM even
   // if she never tapped it; falls back to the time-aware ritual if no
-  // Sean message lands inside that window.
+  // RIVEN message lands inside that window.
   const seanPromptWindow = new Date();
   seanPromptWindow.setHours(seanPromptWindow.getHours() - 24);
 
@@ -64,7 +64,7 @@ export async function loadDashboardData(clerkId: string) {
       where: { userId_date: { userId: user.id, date: yesterday } },
     }),
     // COACH messages from the last 30 days — drives the legacy "Message
-    // from Sean" chip + unread state for any consumer that still reads
+    // from RIVEN" chip + unread state for any consumer that still reads
     // it. The new dashboard headline replaces the visible chip but the
     // count + ids are still wired for analytics / future use.
     (async () => {
@@ -77,10 +77,10 @@ export async function loadDashboardData(clerkId: string) {
       });
     })(),
     // Most recent COACH message in the last 24h — drives the
-    // "Today with Sean" headline. If it has chipOptions set and
+    // "Today with RIVEN" headline. If it has chipOptions set and
     // chipsRepliedAt null, the headline renders the tap chips; if
     // it has audioUrl set, it renders an inline audio player;
-    // otherwise it just shows the text. No /chat thread — Sean's
+    // otherwise it just shows the text. No /chat thread — RIVEN's
     // coaching is a single-surface "ping → tap → done" loop.
     prisma.chatMessage.findFirst({
       where: {
@@ -120,7 +120,7 @@ export async function loadDashboardData(clerkId: string) {
 
   // Parse the chipOptions JSON column into a typed array; null/empty
   // means this message doesn't have chips (it's a plain text or audio
-  // message from Sean).
+  // message from RIVEN).
   const headlineChips = parseChipOptions(latestSeanPrompt?.chipOptions);
 
   return {
@@ -137,7 +137,7 @@ export async function loadDashboardData(clerkId: string) {
     ritualSlot,
     morningFocus,
     presentNames,
-    /** "Today with Sean" headline payload. Null when no COACH message
+    /** "Today with RIVEN" headline payload. Null when no COACH message
      *  has landed in the last 24h — caller falls back to the time-
      *  aware ritual card. */
     latestSeanPrompt: latestSeanPrompt

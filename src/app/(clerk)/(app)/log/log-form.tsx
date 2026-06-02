@@ -103,7 +103,7 @@ export function LogForm({
           // Always use the server's recomputed truth (res.totals) — NOT
           // local arithmetic. Adding analysis.calories to local state was
           // how the /log display drifted away from /dashboard's reading
-          // and Sean caught a 2000-vs-1915 mismatch. server-truth = bulletproof.
+          // and RIVEN caught a 2000-vs-1915 mismatch. server-truth = bulletproof.
           setTotals({
             ...totals,
             caloriesToday: res.totals.calories,
@@ -441,7 +441,7 @@ function MealRowItem({
         title={`Log this whole meal again: ${meal.description}`}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {/* Red exclamation removed per Sean — the food name shouldn't
+          {/* Red exclamation removed per RIVEN — the food name shouldn't
               wear a warning sticker. Any heads-up text still lives in the
               ResultCard for the most recently logged meal. */}
           <span className="font-body text-body-md text-charcoal truncate">
@@ -562,7 +562,7 @@ function ResultCard({
       {/* Heads-up note — only when something refined / processed is on
           the plate. Sits above the coaching prose so the "why" reads as
           context, not a lecture appended at the end. No red exclamation
-          icon (Sean's call: a red alarm next to her food makes the whole
+          icon (RIVEN's call: a red alarm next to her food makes the whole
           log feel judgmental). Soft gold-tinted card with quiet "Heads up"
           label — same surface as our reminder cards. AI prompt caps the
           body at 2 sentences. */}

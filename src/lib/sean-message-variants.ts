@@ -12,7 +12,7 @@
  *     even then we deduplicate against what's been sent, so the freshest
  *     unseen variant is always picked first.
  *
- * Sean wrote most of these directly — see commit history. The remaining
+ * RIVEN wrote most of these directly — see commit history. The remaining
  * 150 (Fri 51-100, 24h 51-100, 72h 51-100) were drafted to match his
  * tone: short, conversational, mostly questions, no "sis/girl/baby,"
  * sparing use of signature phrases.
@@ -27,123 +27,123 @@
  * ────────────────────────────────────────────────────────────── */
 
 export const RHYTHM_WED_PM_TITLES: string[] = [
-  "Mid-week check from Sean",
+  "Mid-week check from RIVEN",
   "Halfway. Where you at?",
   "Wednesday night",
   "Mid-week pulse",
   "Three days in",
-  "Sean: mid-week check",
-  "Wednesday night, Sean",
+  "RIVEN: mid-week check",
+  "Wednesday night, RIVEN",
   "Halfway through",
-  "Mid-week from Sean",
-  "Sean checking in",
+  "Mid-week from RIVEN",
+  "RIVEN checking in",
 ];
 
 export const RHYTHM_FRI_PM_TITLES: string[] = [
   "Weekend incoming",
-  "Friday from Sean",
+  "Friday from RIVEN",
   "Tomorrow's Saturday",
   "Pre-weekend check",
-  "Sean: weekend plan",
+  "RIVEN: weekend plan",
   "Friday night",
   "Weekend warning",
   "Heads up — Saturday",
-  "Pre-Saturday from Sean",
+  "Pre-Saturday from RIVEN",
   "Friday night plan",
 ];
 
 export const BEHAVIORAL_24H_TITLES: string[] = [
-  "Sean noticed",
+  "RIVEN noticed",
   "Checking in",
   "Hey, where you at?",
-  "Sean checking in",
+  "RIVEN checking in",
   "Quick check",
-  "Sean's noticed",
+  "RIVEN's noticed",
   "Talk to me",
   "Empty day",
-  "Sean reaching out",
-  "Quiet day from Sean",
+  "RIVEN reaching out",
+  "Quiet day from RIVEN",
 ];
 
 export const BEHAVIORAL_72H_TITLES: string[] = [
-  "Three days, Sean checking in",
+  "Three days, RIVEN checking in",
   "Three days quiet",
   "Talk to me",
-  "Sean reaching out",
+  "RIVEN reaching out",
   "Where you at?",
-  "Three days — Sean",
-  "Sean asking",
-  "Quiet stretch — Sean here",
+  "Three days — RIVEN",
+  "RIVEN asking",
+  "Quiet stretch — RIVEN here",
   "Door's still open",
-  "Sean after 3 days",
+  "RIVEN after 3 days",
 ];
 
 export const PROGRESS_STREAK_3_TITLES: string[] = [
   "3 days locked in",
-  "Sean: 3-day streak",
+  "RIVEN: 3-day streak",
   "Three straight",
   "3 days",
   "Pattern's forming",
-  "Sean noticed: 3 days",
+  "RIVEN noticed: 3 days",
   "Three days locked",
 ];
 
 export const PROGRESS_STREAK_5_TITLES: string[] = [
   "5-day streak",
-  "Sean: five days",
+  "RIVEN: five days",
   "Five straight",
   "5 days locked",
-  "Sean noticed: 5 days",
+  "RIVEN noticed: 5 days",
   "Five days in",
-  "Sean: 5 days",
+  "RIVEN: 5 days",
 ];
 
 export const PROGRESS_STREAK_7_TITLES: string[] = [
   "7 days. Locked in.",
-  "Sean: one full week",
+  "RIVEN: one full week",
   "7-day streak",
   "Seven straight",
   "Full week",
-  "Sean noticed: 7 days",
-  "Sean: full week",
+  "RIVEN noticed: 7 days",
+  "RIVEN: full week",
 ];
 
 export const PROGRESS_STREAK_14_TITLES: string[] = [
   "14 days locked in",
-  "Sean: two-week streak",
+  "RIVEN: two-week streak",
   "Two full weeks",
   "14 days",
-  "Sean noticed: two weeks",
+  "RIVEN noticed: two weeks",
   "14-day streak",
   "Two weeks in",
 ];
 
 export const PROGRESS_STREAK_30_TITLES: string[] = [
   "30 days. A full month.",
-  "Sean: one-month streak",
+  "RIVEN: one-month streak",
   "One full month",
   "30 days locked in",
-  "Sean noticed: 30 days",
+  "RIVEN noticed: 30 days",
   "30-day streak",
   "A month in",
 ];
 
 export const PROGRESS_STREAK_60_TITLES: string[] = [
   "60 days. Two months.",
-  "Sean: two-month streak",
+  "RIVEN: two-month streak",
   "Two months locked in",
   "60 days",
-  "Sean noticed: 60 days",
+  "RIVEN noticed: 60 days",
   "60-day streak",
   "Two months in",
 ];
 
 export const PROGRESS_STREAK_90_TITLES: string[] = [
   "90 days. Three months.",
-  "Sean: three-month streak",
+  "RIVEN: three-month streak",
   "Three months locked",
   "90 days",
-  "Sean noticed: 90 days",
+  "RIVEN noticed: 90 days",
   "90-day streak",
   "A full quarter",
 ];

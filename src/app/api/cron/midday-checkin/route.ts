@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Midday Sean check-in. Fires daily ~1 PM CT — conditional on her
+ * Midday RIVEN check-in. Fires daily ~1 PM CT — conditional on her
  * not having logged any meal today. The runDailyCheckInBatch helper
  * filters by today's MealLogs for the midday slot specifically.
  *

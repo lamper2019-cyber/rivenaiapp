@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { generatePostIdeas, type IdeasResult } from "./actions";
 
 /**
- * "What to post next" — one tap generates 3 fresh hook ideas seeded by Sean's
+ * "What to post next" — one tap generates 3 fresh hook ideas seeded by RIVEN's
  * best-reaching posts, in his voice. Lives at the bottom of the command center.
  */
 export function PostIdeas() {

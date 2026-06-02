@@ -10,7 +10,7 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  // Four tabs. Sean's coaching surfaces through the Message-from-Sean
+  // Four tabs. RIVEN's coaching surfaces through the Message-from-RIVEN
   // bubble at the top of /dashboard (tap it → opens /chat thread, no
   // bottom-nav slot needed). RIVEN AI is the user ↔ AI assistant for
   // voice meal logging + nutrition questions.

@@ -1,5 +1,5 @@
 /**
- * The sync job: pull Sean's Instagram posts + insights, join the PostHog
+ * The sync job: pull RIVEN's Instagram posts + insights, join the PostHog
  * funnel numbers, and write snapshots to Postgres. Shared by the daily cron
  * (/api/cron/sync-instagram) and the manual "Sync now" button on the page.
  *
@@ -108,7 +108,7 @@ export async function syncInstagram(): Promise<SyncResult> {
   }
 
   // 3. Account snapshot. Carry forward the manually-entered qualified-DM count
-  // so the daily auto-sync doesn't wipe Sean's number.
+  // so the daily auto-sync doesn't wipe RIVEN's number.
   try {
     const acct = await fetchAccountInsights();
     const last = await prisma.igAccountSnapshot.findFirst({

@@ -72,7 +72,7 @@ export async function setQualifiedDms(count: number): Promise<SetDmsResult> {
 export type IdeasResult = { ok: true; ideas: string[] } | { ok: false; error: string };
 
 /**
- * "What to post next" — reads Sean's best-reaching analyzed posts and asks
+ * "What to post next" — reads RIVEN's best-reaching analyzed posts and asks
  * Claude for 3 fresh hook ideas in his voice, leaning into what's working.
  */
 export async function generatePostIdeas(): Promise<IdeasResult> {
@@ -104,7 +104,7 @@ export async function generatePostIdeas(): Promise<IdeasResult> {
       max_tokens: 400,
       messages: [{
         role: "user",
-        content: `You write Instagram hooks for Sean, a weight-loss coach for Black women 35+. Voice: calm, direct, no hype, culturally grounded ("peaceful discipline, steady wins"). No therapy clichés, no "you got this".
+        content: `You write Instagram hooks for RIVEN, a weight-loss coach for Black women 35+. Voice: calm, direct, no hype, culturally grounded ("peaceful discipline, steady wins"). No therapy clichés, no "you got this".
 
 His best-reaching hooks so far:
 ${seed}

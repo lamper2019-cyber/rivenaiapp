@@ -6,17 +6,17 @@ import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 /**
- * Client-side action: chip-tap reply to a Sean prompt.
+ * Client-side action: chip-tap reply to a RIVEN prompt.
  *
  * As of 2026-05-27 the only caller is SeanPromptHeadline on /dashboard.
  * /chat is retired (it redirects home), there is no bottom input, and
- * the AI auto-reply pipeline is shut off — Sean's coaching is now a
+ * the AI auto-reply pipeline is shut off — RIVEN's coaching is now a
  * "ping → tap → done" loop, not a thread.
  *
  * Effect:
- *   1. Persist her USER message (kind=COACH) so Sean's /coach/messages
+ *   1. Persist her USER message (kind=COACH) so RIVEN's /coach/messages
  *      view shows the response.
- *   2. If this is a chip-reply, stamp chipsRepliedAt on the Sean prompt
+ *   2. If this is a chip-reply, stamp chipsRepliedAt on the RIVEN prompt
  *      so the chips collapse on next render.
  *
  * No AI scheduler call. No /chat revalidate (no page to refresh).
@@ -38,7 +38,7 @@ const SendSchema = z.object({
     .max(4, "At most 4 images per message")
     .optional()
     .default([]),
-  /** The Sean message whose chips she tapped. Used to mark chipsRepliedAt
+  /** The RIVEN message whose chips she tapped. Used to mark chipsRepliedAt
    *  so the chips don't re-render. Only set when this is a chip reply. */
   chipMessageId: z.string().optional(),
 });
@@ -77,7 +77,7 @@ export async function sendToSean(
   }
   if (!user) return { ok: false, error: "Account not found." };
   if (!user.profile) {
-    return { ok: false, error: "Complete onboarding before messaging Sean." };
+    return { ok: false, error: "Complete onboarding before messaging RIVEN." };
   }
 
   // 1. Persist her message. Always kind=COACH role=USER on the unified
@@ -94,7 +94,7 @@ export async function sendToSean(
     select: { id: true },
   });
 
-  // 2. If this is a chip-reply, stamp chipsRepliedAt on the Sean
+  // 2. If this is a chip-reply, stamp chipsRepliedAt on the RIVEN
   //    message so the chips collapse on next render. Defensive update
   //    gated to that user's own messages so a stale client can't
   //    mark someone else's row.
@@ -109,7 +109,7 @@ export async function sendToSean(
     });
   }
 
-  // The data lands on /coach/messages for Sean and the SeanPromptHeadline
+  // The data lands on /coach/messages for RIVEN and the SeanPromptHeadline
   // re-renders the answered state on /dashboard.
   revalidatePath("/dashboard");
   revalidatePath("/coach/messages");

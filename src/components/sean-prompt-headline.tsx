@@ -5,18 +5,18 @@ import { useRouter } from "next/navigation";
 import { sendToSean } from "@/app/(clerk)/(app)/chat/sean-actions";
 
 /**
- * "Today with Sean" — the top of /dashboard.
+ * "Today with RIVEN" — the top of /dashboard.
  *
- * As of 2026-05-27 this is the ONLY surface for Sean's coaching. The
+ * As of 2026-05-27 this is the ONLY surface for RIVEN's coaching. The
  * old /chat thread is retired (redirects to /dashboard), the bottom-
- * input is gone, and the AI auto-reply scheduler is shut off. Sean
+ * input is gone, and the AI auto-reply scheduler is shut off. RIVEN
  * pings 3x/day via crons; she answers with chip taps and that's it.
  *
  * Three render modes based on the latest COACH ChatMessage in the
  * last 24h:
  *
  *   1. Unanswered chip-prompt (chipOptions set + chipsRepliedAt null)
- *      → Render Sean's question + tap chips. Tap collapses chips
+ *      → Render RIVEN's question + tap chips. Tap collapses chips
  *      locally + fires sendToSean.
  *
  *   2. Voice memo (audioUrl set)
@@ -24,15 +24,15 @@ import { sendToSean } from "@/app/(clerk)/(app)/chat/sean-actions";
  *      leaving the home screen. No deep-link, no separate page.
  *
  *   3. Plain text or already-answered chips
- *      → Just render Sean's words. No reply CTA. After she taps a
- *      chip we briefly show a "Sent. Sean'll see this." confirmation
+ *      → Just render RIVEN's words. No reply CTA. After she taps a
+ *      chip we briefly show a "Sent. RIVEN will see this." confirmation
  *      so the tap feels acknowledged.
  *
  * If `prompt` is null, the parent renders the time-aware ritual card
  * instead — see /dashboard.
  *
  * The card uses the same gold-tinted treatment as the falling-roses
- * welcome banner / Sunday ritual so all "from Sean" surfaces share a
+ * welcome banner / Sunday ritual so all "from RIVEN" surfaces share a
  * visual family.
  */
 export function SeanPromptHeadline({
@@ -83,7 +83,7 @@ export function SeanPromptHeadline({
 
   return (
     <section
-      aria-label="Today with Sean"
+      aria-label="Today with RIVEN"
       className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-5 shadow-elevation-1 space-y-4"
     >
       <div className="flex items-center gap-2">
@@ -96,7 +96,7 @@ export function SeanPromptHeadline({
           </span>
         </span>
         <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-          Today with Sean
+          Today with RIVEN
         </p>
       </div>
 
@@ -144,7 +144,7 @@ export function SeanPromptHeadline({
 
       {justSent && (
         <p className="font-body text-label-sm text-sage">
-          Sent. Sean&apos;ll see this.
+          Sent. RIVEN&apos;ll see this.
         </p>
       )}
 

@@ -181,7 +181,7 @@ export function CheckInForm({
       {/* Section 7 — wins & struggles */}
       <Section
         title="Wins and struggles"
-        subtitle="A line each. Sean reads every one."
+        subtitle="A line each. RIVEN reads every one."
       >
         <Field label="What went well, what didn't" error={fe.winsAndStruggles}>
           <textarea

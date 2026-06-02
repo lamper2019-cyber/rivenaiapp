@@ -1,5 +1,5 @@
 /**
- * Week boundary helpers — anchored to America/Chicago (Sean's timezone) so the
+ * Week boundary helpers — anchored to America/Chicago (RIVEN's timezone) so the
  * weekly content prompt and Sunday check-in flip at Central-time midnight
  * regardless of where the Railway server is running. Without this, the server's
  * UTC week boundary fires ~5–6 hours early for Central-time clients.

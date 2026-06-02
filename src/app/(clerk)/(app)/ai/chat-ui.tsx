@@ -586,7 +586,7 @@ function MessageBubble({
               aria-hidden
             />
             <span className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
-              {isCoach ? "Sean" : "Riven"}
+              {isCoach ? "RIVEN" : "Riven"}
             </span>
           </div>
           <p className="font-body text-body-md whitespace-pre-wrap leading-relaxed">

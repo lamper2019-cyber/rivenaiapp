@@ -45,7 +45,7 @@ export const MOOD_EMOJI: Record<MoodKind, string> = {
   tired: "😤",
   blah: "🥱",
   // 🤩 reads as "I'm having a good one" with more enthusiasm than the
-  // flat 🙂; per Sean. Stored key is still "good" — no migration needed.
+  // flat 🙂; per RIVEN. Stored key is still "good" — no migration needed.
   good: "🤩",
   fire: "🔥",
 };

@@ -109,7 +109,7 @@ export function SendMessageForm({ clientUserId }: { clientUserId: string }) {
             title={
               trimmed.length === 0
                 ? "Type a message first."
-                : "Rewrite in Sean's voice using R.I.S.E."
+                : "Rewrite in RIVEN's voice using R.I.S.E."
             }
             className="rounded-md border border-gold/70 bg-cream/60 text-charcoal px-4 py-3 font-body text-body-md hover:bg-secondary-container/50 hover:border-gold transition-colors disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
           >

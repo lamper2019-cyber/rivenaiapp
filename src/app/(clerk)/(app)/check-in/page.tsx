@@ -75,7 +75,7 @@ export default async function CheckInPage() {
           The month, on the record.
         </h1>
         <p className="font-body text-body-lg text-on-surface-variant max-w-md">
-          Eight questions. Two photos. Ten minutes. This is how Sean sees the
+          Eight questions. Two photos. Ten minutes. This is how RIVEN sees the
           trend over the long run, not just the day.
         </p>
       </header>

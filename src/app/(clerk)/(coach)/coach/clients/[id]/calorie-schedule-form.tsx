@@ -17,7 +17,7 @@ type DayValues = Record<DayKey, number>;
  * Coach-side per-day calorie schedule editor. Lives on /coach/clients/[id]
  * under the Profile block in the Overview tab. When `initialSchedule` is
  * null, the form prefills every day with the client's flat cutCalories so
- * Sean only has to nudge the days that should differ. Save writes the
+ * RIVEN only has to nudge the days that should differ. Save writes the
  * schedule. Clear (only shown when a schedule is active) reverts to flat.
  */
 export function CalorieScheduleForm({
@@ -43,7 +43,7 @@ export function CalorieScheduleForm({
   // the new state without a full page refresh.
   const [isActive, setIsActive] = useState(initialSchedule !== null);
 
-  // The weekly average Sean is aiming this client at. On a cut the WEEK is
+  // The weekly average RIVEN is aiming this client at. On a cut the WEEK is
   // what matters, not any single day — she sets the target here, builds a
   // high/low pattern in the day inputs, then snaps the week onto it.
   const [targetAvg, setTargetAvg] = useState<number>(() =>

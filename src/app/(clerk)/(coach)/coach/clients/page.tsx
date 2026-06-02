@@ -97,8 +97,8 @@ export default async function CoachClientsPage({
       })
     : [];
 
-  // Bulk fetch: latest COACH-from-Sean ChatMessage per client. Used to detect
-  // a pending Sunday check-in (submitted this week but Sean hasn't replied since).
+  // Bulk fetch: latest COACH-from-RIVEN ChatMessage per client. Used to detect
+  // a pending Sunday check-in (submitted this week but RIVEN hasn't replied since).
   const latestCoachReplies = clientIds.length
     ? await prisma.chatMessage.findMany({
         where: {
@@ -149,7 +149,7 @@ export default async function CoachClientsPage({
   });
 
   // Everyone else: clients who didn't make it into either bucket. Keeps the
-  // bottom list focused — Sean already saw the urgent + the wins above.
+  // bottom list focused — RIVEN already saw the urgent + the wins above.
   const everyoneElse = clients.filter((c) => !bucketedClientIds.has(c.id));
 
   // "Today" strip: split onboarded clients by whether they've logged any meal

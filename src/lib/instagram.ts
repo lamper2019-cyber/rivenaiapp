@@ -1,9 +1,9 @@
 /**
- * Instagram API client (Instagram Login flavor) — pulls Sean's OWN account
+ * Instagram API client (Instagram Login flavor) — pulls RIVEN's OWN account
  * performance for the Content Command Center.
  *
  * We use the **Instagram API with Instagram Login** (host: graph.instagram.com),
- * NOT the Facebook-Login Graph API. This was a deliberate pivot: Sean's RIVEN
+ * NOT the Facebook-Login Graph API. This was a deliberate pivot: RIVEN's RIVEN
  * account (@itsseanwilliams) lives under a different Facebook account than the
  * Meta app, and the Facebook-Login path requires the IG account + a Facebook
  * Page + the app to all sit under one Facebook account. Instagram Login skips
@@ -73,7 +73,7 @@ async function graphGet<T>(path: string, params: Record<string, string>): Promis
   return json as T;
 }
 
-/** Recent media on Sean's account. One page (~30) is plenty for a weekly read. */
+/** Recent media on RIVEN's account. One page (~30) is plenty for a weekly read. */
 export async function fetchRecentMedia(limit = 30): Promise<IgMediaRaw[]> {
   const fields =
     "id,media_type,media_product_type,permalink,caption,thumbnail_url,media_url,timestamp";
@@ -168,7 +168,7 @@ export function isReelMedia(m: IgMediaRaw): boolean {
  * Refresh the long-lived token. Instagram Login long-lived tokens last 60
  * days and refresh via `ig_refresh_token` with NO app secret — just the
  * current token (must be >24h old and still valid). The daily cron calls
- * this and logs the fresh token so Sean can rotate the env var before the
+ * this and logs the fresh token so RIVEN can rotate the env var before the
  * 60-day window closes. Returns the new token string.
  */
 export async function refreshLongLivedToken(): Promise<string> {

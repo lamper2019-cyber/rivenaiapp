@@ -23,11 +23,11 @@ import type {
  *   └────────────┴───────────────────────────┴──────────────┘
  *
  * On mobile the left rail collapses into a "back to list" header; the
- * right rail hides entirely (Sean uses the dashboard mostly on desktop
+ * right rail hides entirely (RIVEN uses the dashboard mostly on desktop
  * anyway). Filter chips control which threads show in the list; client
  * selection via ?clientId= so refresh / link-share works.
  *
- * Sean's reply: types into the input, hits send, sendCoachReply fires.
+ * RIVEN's reply: types into the input, hits send, sendCoachReply fires.
  * That action also cancels any queued AI auto-reply so the client
  * doesn't get a duplicate response.
  */
@@ -408,7 +408,7 @@ function ThreadBubble({
       </div>
     );
   }
-  // Assistant — Sean or AI auto-reply on Sean's behalf.
+  // Assistant — RIVEN or AI auto-reply on RIVEN's behalf.
   return (
     <div className="flex justify-end">
       <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-charcoal text-cream px-gutter py-3 shadow-elevation-1">
@@ -419,7 +419,7 @@ function ThreadBubble({
           {message.aiGenerated ? (
             <span
               className="inline-flex items-center gap-1 font-body text-label-sm text-cream/70"
-              title="This was the auto-reply on your behalf — the client sees it as from Sean."
+              title="This was the auto-reply on your behalf — the client sees it as from RIVEN."
             >
               <span aria-hidden>◆</span>
               auto-reply

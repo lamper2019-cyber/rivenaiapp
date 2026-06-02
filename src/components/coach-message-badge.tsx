@@ -11,15 +11,15 @@ export type CoachMessageSummary = {
 };
 
 /**
- * "Message from Sean" pill — top-right of the home screen.
+ * "Message from RIVEN" pill — top-right of the home screen.
  *
  * Single visual treatment: solid charcoal pill, cream text, serif S
  * monogram. Same look as the log-button pill so the dashboard reads
  * as a small set of consistent charcoal tappables. A red count dot
  * on the avatar is the only unread cue — no gold halo, no breath
- * animation (per Sean's 2026-05-27 evening direction).
+ * animation (per RIVEN's 2026-05-27 evening direction).
  *
- * Tap routes to /chat (the unified Sean thread, with typing input).
+ * Tap routes to /chat (the unified RIVEN thread, with typing input).
  * Visiting /chat calls `markCoachMessageSeen` which writes Date.now()
  * to localStorage; the badge's "unread" state is everything newer
  * than that timestamp. Self-hides when she has zero coach messages
@@ -53,8 +53,8 @@ export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[
       href="/chat"
       aria-label={
         isUnread
-          ? `${unreadCount} new ${unreadCount === 1 ? "message" : "messages"} from Sean`
-          : "View messages from Sean"
+          ? `${unreadCount} new ${unreadCount === 1 ? "message" : "messages"} from RIVEN`
+          : "View messages from RIVEN"
       }
       className="fixed top-[calc(env(safe-area-inset-top)_+_12px)] right-3 z-50 inline-flex items-center gap-2 rounded-full bg-charcoal text-cream border border-charcoal pl-1 pr-3 py-1 shadow-elevation-1 active:scale-95 transition-transform"
     >
@@ -77,7 +77,7 @@ export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[
         )}
       </span>
       <span className="font-body text-label-sm tracking-wide">
-        Message from Sean
+        Message from RIVEN
       </span>
     </Link>
   );

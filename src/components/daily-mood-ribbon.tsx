@@ -20,7 +20,7 @@ import {
  *
  *   1. Buttons visible → she taps a mood.
  *   2. Tapped emoji floats up (riven-float-up); ribbon collapses; a
- *      Sean-voice coaching line lands matched to the mood. If she
+ *      RIVEN-voice coaching line lands matched to the mood. If she
  *      hasn't yet answered the follow-up, three small chip buttons
  *      appear under the line — "What's making it ___? sleep / food /
  *      stress."
@@ -151,7 +151,7 @@ export function DailyMoodRibbon({
 
   return (
     <section
-      aria-label="Today's note from Sean"
+      aria-label="Today's note from RIVEN"
       className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-5 shadow-elevation-1 riven-rise-in space-y-4"
     >
       {/* The coach line. */}
@@ -198,7 +198,7 @@ export function DailyMoodRibbon({
       {/* Community poll bars — fires once she's past the follow-up
           (answered or skipped). Shows how the whole active client room
           is feeling today, as a bar chart sorted by current percent.
-          Ephemeral by design (Sean's call): bars fade in for ~5s, then
+          Ephemeral by design (RIVEN's call): bars fade in for ~5s, then
           fade out so they don't compete with the coach line. */}
       {!showCauseChips && (
         <MoodPollBars counts={counts} total={totalTaps} myMood={myMood} />

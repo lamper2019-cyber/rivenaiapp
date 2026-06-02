@@ -31,7 +31,7 @@ export function MessagesInbox({ messages }: { messages: CoachMessage[] }) {
                 className="inline-block w-2 h-2 rounded-full bg-gold"
                 aria-hidden
               />
-              Sean
+              RIVEN
             </p>
             <time
               dateTime={m.createdAt}

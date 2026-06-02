@@ -10,7 +10,7 @@ import { setClientComp, type SetClientCompResult } from "@/lib/coach-actions";
  * through the normal trial flow).
  *
  * Stripe webhook explicitly never overwrites "comped" status, so once a
- * client is comped she stays comped until Sean toggles her off here.
+ * client is comped she stays comped until RIVEN toggles her off here.
  */
 export function CompToggle({
   clientUserId,

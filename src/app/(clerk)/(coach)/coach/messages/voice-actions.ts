@@ -9,13 +9,13 @@ import { sendPushToUser } from "@/lib/push";
 /**
  * Voice moment actions for the coach dashboard:
  *
- *   - sendVoiceMoment: Sean recorded a 60-second voice memo for a
+ *   - sendVoiceMoment: RIVEN recorded a 60-second voice memo for a
  *     queued milestone. Creates a COACH-kind ChatMessage with the
  *     audio URL + duration, flips the VoiceMoment to "recorded",
  *     pushes the client. The audio renders as a player bubble in
- *     her unified Sean thread.
+ *     her unified RIVEN thread.
  *
- *   - skipVoiceMoment: Sean chose not to record for this trigger.
+ *   - skipVoiceMoment: RIVEN chose not to record for this trigger.
  *     Flips the row to "skipped" so the queue clears. Nothing gets
  *     sent to the client.
  *
@@ -65,9 +65,9 @@ export async function sendVoiceMoment(
   }
 
   // Create the COACH-kind audio message. Plain content stays empty —
-  // the player bubble keys off audioUrl. senderUserId = Sean (coach)
+  // the player bubble keys off audioUrl. senderUserId = RIVEN (coach)
   // so the audit trail shows it was him, even though clients see
-  // every COACH message as just "from Sean."
+  // every COACH message as just "from RIVEN."
   const message = await prisma.chatMessage.create({
     data: {
       userId: moment.recipientUserId,
@@ -94,7 +94,7 @@ export async function sendVoiceMoment(
   });
 
   // Cancel any queued AI auto-reply for this client — a voice memo
-  // from Sean is a much stronger signal than a text reply, no need
+  // from RIVEN is a much stronger signal than a text reply, no need
   // for the AI to also chime in.
   await prisma.pendingAiReply.updateMany({
     where: { userId: moment.recipientUserId, status: "pending" },
@@ -105,7 +105,7 @@ export async function sendVoiceMoment(
   // knows what to expect when she opens the app.
   try {
     await sendPushToUser(moment.recipientUserId, {
-      title: "Sean recorded you a voice memo",
+      title: "RIVEN recorded you a voice memo",
       body: "Tap to listen.",
       url: "/dashboard",
       tag: `voice-${moment.recipientUserId}`,

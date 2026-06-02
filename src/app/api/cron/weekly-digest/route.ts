@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Weekly "Monday read" — pushes Sean a short content digest from the Command
+ * Weekly "Monday read" — pushes RIVEN a short content digest from the Command
  * Center: his top post, and the auto-detected pattern. Keeps him in the loop
  * without opening the dashboard.
  *

@@ -10,7 +10,7 @@ import { MessagesBoard } from "./messages-board";
 
 /**
  * Coach messaging dashboard — three-column layout, every active client
- * thread in one place. Sean reads from here, replies from here, and
+ * thread in one place. RIVEN reads from here, replies from here, and
  * sees which threads have pending AI auto-replies he might want to
  * intercept.
  *
@@ -22,7 +22,7 @@ import { MessagesBoard } from "./messages-board";
  *     check-in trend)
  *
  * Active client selected via ?clientId= — falls back to first
- * "waiting on Sean" client on initial load.
+ * "waiting on RIVEN" client on initial load.
  */
 export default async function CoachMessagesPage({
   searchParams,
@@ -38,7 +38,7 @@ export default async function CoachMessagesPage({
   ]);
 
   // Pick active thread: explicit ?clientId= wins, else first row
-  // (which is already sorted "waiting on Sean" first, then by recency).
+  // (which is already sorted "waiting on RIVEN" first, then by recency).
   const selectedId =
     (searchParams?.clientId &&
       threads.find((t) => t.userId === searchParams.clientId)?.userId) ||

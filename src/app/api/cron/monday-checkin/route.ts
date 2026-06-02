@@ -8,7 +8,7 @@ export const maxDuration = 800; // ~13 min safety net; the batch itself runs
 // 5 clients in parallel and should finish in under 3 min for ≤50 clients.
 
 /**
- * Monday-morning Sean check-in (scheduled).
+ * Monday-morning RIVEN check-in (scheduled).
  *
  * Protected by CRON_SECRET. Schedule from Railway:
  *   POST https://rivenmethod.com/api/cron/monday-checkin

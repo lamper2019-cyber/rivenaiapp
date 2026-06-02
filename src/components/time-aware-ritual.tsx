@@ -112,7 +112,7 @@ export function TimeAwareRitual({
           How&apos;d today land, {firstName}?
         </h1>
         <p className="font-body text-body-md text-on-surface-variant leading-relaxed max-w-md">
-          Tap a mood below to close out the day. Sean reads the patterns
+          Tap a mood below to close out the day. RIVEN reads the patterns
           at the monthly check-in.
         </p>
       </section>

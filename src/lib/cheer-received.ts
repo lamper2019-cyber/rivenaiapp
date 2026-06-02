@@ -13,7 +13,7 @@ export type CheerReceivedSummary = {
   mostRecentContext: string | null;
 };
 
-// Softened context phrases. Sean's note: the originals read judgey
+// Softened context phrases. RIVEN's note: the originals read judgey
 // ("your streak that broke", "your heavy day"). Reframed so the subject
 // is HER showing up, not the failure that triggered the rose.
 // Phrasing slots into "Sent because ___." in the card.

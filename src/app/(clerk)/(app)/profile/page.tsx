@@ -13,7 +13,7 @@ import { MoodHistory } from "@/components/mood-history";
 
 // Weight sparkline returned after the 2026-05-27 simplification — the
 // 30-day slider check-in writes here so the graph has real signal.
-// Waist trend is intentionally NOT shown; Sean wanted weight as the
+// Waist trend is intentionally NOT shown; RIVEN wanted weight as the
 // primary number-to-watch on /profile.
 
 export default async function ProfilePage() {
@@ -87,7 +87,7 @@ export default async function ProfilePage() {
         <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal">
           {profile?.name ?? "Your transformation"}
         </h1>
-        {/* Phase indicator removed per Sean — the four protocol phases
+        {/* Phase indicator removed per RIVEN — the four protocol phases
             weren't being actively progressed against, so showing
             "Phase 1 · Active" felt aspirational rather than honest. */}
       </header>
@@ -107,7 +107,7 @@ export default async function ProfilePage() {
 
       {/* Weight trend returned 2026-05-27 — now that the 30-day slider
           check-in writes a row regularly, the chart has real signal.
-          Waist trend stays hidden (Sean wants weight as the only
+          Waist trend stays hidden (RIVEN wants weight as the only
           tracked number on /profile). Streak-protection block remains
           out — that data still feeds proactive logic but doesn't
           earn screen real estate. */}
@@ -143,7 +143,7 @@ export default async function ProfilePage() {
       <MoodHistory entries={moodHistory} />
 
       {/* Calorie banking lever — client-controlled. Smooths her daily target
-          across the week without touching the weekly average Sean coaches. */}
+          across the week without touching the weekly average RIVEN coaches. */}
       {profile && (
         <section className="space-y-3">
           <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
@@ -196,7 +196,7 @@ export default async function ProfilePage() {
           </Link>
         )}
 
-        {/* "This week's prompt" content card removed per Sean — same
+        {/* "This week's prompt" content card removed per RIVEN — same
             spirit as the dashboard cleanup. The /content route still
             exists for anyone who lands there directly, but the profile
             doesn't surface it anymore. */}

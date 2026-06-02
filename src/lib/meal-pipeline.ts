@@ -99,7 +99,7 @@ export async function analyzeMeal(args: {
  * Why we don't read from `DailyTotals` for display:
  *   That row is a denormalized cache. Historically it drifted from the
  *   actual MealLog sum (TZ-bucket migrations, race conditions, manual DB
- *   edits during testing). Sean caught a drift where /dashboard showed
+ *   edits during testing). RIVEN caught a drift where /dashboard showed
  *   2,000 while /log showed 1,915 — same field on both pages — because
  *   one read the stale cache and the other was operating on local state.
  *

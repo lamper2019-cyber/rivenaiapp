@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { startOfCentralDay, startOfCentralMonth } from "@/lib/dates";
 
 /**
- * 30-day weight check-in — the simplified monthly cadence Sean asked
+ * 30-day weight check-in — the simplified monthly cadence RIVEN asked
  * for during the 2026-05-27 "keep it simple" pass.
  *
  * Trigger rules:
@@ -13,7 +13,7 @@ import { startOfCentralDay, startOfCentralMonth } from "@/lib/dates";
  *
  * Snapshot is rendered at the top of /dashboard as a slider card
  * (weight + waist) — same prime real estate as the daily mood ribbon
- * and Sean prompt headline. She submits, the card disappears, the
+ * and RIVEN prompt headline. She submits, the card disappears, the
  * graph on /profile gets a new point.
  *
  * Storage: writes to the existing WeeklyCheckIn table with defaults

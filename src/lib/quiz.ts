@@ -147,7 +147,7 @@ export const Q14: ChoiceQuestion = {
 // Q15 ("Anything else I should know?") used to live here but the
 // textarea was unreliable on mobile and the answer was never wired into
 // anything downstream — leads kept showing empty q15 fields. Removed
-// per Sean. Coach-side leads page also drops the surrounding card.
+// per RIVEN. Coach-side leads page also drops the surrounding card.
 
 export const QUALIFYING_QUESTIONS: Question[] = [Q11, Q12, Q13, Q14];
 
@@ -289,7 +289,7 @@ export function temperatureFromScore(score: number): Temperature {
  * the top three to show on the results page — higher = more impactful.
  * Each entry has BOTH a corrective version (shown if she answered "no")
  * AND an affirming version (shown if she answered "yes"). The results
- * page mixes them so the page feels like Sean actually read her answers.
+ * page mixes them so the page feels like RIVEN actually read her answers.
  */
 const INSIGHT_BANK: Record<
   string,

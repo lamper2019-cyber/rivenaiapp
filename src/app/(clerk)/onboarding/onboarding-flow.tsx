@@ -7,7 +7,7 @@ import { calculateTargets } from "@/lib/calculations";
 import type { QuizLeadSummary } from "./page";
 
 /**
- * Step-by-step onboarding with Sean's voice on every prompt. One question
+ * Step-by-step onboarding with RIVEN's voice on every prompt. One question
  * per screen, big visual inputs (sliders / steppers / illustrated cards)
  * instead of plain text fields. Persists to localStorage so a refresh
  * resumes where she left off; submits the whole form once at the end via
@@ -180,7 +180,7 @@ export function OnboardingFlow({
 
       <div className="flex-grow flex flex-col justify-center py-8">
         {/* Quiz-handoff banner — shown only on step 0 when we have her
-            assessment data, so she lands knowing Sean already knows the
+            assessment data, so she lands knowing RIVEN already knows the
             shape of where she's coming from. */}
         {state.step === 0 && quizLead && (
           <div className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-4 shadow-elevation-1 mb-6">

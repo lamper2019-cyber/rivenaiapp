@@ -1,15 +1,15 @@
 /**
- * Message bank for Sean's 3x/day proactive check-ins on the unified
+ * Message bank for RIVEN's 3x/day proactive check-ins on the unified
  * thread. The morning-checkin / midday-checkin / evening-checkin cron
  * routes pick a variant from these arrays based on the date so the
  * same client doesn't see the same phrasing two days in a row.
  *
  * Voice rules (per CLAUDE.md + BRAND.md): direct, warm, no preamble,
- * no preachy. Sean talks like a smart older brother. Closed questions
+ * no preachy. RIVEN talks like a smart older brother. Closed questions
  * with tap-chip options so she can engage in <2 seconds.
  *
  * Each variant carries:
- *   - text: what Sean's message reads as (1-2 short sentences)
+ *   - text: what RIVEN's message reads as (1-2 short sentences)
  *   - chips: 3-4 reply options. The chip "value" is what gets saved
  *     as her reply (also fed to the AI for the auto-reply context).
  *     The chip "label" is what she sees on the button.

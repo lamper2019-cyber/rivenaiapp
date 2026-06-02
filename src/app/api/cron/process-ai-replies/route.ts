@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Process due AI auto-replies on the unified "Sean" thread.
+ * Process due AI auto-replies on the unified "RIVEN" thread.
  *
- * [RETIRED 2026-05-27] Sean's "keep it simple" pass removed the
+ * [RETIRED 2026-05-27] RIVEN's "keep it simple" pass removed the
  * /chat thread entirely. Without a typing input there are no client
  * messages for the AI to reply to — sendToSean now skips the
  * scheduler entirely. This route is gated OFF by default to drain
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       ok: true,
       retired: true,
       message:
-        "process-ai-replies cron is retired. /chat thread is gone; Sean's coaching is now SeanPromptHeadline-only. Set ENABLE_PROCESS_AI_REPLIES=1 to revive.",
+        "process-ai-replies cron is retired. /chat thread is gone; RIVEN's coaching is now SeanPromptHeadline-only. Set ENABLE_PROCESS_AI_REPLIES=1 to revive.",
     });
   }
 

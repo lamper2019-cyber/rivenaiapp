@@ -5,7 +5,7 @@
  *   1. Create the User row on first hit (so onboarding isn't the only entry
  *      point that can mint a User; coaches never see onboarding).
  *   2. If the email is in COACH_EMAIL and the existing role is CLIENT,
- *      upgrade to COACH. This means setting COACH_EMAIL after Sean already
+ *      upgrade to COACH. This means setting COACH_EMAIL after RIVEN already
  *      signed up will still promote him.
  *
  * Never downgrades — removing an email from COACH_EMAIL won't strip the role.

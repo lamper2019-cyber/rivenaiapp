@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Evening Sean check-in. Fires daily ~8 PM CT.
+ * Evening RIVEN check-in. Fires daily ~8 PM CT.
  *
  * Suggested Railway cron: 1 1 * * *  UTC (8 PM CDT / 7 PM CST).
  * Auth: Authorization: Bearer $CRON_SECRET

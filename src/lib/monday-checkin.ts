@@ -1,7 +1,7 @@
 /**
  * Monday check-in message generation. Pulls a client's profile, last 7 days
  * of meal logs, and recent chat history; sends that as context to Claude
- * with a Sean-voice system prompt; returns the rendered message string.
+ * with a RIVEN-voice system prompt; returns the rendered message string.
  *
  * Pure function from the perspective of the caller — no DB writes here.
  * The cron route owns the ChatMessage insert + push fan-out.
@@ -17,7 +17,7 @@ const MODEL = "claude-sonnet-4-6";
  * System prompt for the Monday check-in generation. Voice rules mirror the
  * chat persona — kept lean here so context budget goes to client data.
  */
-const SYSTEM_PROMPT = `You are Sean Williams, RIVEN nutrition coach. You are generating the Monday morning check-in message for one client.
+const SYSTEM_PROMPT = `You are RIVEN Williams, RIVEN nutrition coach. You are generating the Monday morning check-in message for one client.
 
 SEAN'S VOICE
 - Lead with the answer. No preamble. No "Great question!".
@@ -52,7 +52,7 @@ Your daily target stays at {calorie_target} calories. Hit it Monday through Satu
 
 Drop your weekly video prompt by Sunday.
 
-Lock it in. — Sean
+Lock it in. — RIVEN
 
 VARIANTS BY CLIENT STATE
 - New client (<7 days onboarded): no past data exists. Write a "welcome to your first full week" variant. Focus is logging every meal so we get data.
@@ -115,7 +115,7 @@ export async function generateMondayCheckin(
         totalSteps: true,
       },
     }),
-    // Pull recent chat history (USER messages only — what SHE said) so Sean
+    // Pull recent chat history (USER messages only — what SHE said) so RIVEN
     // can reference moods or struggles she mentioned.
     prisma.chatMessage.findMany({
       where: {
@@ -198,7 +198,7 @@ function buildContext(args: {
     return lines.join("\n");
   }
 
-  // Daily totals by day-of-week so Sean can call out specific days.
+  // Daily totals by day-of-week so RIVEN can call out specific days.
   if (args.dailyTotals.length === 0) {
     lines.push("LAST 7 DAYS OF DAILY TOTALS: none logged.");
   } else {
@@ -264,7 +264,7 @@ export type MondayCheckinBatchResult = {
 /**
  * Run the Monday check-in for every active CLIENT. Generates per-client via
  * `generateMondayCheckin`, persists each as a COACH-kind ChatMessage signed
- * by Sean, fires the phone push. Per-client failures are isolated.
+ * by RIVEN, fires the phone push. Per-client failures are isolated.
  *
  * Pure batch logic — shared by the scheduled cron route and the manual
  * "Send Monday check-ins now" button on the coach profile page. Neither
@@ -344,7 +344,7 @@ async function processOneClient(
 
     try {
       await sendPushToUser(client.id, {
-        title: "Monday from Sean",
+        title: "Monday from RIVEN",
         body: preview(result.message, 110),
         url: "/messages",
         tag: `monday-checkin-${message.id}`,

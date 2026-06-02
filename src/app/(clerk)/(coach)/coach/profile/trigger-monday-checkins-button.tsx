@@ -77,7 +77,7 @@ export function TriggerMondayCheckinsButton() {
       </div>
 
       <p className="font-body text-label-sm text-on-surface-variant/80">
-        Generates a personalized Sean-voice check-in for every active client
+        Generates a personalized RIVEN-voice check-in for every active client
         based on her last 7 days, posts it in her message thread, and pushes
         a notification. Same work as the scheduled Monday cron.
       </p>

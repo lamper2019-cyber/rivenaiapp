@@ -20,8 +20,8 @@ import {
  *   - is_this_you:  3 confession-style reactions
  *
  * Auto-rotation picks the suggested kind for this week (server-side via
- * pickNextRotationKind); Sean can override here. Each kind has sensible
- * default options that pre-fill so Sean can ship a prompt with one save.
+ * pickNextRotationKind); RIVEN can override here. Each kind has sensible
+ * default options that pre-fill so RIVEN can ship a prompt with one save.
  */
 
 type TapKind = Exclude<SundayPromptKind, "open">;
@@ -63,7 +63,7 @@ export function SundayPromptForm({
   const [result, setResult] = useState<SetSundayPromptResult | null>(null);
 
   // When kind changes (and the current options were the defaults for the
-  // previous kind), reseed with this kind's defaults. If Sean has typed
+  // previous kind), reseed with this kind's defaults. If RIVEN has typed
   // custom options we keep them — only reseed when the count is wrong
   // for the new format.
   useEffect(() => {
@@ -79,7 +79,7 @@ export function SundayPromptForm({
       prev.map((o, i) =>
         i === idx
           ? {
-              // Auto-derive a snake-case key from the label so Sean doesn't
+              // Auto-derive a snake-case key from the label so RIVEN doesn't
               // have to think about it. Keys feed the tally column.
               key: label
                 .toLowerCase()

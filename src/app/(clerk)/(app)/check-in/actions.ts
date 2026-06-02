@@ -129,7 +129,7 @@ export async function submitCheckIn(
   });
 
   // Voice moment trigger — queue a 60-second voice-memo prompt for
-  // Sean on every monthly check-in submission. The unique constraint
+  // RIVEN on every monthly check-in submission. The unique constraint
   // on (recipient, kind, source) means re-submitting the same month's
   // check-in doesn't double-queue (the createMany skipDuplicates pattern
   // is unnecessary). Try/catch swallowed because a queue failure

@@ -21,7 +21,7 @@ export const isPosthogQueryConfigured =
 
 const API_HOST = process.env.POSTHOG_API_HOST || "https://us.posthog.com";
 
-// Keep in sync with the internal/test accounts Sean excludes from analysis.
+// Keep in sync with the internal/test accounts RIVEN excludes from analysis.
 const INTERNAL_EMAILS = [
   "lamper.2019@gmail.com",
   "seanwilliams0324@gmail.com",

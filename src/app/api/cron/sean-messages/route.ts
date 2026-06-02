@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 800;
 
 /**
- * Proactive Sean-voice messaging tick.
+ * Proactive RIVEN-voice messaging tick.
  *
  * [RETIRED 2026-05-27] This hourly engine ran on top of the new 3x/day
  * chip-prompt routes and was the main source of push fatigue. The
@@ -18,7 +18,7 @@ export const maxDuration = 800;
  *   - Progress streak 30/60/90     → peer-wins surface + voice moments
  *
  * The route is GATED OFF by default. Set ENABLE_SEAN_MESSAGES_CRON=1
- * in env if you want to revive it. Sean's plan: disable the Railway
+ * in env if you want to revive it. RIVEN's plan: disable the Railway
  * service entirely so this is never called in production.
  *
  * Code preserved in case we want to reuse the 100-variant banks for

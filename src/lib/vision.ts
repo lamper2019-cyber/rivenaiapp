@@ -1,6 +1,6 @@
 /**
  * Vision engine — READS THE SCREEN of a post (on-screen captions + visuals)
- * and returns a structured analysis. Built this way because Sean's content is
+ * and returns a structured analysis. Built this way because RIVEN's content is
  * mostly silent (text on screen, no talking), so audio transcription is
  * useless — we look, we don't listen.
  *
@@ -72,7 +72,7 @@ async function sampleVideoFrames(mediaUrl: string, timestamps = [0.5, 2.5, 4.5, 
 }
 
 const PROMPT = (caption: string) =>
-  `These are frames (in order) from an Instagram post by a weight-loss coach (Sean) for Black women 35+. His brand voice is calm, no-hype, culturally grounded ("peaceful discipline, steady wins"). Caption: "${caption.slice(0, 300)}".
+  `These are frames (in order) from an Instagram post by a weight-loss coach (RIVEN) for Black women 35+. His brand voice is calm, no-hype, culturally grounded ("peaceful discipline, steady wins"). Caption: "${caption.slice(0, 300)}".
 
 Read what's ON SCREEN (the captions/text and the visuals — he often doesn't talk). Reply ONLY with minified JSON, no markdown:
 {"hook":"the opening on-screen line, verbatim","onScreenText":"all text shown across the frames, in order","visualSummary":"what's physically shown, 1 sentence","contentType":"story|teaching|result|bts|other","whyItWorks":"1-2 sentences: why this does or doesn't stop the scroll for his audience"}`;

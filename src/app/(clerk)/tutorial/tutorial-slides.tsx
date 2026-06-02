@@ -34,14 +34,14 @@ const SLIDES: Slide[] = [
   {
     eyebrow: "Step 3 of 4",
     title: "Monthly check-in.",
-    body: "On the 1st of each month, you'll complete a quick check-in — weight, waist, photos, sleep, how the month went. Once a month, ten minutes. This is how Sean tracks the real trend and adjusts your plan.",
+    body: "On the 1st of each month, you'll complete a quick check-in — weight, waist, photos, sleep, how the month went. Once a month, ten minutes. This is how RIVEN tracks the real trend and adjusts your plan.",
     icon: "calendar_month",
     ctaLabel: "Next",
   },
   {
     eyebrow: "Step 4 of 4",
     title: "Your weekly prompt.",
-    body: "Each week, you'll get one short content prompt — a quick video or voice memo. It helps Sean see how you're feeling and what's working. Takes thirty seconds.",
+    body: "Each week, you'll get one short content prompt — a quick video or voice memo. It helps RIVEN see how you're feeling and what's working. Takes thirty seconds.",
     icon: "videocam",
     ctaLabel: "Let's begin",
   },

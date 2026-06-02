@@ -27,8 +27,8 @@ export type SendCoachMessageResult =
   | { ok: false; error: string };
 
 /**
- * Sean (or any user with role=COACH) sends a personal message that lands in
- * the named client's chat thread, styled as a Sean message.
+ * RIVEN (or any user with role=COACH) sends a personal message that lands in
+ * the named client's chat thread, styled as a RIVEN message.
  *
  * Designed to be called from the coach dashboard. Will refuse for non-coaches.
  */
@@ -61,7 +61,7 @@ export async function sendCoachMessage(
     return { ok: false, error: "Coach record not found." };
   }
   if (coach.role !== "COACH") {
-    return { ok: false, error: "Only coaches can send Sean messages." };
+    return { ok: false, error: "Only coaches can send RIVEN messages." };
   }
 
   const client = await prisma.user.findUnique({
@@ -88,7 +88,7 @@ export async function sendCoachMessage(
   // Deep-link to /dashboard so she lands on the SeanPromptHeadline
   // showing the new message (the /chat thread is retired).
   await sendPushToUser(client.id, {
-    title: "Message from Sean",
+    title: "Message from RIVEN",
     body: preview(parsed.data.content, 120),
     url: "/dashboard",
     tag: `coach-msg-${message.id}`,
@@ -125,7 +125,7 @@ export type UpdateClientTargetsResult =
  * Coach updates a client's daily calorie and protein targets.
  *
  * Side effect: posts a COACH message into the client's chat announcing the
- * change. That message lights up the home-screen "Message from Sean" chip
+ * change. That message lights up the home-screen "Message from RIVEN" chip
  * (the client's localStorage tracks the latest seen coach message id).
  */
 export async function updateClientTargets(
@@ -214,7 +214,7 @@ export async function updateClientTargets(
   // Deep-links to /dashboard since /chat is retired — the targets
   // announcement will surface in the SeanPromptHeadline.
   await sendPushToUser(client.id, {
-    title: "Sean updated your targets",
+    title: "RIVEN updated your targets",
     body: preview(announcement, 120),
     url: "/dashboard",
     tag: `coach-targets-${message.id}`,
@@ -260,16 +260,16 @@ export type RewriteCoachMessageResult =
   | { ok: false; error: string };
 
 /**
- * Voice-rewrite the coach's draft message in Sean's R.I.S.E.-aware tone.
+ * Voice-rewrite the coach's draft message in RIVEN's R.I.S.E.-aware tone.
  * Coach-only. Doesn't touch the DB; the rewrite just replaces the textarea
  * value client-side before Send is tapped. Original text never persists.
  *
  * System prompt is the verbatim spec the coach provided so the voice stays
  * consistent and is easy to tune. Don't shorten it.
  */
-const REWRITE_SYSTEM_PROMPT = `You are rewriting messages for Sean, a nutrition coach. Sean's voice is:
+const REWRITE_SYSTEM_PROMPT = `You are rewriting messages for RIVEN, a nutrition coach. RIVEN's voice is:
 - Direct, warm, no-BS. He's a coach who cares, not a guru or salesman.
-- Speaks like a real person who's been through it — Sean went from 241 lbs to fit, so he understands the struggle firsthand
+- Speaks like a real person who's been through it — RIVEN went from 241 lbs to fit, so he understands the struggle firsthand
 - Casual but never sloppy. Uses contractions, short sentences, occasional profanity is fine but not constant
 - No fluff, no 'crush your goals,' no 'transformation journey' language
 - Doesn't shame the client. Recognizes what happened, reframes it as a system issue (not a moral failing), gives one small specific fix, sets the next expectation
@@ -281,7 +281,7 @@ const REWRITE_SYSTEM_PROMPT = `You are rewriting messages for Sean, a nutrition 
 - Keep responses under 5 sentences when possible
 - Always end with a concrete next step
 
-Rewrite the user's message in Sean's voice. If it's a negative client update, apply R.I.S.E. If it's a general coaching message (encouragement, check-in, instruction), keep it warm, direct, and end with a clear action. Return ONLY the rewritten message — no preamble, no explanation, no quotes around it.`;
+Rewrite the user's message in RIVEN's voice. If it's a negative client update, apply R.I.S.E. If it's a general coaching message (encouragement, check-in, instruction), keep it warm, direct, and end with a clear action. Return ONLY the rewritten message — no preamble, no explanation, no quotes around it.`;
 
 export async function rewriteCoachMessage(
   formData: FormData
@@ -360,7 +360,7 @@ export type TriggerMondayCheckinsResult =
 /**
  * Manual trigger for the Monday check-in batch. Same work as the scheduled
  * cron route, but gated by Clerk + role=COACH instead of CRON_SECRET so
- * Sean can fire it from the coach profile page (useful for previewing
+ * RIVEN can fire it from the coach profile page (useful for previewing
  * voice + verifying the system before the cron service is wired up, and
  * for catching up if a Monday gets missed).
  */
@@ -431,7 +431,7 @@ export type SetClientCalorieScheduleResult =
  * reverts the client to the flat cutCalories on her Profile.
  *
  * No chat-announcement side effect (unlike updateClientTargets) — calorie
- * cycling is something Sean configures in advance, often without telling
+ * cycling is something RIVEN configures in advance, often without telling
  * the client up front. He can announce manually via /coach if he wants.
  */
 export async function setClientCalorieSchedule(
@@ -593,7 +593,7 @@ export type CompAllClientsResult =
   | { ok: false; error: string };
 
 /**
- * Bulk-comp every existing CLIENT user — Sean's "grandfather them all in
+ * Bulk-comp every existing CLIENT user — RIVEN's "grandfather them all in
  * for now" button. Skips anyone already on `comped` so the report counts
  * are honest. Safe to run multiple times; idempotent. Future signups still
  * go through the normal /pricing + Stripe flow.

@@ -188,7 +188,7 @@ function VideoInstallBanner({
   escalated: boolean;
   onDismiss: () => void;
 }) {
-  // Video is only available for the two phone paths Sean recorded.
+  // Video is only available for the two phone paths RIVEN recorded.
   // Desktop falls through to text steps.
   const videoSrc =
     platform === "ios"

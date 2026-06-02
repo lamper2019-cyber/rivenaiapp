@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
  * Pass `"schedule": null` (or omit it) to CLEAR the schedule and revert
  * the client back to flat cutCalories.
  *
- * Example call from Sean's laptop:
+ * Example call from RIVEN's laptop:
  *   curl -X POST https://rivenmethod.com/api/admin/set-calorie-schedule \
  *     -H "Authorization: Bearer $CRON_SECRET" \
  *     -H "Content-Type: application/json" \

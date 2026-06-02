@@ -39,7 +39,7 @@ export function isSundayPromptKind(v: string): v is SundayPromptKind {
 export type SundayPromptOption = { key: string; label: string };
 
 // Default option seeds the coach editor uses when a kind is first picked.
-// Sean can rewrite any of them, but these are sensible starting points.
+// RIVEN can rewrite any of them, but these are sensible starting points.
 export const DEFAULT_OPTIONS: Record<
   Exclude<SundayPromptKind, "open">,
   SundayPromptOption[]
@@ -198,7 +198,7 @@ export async function getSundayRitualSnapshot(
     options,
   };
 
-  // Pull all answers in one shot. Active clients OR the coach (Sean
+  // Pull all answers in one shot. Active clients OR the coach (RIVEN
   // participating is part of the value).
   const answers = await prisma.sundayPromptAnswer.findMany({
     where: {

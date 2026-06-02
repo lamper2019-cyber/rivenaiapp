@@ -101,7 +101,7 @@ export default async function CoachClientDetailPage({
         take: 1,
         select: { totalCalories: true, totalProtein: true },
       },
-      // Sender join dropped — UI hardcodes "Sean" for COACH messages now,
+      // Sender join dropped — UI hardcodes "RIVEN" for COACH messages now,
       // so we don't need to fetch the related User row.
       chatMessages: {
         orderBy: { createdAt: "desc" },
@@ -165,7 +165,7 @@ export default async function CoachClientDetailPage({
   const heatmap7 = take7(heatmap28);
 
   // 30-day mood history — feeds the Overview "Mood patterns" card so
-  // Sean can spot what's driving her tired/meh days month over month.
+  // RIVEN can spot what's driving her tired/meh days month over month.
   // Best-effort; if it fails, the panel just hides.
   const moodHistory = await getMyMoodHistory(client.id, 30).catch(() => []);
 
@@ -242,7 +242,7 @@ export default async function CoachClientDetailPage({
             <Field label="Cycle status" value={profile.cycleStatus.toLowerCase()} />
             <Field label="Age" value={`${profile.age}`} />
             {/* Read-only — the client owns this toggle from her /profile.
-                Shows Sean whether she's banking calories across the week. */}
+                Shows RIVEN whether she's banking calories across the week. */}
             <Field
               label="Smoothing"
               value={profile.calorieBankingEnabled ? "on" : "off"}
@@ -266,7 +266,7 @@ export default async function CoachClientDetailPage({
       )}
 
       {/* Mood patterns — last 30 days of one-tap mood + optional cause
-          (sleep / food / stress). Lets Sean spot the lever to pull at
+          (sleep / food / stress). Lets RIVEN spot the lever to pull at
           the monthly check-in: "her meh days have been mostly sleep-
           driven this month." Same component clients see on /profile. */}
       <MoodHistory entries={moodHistory} />
@@ -333,9 +333,9 @@ export default async function CoachClientDetailPage({
           {chatMessagesAsc.map((m) => {
             const isUser = m.role === "USER";
             const isCoachMessage = m.kind === "COACH" && !isUser;
-            // All COACH messages render as "Sean" — single-coach brand, never
+            // All COACH messages render as "RIVEN" — single-coach brand, never
             // a stale Profile.name leaking into the UI.
-            const senderName = "Sean";
+            const senderName = "RIVEN";
 
             if (isUser) {
               return (

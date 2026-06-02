@@ -12,9 +12,9 @@ export const dynamic = "force-dynamic";
 /**
  * Daily Instagram → PostHog sync for the Content Command Center.
  *
- * Pulls Sean's recent posts + insights, joins funnel numbers, writes
+ * Pulls RIVEN's recent posts + insights, joins funnel numbers, writes
  * snapshots to Postgres. Also refreshes the long-lived Meta token (valid
- * ~60d, refreshable any time) and logs the fresh one so Sean can rotate the
+ * ~60d, refreshable any time) and logs the fresh one so RIVEN can rotate the
  * env var before expiry — we don't have a secrets store to write it back to.
  *
  * Schedule (Railway service or cron-job.org, mirrors the other crons):

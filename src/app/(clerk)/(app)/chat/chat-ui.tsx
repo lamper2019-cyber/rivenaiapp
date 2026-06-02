@@ -14,12 +14,12 @@ export type ChatMessage = {
   content: string;
   imageUrls?: string[];
   senderName?: string;
-  /** Voice memo from Sean. When present, the bubble renders an audio
+  /** Voice memo from RIVEN. When present, the bubble renders an audio
    *  player instead of the plain-text bubble (content is empty in
    *  this case). Only set on assistant/COACH messages. */
   audioUrl?: string | null;
   audioDurationSec?: number | null;
-  /** Tap-reply chips for Sean's proactive daily prompts. When set +
+  /** Tap-reply chips for RIVEN's proactive daily prompts. When set +
    *  chipsRepliedAt is null, the bubble renders chip buttons below
    *  the text. Tapping a chip fires sendToSean and stamps
    *  chipsRepliedAt so the chips disappear on next render. */
@@ -43,7 +43,7 @@ export function ChatUI({
   initialMessages: ChatMessage[];
   onboarded: boolean;
   /** Server-side hint: does this user have a PendingAiReply queued?
-   *  Drives the "Sean's reading..." indicator on first paint so it's
+   *  Drives the "RIVEN's reading..." indicator on first paint so it's
    *  visible immediately rather than after the first polling tick. */
   initialHasPendingReply?: boolean;
 }) {
@@ -54,7 +54,7 @@ export function ChatUI({
   // "sending" = her send() in flight (saving the user message + scheduling
   // a reply). "hasPendingReply" = there's a PendingAiReply queued for her;
   // "showReadingIndicator" = the ~60s grace period has elapsed and we
-  // should render the "Sean's reading..." bubble. The grace period
+  // should render the "RIVEN's reading..." bubble. The grace period
   // hides the indicator from popping up the second she taps send —
   // that would read as a bot. We let her message sit alone for a beat
   // first, then the indicator appears.
@@ -86,7 +86,7 @@ export function ChatUI({
   }, [messages]);
 
   // Mark coach messages as seen on first paint. Drives the unread state
-  // on the dashboard's top-right "Message from Sean" pill — visiting
+  // on the dashboard's top-right "Message from RIVEN" pill — visiting
   // here resets the unread count to zero.
   useEffect(() => {
     markCoachMessageSeen();
@@ -99,7 +99,7 @@ export function ChatUI({
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [input]);
 
-  // Poll for new messages while a reply is pending. Sean's auto-reply
+  // Poll for new messages while a reply is pending. RIVEN's auto-reply
   // lands within ~2 minutes — refreshing every 15 seconds catches it
   // quickly after the cron fires. router.refresh() re-runs the server
   // page component, which re-fetches the thread + pending-reply state.
@@ -113,9 +113,9 @@ export function ChatUI({
     return () => window.clearInterval(interval);
   }, [hasPendingReply, router]);
 
-  // The "Sean's reading..." indicator does NOT show immediately. We
+  // The "RIVEN's reading..." indicator does NOT show immediately. We
   // wait ~60 seconds after the pending state begins, then show it.
-  // Reads as Sean opened the message and is composing a reply —
+  // Reads as RIVEN opened the message and is composing a reply —
   // matches the ~2 min total wait. If the reply lands inside the
   // grace window (rare with our distribution but possible), the
   // indicator never appears and her reply just shows up.
@@ -230,7 +230,7 @@ export function ChatUI({
   const EMPTY_EXIT_MS = 380;
 
   /** Single send pipeline. opts.chipMessageId is set when the source
-   *  is a chip tap on a Sean message — server stamps that row's
+   *  is a chip tap on a RIVEN message — server stamps that row's
    *  chipsRepliedAt so the chips collapse. */
   async function send(
     text: string,
@@ -255,9 +255,9 @@ export function ChatUI({
     setInput("");
 
     // Optimistic: drop her message into the thread immediately so the
-    // UI feels instant. No assistant placeholder — Sean's reply lands
+    // UI feels instant. No assistant placeholder — RIVEN's reply lands
     // 1.5-15 min later via the cron, and the polling effect picks it
-    // up. While waiting, the "Sean's reading..." indicator shows.
+    // up. While waiting, the "RIVEN's reading..." indicator shows.
     const userMsg: ChatMessage = {
       id: `local-user-${Date.now()}`,
       role: "user",
@@ -426,7 +426,7 @@ export function ChatUI({
         {!onboarded && (
           <div className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-3 mb-6">
             <p className="font-body text-body-md text-charcoal">
-              Complete onboarding before messaging Sean. Head back to{" "}
+              Complete onboarding before messaging RIVEN. Head back to{" "}
               <a href="/onboarding" className="underline underline-offset-4">
                 /onboarding
               </a>
@@ -452,7 +452,7 @@ export function ChatUI({
                 }
               />
             ))}
-            {/* "Sean's reading..." indicator. Doesn't appear until
+            {/* "RIVEN's reading..." indicator. Doesn't appear until
                 ~60s after she sends (see showReadingIndicator effect
                 above) so it doesn't pop up the second her message
                 lands — that would read as a bot. Sits below the last
@@ -466,7 +466,7 @@ export function ChatUI({
                     aria-hidden
                   />
                   <span className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
-                    Sean&apos;s reading
+                    RIVEN&apos;s reading
                   </span>
                   <span className="inline-flex gap-1">
                     <Dot delay="0ms" />
@@ -597,7 +597,7 @@ export function ChatUI({
                 onboarded
                   ? hasAnyAttachment
                     ? "Add a question about the photo…"
-                    : "Message Sean…"
+                    : "Message RIVEN…"
                   : "Onboarding required"
               }
               maxLength={2000}
@@ -632,7 +632,7 @@ function MessageBubble({
   const isUser = message.role === "user";
   const isCoach = message.kind === "COACH" && !isUser;
 
-  // Copy buttons removed per Sean — texting Sean doesn't ask for a
+  // Copy buttons removed per RIVEN — texting RIVEN doesn't ask for a
   // "copy text" affordance; it dilutes the conversation. The
   // CopyButton component itself stays in the file below for now in
   // case we want it on a different surface later.
@@ -668,7 +668,7 @@ function MessageBubble({
     );
   }
 
-  // Assistant — Sean (real or auto-reply, indistinguishable here).
+  // Assistant — RIVEN (real or auto-reply, indistinguishable here).
   const isVoice = !!message.audioUrl;
   return (
     <li className="flex justify-start">
@@ -687,7 +687,7 @@ function MessageBubble({
             aria-hidden
           />
           <span className="font-body text-label-sm tracking-widest uppercase text-on-surface-variant">
-            {isCoach ? "Sean" : "Riven"}
+            {isCoach ? "RIVEN" : "Riven"}
           </span>
           {isVoice && (
             <span className="inline-flex items-center gap-1 font-body text-label-sm text-on-surface-variant/80">
@@ -732,7 +732,7 @@ function MessageBubble({
 }
 
 /**
- * Inline audio player for voice memos from Sean. Custom controls so
+ * Inline audio player for voice memos from RIVEN. Custom controls so
  * the bubble matches the brand instead of the chrome of native
  * <audio controls>. Tap play → audio plays through to the end. Tap
  * again to pause. Progress bar reflects playback position.
@@ -831,7 +831,7 @@ function VoicePlayer({
   );
 }
 
-// CopyButton was removed per Sean — texting Sean shouldn't have a
+// CopyButton was removed per RIVEN — texting RIVEN shouldn't have a
 // "copy text" affordance. Component deleted; can be re-introduced
 // from git history if we want it on a different surface later.
 
@@ -853,7 +853,7 @@ function Dot({ delay }: { delay: string }) {
 
 function EmptyState({
   // onPrompt + disabled were used for the old AI suggested-prompts grid.
-  // Unified thread doesn't need suggestions — Sean writes proactively
+  // Unified thread doesn't need suggestions — RIVEN writes proactively
   // via the cron, and her first message is whatever's on her mind. Kept
   // the same props signature so the parent doesn't churn.
   exiting,
@@ -881,7 +881,7 @@ function EmptyState({
         style={{ transitionDelay: exiting ? "0ms" : "100ms" }}
       >
         Quick question, meal you&apos;re unsure about, a hard day —
-        Sean reads everything. He answers in a few minutes most of
+        RIVEN reads everything. He answers in a few minutes most of
         the time. Tap the photo icon to share a meal pic.
       </p>
     </div>

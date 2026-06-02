@@ -12,26 +12,26 @@ import {
 import type Anthropic from "@anthropic-ai/sdk";
 
 /**
- * Auto-reply scheduler for the unified "Sean" thread.
+ * Auto-reply scheduler for the unified "RIVEN" thread.
  *
- * When a client sends Sean a message, we don't reply instantly — that
+ * When a client sends RIVEN a message, we don't reply instantly — that
  * gives away that an AI is on the other side. Instead we queue a reply
  * via PendingAiReply with a randomized scheduledFor in the ~90-130
  * second range — every reply lands within ~2 minutes, with small jitter
  * so two consecutive replies don't have the same gap.
  *
- * Distribution (Sean's tightened spec):
+ * Distribution (RIVEN's tightened spec):
  *   - All replies: 90s - 130s (1.5 - 2.2 min)
  *   - Skewed slightly toward the back of the window (~110s mean)
  *
- * The "Sean's reading..." indicator on the client doesn't appear
+ * The "RIVEN's reading..." indicator on the client doesn't appear
  * immediately when she sends — it shows up ~60 seconds in, then holds
  * until the reply lands. So her experience is: send → quiet for ~60s
- * → "Sean's reading" → ~60s later → his reply.
+ * → "RIVEN's reading" → ~60s later → his reply.
  *
  * The cron at /api/cron/process-ai-replies fires every minute, picks
  * due rows, generates the reply via Claude, inserts it as a COACH
- * ChatMessage with aiGenerated=true. Clients see "from Sean" — the
+ * ChatMessage with aiGenerated=true. Clients see "from RIVEN" — the
  * aiGenerated flag is invisible to them; only the coach dashboard
  * surfaces it.
  */
@@ -40,7 +40,7 @@ const HISTORY_LIMIT = 20;
 const RECENT_MEAL_HOURS = 36;
 const STREAK_WINDOW_DAYS = 14;
 
-/** Pick a randomized delay in milliseconds matching Sean's spec.
+/** Pick a randomized delay in milliseconds matching RIVEN's spec.
  *  Every reply lands within ~2 minutes (90-130s window). The skew is
  *  toward the back half of the window so most replies feel like ~2 min
  *  rather than near-instant. */
@@ -80,7 +80,7 @@ export async function scheduleAiReply(opts: {
 }
 
 /**
- * Process one due AI reply: generate the Sean-voice response via
+ * Process one due AI reply: generate the RIVEN-voice response via
  * Claude using the same live-context prompt the /chat stream uses,
  * insert it as a COACH ChatMessage with aiGenerated=true, mark the
  * pending row sent.
@@ -206,11 +206,11 @@ export async function processPendingReply(pendingId: string): Promise<{
       streakDays,
     });
 
-    // Pull recent unified-thread history. Everything on the Sean thread
+    // Pull recent unified-thread history. Everything on the RIVEN thread
     // is kind=COACH; the role column carries the directional info
-    // (USER = her side, ASSISTANT = Sean side). Auto-replies and real
-    // Sean replies both come through with role=ASSISTANT — fine for
-    // the API because both look like "Sean talking" to the model.
+    // (USER = her side, ASSISTANT = RIVEN side). Auto-replies and real
+    // RIVEN replies both come through with role=ASSISTANT — fine for
+    // the API because both look like "RIVEN talking" to the model.
     const historyDesc = await prisma.chatMessage.findMany({
       where: { userId: user.id, kind: "COACH" },
       orderBy: { createdAt: "desc" },
@@ -254,7 +254,7 @@ export async function processPendingReply(pendingId: string): Promise<{
     if (!text) throw new Error("Empty response from Claude.");
 
     // Insert as a COACH-kind ChatMessage with aiGenerated=true. Looks
-    // like real Sean to the client; the aiGenerated flag only the coach
+    // like real RIVEN to the client; the aiGenerated flag only the coach
     // dashboard reads.
     const created = await prisma.chatMessage.create({
       data: {

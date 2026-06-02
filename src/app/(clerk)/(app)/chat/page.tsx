@@ -5,20 +5,20 @@ import { ChatUI, type ChatMessage } from "./chat-ui";
 const HISTORY_LIMIT = 30;
 
 /**
- * The Sean thread.
+ * The RIVEN thread.
  *
- * Reached two ways: (1) tap the Message-from-Sean bubble at the top
+ * Reached two ways: (1) tap the Message-from-RIVEN bubble at the top
  * of /dashboard, (2) deep-link from a push notification. There is no
- * bottom-nav tab for this — Sean's coaching is always surfaced via
+ * bottom-nav tab for this — RIVEN's coaching is always surfaced via
  * the dashboard bubble first.
  *
  * Renders every COACH-kind message for the viewer (her side as
- * role=USER, Sean's side as role=ASSISTANT). She can type a free-text
- * reply at the bottom; her message persists and shows up in Sean's
+ * role=USER, RIVEN's side as role=ASSISTANT). She can type a free-text
+ * reply at the bottom; her message persists and shows up in RIVEN's
  * /coach/messages inbox where he answers manually.
  *
  * The AI auto-reply pipeline is OFF. When she sends a message, it
- * sits and waits for real Sean. No bot pretends to be him.
+ * sits and waits for real RIVEN. No bot pretends to be him.
  */
 export const dynamic = "force-dynamic";
 
@@ -88,7 +88,7 @@ export default async function ChatPage() {
           </span>
           <div>
             <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-              Sean
+              RIVEN
             </p>
             <p className="font-body text-label-sm text-on-surface-variant/80">
               Your coach

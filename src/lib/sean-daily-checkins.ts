@@ -7,7 +7,7 @@ import {
 import { sendPushToUser } from "@/lib/push";
 
 /**
- * Shared logic for the 3x/day Sean check-in crons.
+ * Shared logic for the 3x/day RIVEN check-in crons.
  *
  *   morning  ~8 AM CT — every active client
  *   midday   ~1 PM CT — active clients with NO MealLog today (nudge)
@@ -112,7 +112,7 @@ async function sendCheckInTo(
   variant: DailyPromptVariant,
 ): Promise<void> {
   // The check-in message is a COACH-kind ChatMessage on the unified
-  // Sean thread, with chipOptions set. aiGenerated stays false — this
+  // RIVEN thread, with chipOptions set. aiGenerated stays false — this
   // is a system-templated proactive prompt, not an AI-composed
   // reply.
   await prisma.chatMessage.create({
@@ -131,11 +131,11 @@ async function sendCheckInTo(
 
   // Push notification — deep-links to /dashboard so she lands directly
   // on the new SeanPromptHeadline at the top of the page rather than
-  // having to find the Sean tab. Same tag per client so a stale
+  // having to find the RIVEN tab. Same tag per client so a stale
   // notification gets replaced rather than stacking.
   try {
     await sendPushToUser(clientUserId, {
-      title: "Sean wrote you",
+      title: "RIVEN wrote you",
       body: variant.text.slice(0, 140),
       url: "/dashboard",
       tag: `daily-checkin-${clientUserId}`,

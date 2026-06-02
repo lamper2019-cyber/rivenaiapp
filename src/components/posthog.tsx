@@ -53,7 +53,7 @@ export function PostHogInit() {
           // — landing → quiz → VSL → pricing — onto the real person so
           // the sales funnel connects across the sign-up boundary).
           person_profiles: "identified_only",
-          // Session replay is ON by default — Sean wants to watch real
+          // Session replay is ON by default — RIVEN wants to watch real
           // sessions of people moving through the quiz/pricing. If it
           // ever eats too much monthly quota, set NEXT_PUBLIC_POSTHOG_REPLAY=0
           // to kill it without a code change.

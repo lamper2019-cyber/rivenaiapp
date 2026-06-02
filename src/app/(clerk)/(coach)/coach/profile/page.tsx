@@ -46,7 +46,7 @@ export default async function CoachProfilePage() {
     : null;
 
   // This week's Sunday prompt — drives the editor below. Falls back to
-  // an empty draft if Sean hasn't set one yet for the current ISO week.
+  // an empty draft if RIVEN hasn't set one yet for the current ISO week.
   const currentSundayPrompt = await getCurrentWeekPrompt().catch(() => null);
   const suggestedKind = await pickNextRotationKind().catch(
     () => "pulse" as const,
@@ -55,7 +55,7 @@ export default async function CoachProfilePage() {
   // Existing kind (if a prompt is already saved this week) — drop "open"
   // from the editor's view since the legacy format is retired for new
   // prompts. If a stale "open" row exists for this week, the editor will
-  // re-pick the rotation default and Sean can save over it.
+  // re-pick the rotation default and RIVEN can save over it.
   const existingKindRaw: SundayPromptKind | null =
     currentSundayPrompt && isSundayPromptKind(currentSundayPrompt.kind)
       ? currentSundayPrompt.kind
@@ -94,7 +94,7 @@ export default async function CoachProfilePage() {
           Coach
         </p>
         <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal">
-          Sean
+          RIVEN
         </h1>
         <p className="font-body text-body-md text-on-surface-variant">
           {email}
@@ -137,7 +137,7 @@ export default async function CoachProfilePage() {
         )}
       </section>
 
-      {/* Coaching tools — manual triggers Sean reaches for periodically. */}
+      {/* Coaching tools — manual triggers RIVEN reaches for periodically. */}
       <section className="space-y-6">
         <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
           Coaching tools

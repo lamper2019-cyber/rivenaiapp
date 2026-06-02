@@ -92,7 +92,7 @@ export function buildCalendarDays(input: {
     if (entry.totalCal === 0 || target === 0) {
       status = "empty";
     } else if (entry.totalCal <= target) {
-      // At or below target = in deficit zone. Sean's coaching goal.
+      // At or below target = in deficit zone. RIVEN's coaching goal.
       status = "sage";
     } else if (entry.totalCal <= target * 1.25) {
       status = "gold";

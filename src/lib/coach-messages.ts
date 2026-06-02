@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
  * Returns every active client with:
  *   - their last message (any kind) so the left-rail can show a preview
  *   - whether she's waiting on a reply (her last message is the latest;
- *     Sean hasn't answered yet) — drives the "needs you" indicator
+ *     RIVEN hasn't answered yet) — drives the "needs you" indicator
  *   - basic context for the right-rail when this client is selected
  *
  * For the active thread (selected via ?clientId=), we also pull the
@@ -23,10 +23,10 @@ export type ClientThreadSummary = {
     aiGenerated: boolean;
     createdAt: Date;
   } | null;
-  /** She's waiting on Sean = her latest message has no Sean (or AI)
+  /** She's waiting on RIVEN = her latest message has no RIVEN (or AI)
    *  reply after it. Drives the dot + sort order. */
   waitingOnSean: boolean;
-  /** Any pending AI auto-reply queued. Sean uses this to decide
+  /** Any pending AI auto-reply queued. RIVEN uses this to decide
    *  whether to chime in (and cancel the AI) vs let AI handle it. */
   pendingAiReplyId: string | null;
 };
@@ -117,7 +117,7 @@ export async function listClientThreads(): Promise<ClientThreadSummary[]> {
     };
   });
 
-  // Sort: "waiting on Sean" first, then by last-message recency.
+  // Sort: "waiting on RIVEN" first, then by last-message recency.
   rows.sort((a, b) => {
     if (a.waitingOnSean !== b.waitingOnSean) {
       return a.waitingOnSean ? -1 : 1;
@@ -130,7 +130,7 @@ export async function listClientThreads(): Promise<ClientThreadSummary[]> {
 }
 
 /**
- * Queued voice moments waiting for Sean to record. Each row maps to
+ * Queued voice moments waiting for RIVEN to record. Each row maps to
  * one client + one trigger event (a monthly check-in submission so
  * far). Sorted oldest-first so the queue drains FIFO.
  */

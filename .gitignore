@@ -38,3 +38,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Large local assets — never commit (GitHub 100MB limit)
+*.mp4
+/sean profile new.jpg
+/riven logo PWA logo.PNG
+/messaging Dashboard UI/

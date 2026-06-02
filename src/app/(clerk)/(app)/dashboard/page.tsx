@@ -19,7 +19,7 @@ import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
 // Daily mood ribbon retired from /dashboard on 2026-05-27. Mood data
 // model + MoodHistory on /profile both stay.
 // Pulse toasts ("so-and-so just logged a meal") retired same day —
-// Sean asked to remove the activity feed entirely. lib/pulse.ts +
+// RIVEN asked to remove the activity feed entirely. lib/pulse.ts +
 // the underlying queries remain for any future surface.
 import { PresenceIndicator } from "@/components/presence-indicator";
 import { CoachMessageBadge } from "@/components/coach-message-badge";
@@ -87,9 +87,9 @@ export default async function DashboardPage() {
   } = data;
   // ritualSlot, morningFocus, latestSeanPrompt still load on the
   // server (the loader is a stable contract) but the time-aware
-  // ritual card and the inline Sean bubble are both gone. Sean now
-  // lives entirely in the top-right "Message from Sean" pill which
-  // routes to /chat. The greeting + rotating Sean-voice quote took
+  // ritual card and the inline RIVEN bubble are both gone. RIVEN now
+  // lives entirely in the top-right "Message from RIVEN" pill which
+  // routes to /chat. The greeting + rotating RIVEN-voice quote took
   // the inline slot.
 
   // Ambient community trio + Sunday ritual snapshot. Best-effort: each
@@ -177,14 +177,14 @@ export default async function DashboardPage() {
         />
       )}
 
-      {/* Top-right "Message from Sean" pill — solid charcoal, serif
+      {/* Top-right "Message from RIVEN" pill — solid charcoal, serif
           S monogram, red unread count dot. Routes to /chat where she
           can read the thread and type back. Self-hides when there's
           zero coach-message history. */}
       <CoachMessageBadge messages={recentCoachMessages} />
 
-      {/* Greeting + rotating Sean-voice quote. Replaced the time-aware
-          ritual card on 2026-05-27 — Sean wanted the old "Good morning,
+      {/* Greeting + rotating RIVEN-voice quote. Replaced the time-aware
+          ritual card on 2026-05-27 — RIVEN wanted the old "Good morning,
           [Name]" treatment back. Quote rotates daily off the seeded
           bank in @/lib/daily-quotes. */}
       <header className="space-y-2">
@@ -230,7 +230,7 @@ export default async function DashboardPage() {
           reads exactly as it used to.
 
           DailyMoodRibbon retired 2026-05-27 — its slot now belongs to
-          the Message-from-Sean bubble above. Mood data model + mood
+          the Message-from-RIVEN bubble above. Mood data model + mood
           history on /profile both stay. */}
       {showSunday && sundaySnapshot?.prompt && (
         <SundayRitual
@@ -260,7 +260,7 @@ export default async function DashboardPage() {
         <PeerWins candidates={peerWinCandidates} />
       )}
       {/* Pulse toasts ("So-and-so just logged a meal" pop-ups) retired
-          2026-05-27 — Sean asked to remove the activity feed entirely.
+          2026-05-27 — RIVEN asked to remove the activity feed entirely.
           The aggregate "Together" stats below still show. */}
       {collectiveStats && (
         <CollectiveCounter
@@ -337,7 +337,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* Removed per Sean — wasn't earning the screen real estate:
+      {/* Removed per RIVEN — wasn't earning the screen real estate:
             - Ask RIVEN hero (the bottom-nav Chat tab covers this)
             - LogStepsForm (steps progress still renders in Today below)
             - Sunday check-in card (path remains via /check-in + push)

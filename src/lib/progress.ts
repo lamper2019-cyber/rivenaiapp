@@ -33,7 +33,7 @@ export function computeWins(profile: Profile, checkIns: WeeklyCheckIn[]): Win[] 
     wins.push({
       id: "up-since-start",
       headline: `Up ${Math.abs(lost).toFixed(1)} lbs`,
-      detail: `Could be cycle, sleep, or stress. Sean reads the trend, not the number.`,
+      detail: `Could be cycle, sleep, or stress. RIVEN reads the trend, not the number.`,
       tone: "neutral",
     });
   }

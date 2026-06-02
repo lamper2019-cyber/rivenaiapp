@@ -1,5 +1,5 @@
 /**
- * Sean-voice motivational lines that rotate under the dashboard greeting.
+ * RIVEN-voice motivational lines that rotate under the dashboard greeting.
  * Picked deterministically by day-of-year so a client sees the same line all
  * day — and a different one tomorrow.
  */

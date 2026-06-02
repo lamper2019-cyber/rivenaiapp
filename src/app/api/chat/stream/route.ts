@@ -40,7 +40,7 @@ const TOOL_LOOP_MAX_ITERATIONS = 4;
 const LOG_MEAL_TOOL: Anthropic.Tool = {
   name: "log_meal",
   description:
-    "Save a meal log to the client's RIVEN account. Call this when she tells you she ate something — anything from a one-line mention to a detailed description with stated calorie counts. The downstream pipeline applies the +35% overestimation buffer (or honors her explicit numbers when she gave them) and persists a MealLog row plus updates today's totals. After the tool returns, weave the macros into your Sean-voice reply; do NOT estimate macros yourself.",
+    "Save a meal log to the client's RIVEN account. Call this when she tells you she ate something — anything from a one-line mention to a detailed description with stated calorie counts. The downstream pipeline applies the +35% overestimation buffer (or honors her explicit numbers when she gave them) and persists a MealLog row plus updates today's totals. After the tool returns, weave the macros into your RIVEN-voice reply; do NOT estimate macros yourself.",
   input_schema: {
     type: "object",
     properties: {
@@ -263,7 +263,7 @@ export async function POST(req: Request) {
             // Bumped from 1024 → 1600. "How am I doing this week?" /
             // "look at my meals and tell me what to improve" responses
             // were running out of room mid-stream because they have to
-            // reference 5 recent meals AND give a Sean-voice take. 1600
+            // reference 5 recent meals AND give a RIVEN-voice take. 1600
             // gives breathing room; rarely-needed bigger answers can
             // still finish in a follow-up iteration.
             max_tokens: 1600,
@@ -463,7 +463,7 @@ async function runChatTool(args: {
   });
 
   // Returned to Claude as the tool_result. The model uses these fields to
-  // write its Sean-voice reply ("logged X cal, that puts you at Y of Z").
+  // write its RIVEN-voice reply ("logged X cal, that puts you at Y of Z").
   return {
     saved: true,
     mealLogId,

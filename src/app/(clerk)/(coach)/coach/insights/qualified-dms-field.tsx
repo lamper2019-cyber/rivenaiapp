@@ -6,7 +6,7 @@ import { setQualifiedDms } from "./actions";
 /**
  * The "qualified DMs this week" stat — but editable inline. This is the
  * single highest-signal number (people asking "how do I work with you?"),
- * and IG won't hand us messaging data without heavy review, so Sean taps it
+ * and IG won't hand us messaging data without heavy review, so RIVEN taps it
  * in. Click the number → it becomes an input → blur/Enter saves.
  */
 export function QualifiedDmsField({ current }: { current: number | null }) {

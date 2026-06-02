@@ -9,7 +9,7 @@ const HISTORY_LIMIT = 30;
  * on 2026-05-27 (later that evening, after the "keep it simple" pass
  * left it tabless).
  *
- * Strictly user ↔ AI: filters ChatMessage by kind="AI". Sean's COACH
+ * Strictly user ↔ AI: filters ChatMessage by kind="AI". RIVEN's COACH
  * thread lives at /chat (separate surface, separate mental model).
  * The streaming endpoint is /api/chat/stream, untouched from when
  * this UI was the original /chat page.
@@ -33,7 +33,7 @@ export default async function AiPage() {
 
       if (user) {
         // RIVEN AI is strictly the user ↔ AI conversation. COACH messages
-        // live on /chat (Sean's thread). Filtering by kind here is the
+        // live on /chat (RIVEN's thread). Filtering by kind here is the
         // single source of truth — no coach content ever leaks into the
         // AI thread.
         const messagesDesc = await prisma.chatMessage.findMany({

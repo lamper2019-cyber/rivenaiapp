@@ -1,11 +1,11 @@
 /**
  * Bucketed triage for the coach roster. Splits clients into:
- *  - needsAttention: Sean has an action item (no-log, pending check-in)
- *  - doingWell:      Sean should acknowledge (streak milestone, weight drop)
+ *  - needsAttention: RIVEN has an action item (no-log, pending check-in)
+ *  - doingWell:      RIVEN should acknowledge (streak milestone, weight drop)
  *  - (everyone else): no signal either way — shown in the plain roster
  *
  * One client only appears in ONE bucket. needsAttention always wins — if she
- * needs Sean's eyes, that's more urgent than celebrating.
+ * needs RIVEN's eyes, that's more urgent than celebrating.
  *
  * Pure function. Computation happens in the page (so we can batch DB reads),
  * then the arrays are handed to the TriageFeed component for render.

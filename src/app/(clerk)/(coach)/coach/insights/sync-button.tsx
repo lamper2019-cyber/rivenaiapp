@@ -5,7 +5,7 @@ import { runManualSync, type ManualSyncResult } from "./actions";
 
 /**
  * "Sync now" — pulls the latest Instagram + funnel numbers on demand. The
- * daily cron does this automatically; this is for when Sean wants a fresh
+ * daily cron does this automatically; this is for when RIVEN wants a fresh
  * read right after posting.
  */
 export function SyncButton() {
