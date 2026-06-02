@@ -561,27 +561,53 @@ function PlanRevealStep({ state, submitError }: { state: State; submitError: str
     });
   }, [state]);
 
+  // Projection: how long to reach goal at the plan's deficit. ~3500 cal / lb.
+  // We clamp the displayed weekly pace to a sustainable band (0.5–1.5 lb/wk)
+  // so the timeline reads honest, not crash-diet.
+  const projection = useMemo(() => {
+    if (!targets) return null;
+    const delta = state.currentWeight - state.goalWeight; // + = losing
+    if (delta <= 0) return { weeks: 0, weeklyLoss: 0, goalDateLabel: null as string | null };
+    const rawWeekly = ((targets.maintenanceCalories - targets.cutCalories) * 7) / 3500;
+    const weeklyLoss = Math.min(1.5, Math.max(0.5, rawWeekly));
+    const weeks = Math.ceil(delta / weeklyLoss);
+    const d = new Date();
+    d.setDate(d.getDate() + weeks * 7);
+    const goalDateLabel = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    return { weeks, weeklyLoss, goalDateLabel };
+  }, [targets, state.currentWeight, state.goalWeight]);
+
+  const losing = state.currentWeight > state.goalWeight;
+
   return (
     <div>
       <SeanSays>
-        Alright{state.name ? `, ${state.name}` : ""}. Here&apos;s where we&apos;re starting.
+        Here&apos;s your plan{state.name ? `, ${state.name}` : ""}.
       </SeanSays>
 
+      {/* The reveal — animated weight curve from today to the goal date. */}
       {targets && (
-        <div className="rounded-md bg-cream border border-gold/40 shadow-elevation-1 px-gutter py-5 space-y-3 mb-6">
-          <PlanRow label="Daily target" value={`${targets.cutCalories.toLocaleString()} cal`} />
-          <PlanRow label="Protein floor" value={`${targets.proteinFloor}g`} />
-          <PlanRow
-            label="Maintenance"
-            value={`${targets.maintenanceCalories.toLocaleString()} cal`}
-            muted
+        <div className="rounded-2xl bg-cream border border-gold/40 shadow-elevation-1 px-gutter py-5 mb-5">
+          <WeightCurve
+            current={state.currentWeight}
+            goal={state.goalWeight}
+            goalDateLabel={losing ? projection?.goalDateLabel ?? null : null}
           />
+          <div className="grid grid-cols-3 gap-2 mt-5 pt-4 border-t border-outline-variant/40">
+            <PlanStat label="Daily target" value={targets.cutCalories.toLocaleString()} unit="cal" />
+            <PlanStat label="Protein floor" value={String(targets.proteinFloor)} unit="g" />
+            <PlanStat
+              label="Pace"
+              value={losing && projection ? projection.weeklyLoss.toFixed(1) : "—"}
+              unit={losing ? "lb/wk" : ""}
+            />
+          </div>
         </div>
       )}
 
       <SeanSays>
-        No judgment on the numbers. They&apos;re data we&apos;re going to use.
-        We&apos;ll fine-tune week by week.
+        Built from your numbers — sustainable, not a crash. We fine-tune it
+        week by week. Steady wins.
       </SeanSays>
 
       {submitError && (
@@ -589,6 +615,90 @@ function PlanRevealStep({ state, submitError }: { state: State; submitError: str
           <p className="font-body text-body-md text-soft-red">{submitError}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The animated weight-curve graph — the emotional centerpiece of onboarding.
+ * Draws an ease-out decline from today's weight to the goal (front-loaded
+ * loss tapering off — both realistic and motivating), with a dot landing on
+ * the goal. The line animates in on mount (stroke draw), reduced-motion safe.
+ */
+function WeightCurve({
+  current,
+  goal,
+  goalDateLabel,
+}: {
+  current: number;
+  goal: number;
+  goalDateLabel: string | null;
+}) {
+  const W = 300;
+  const H = 150;
+  const padX = 14;
+  const padTop = 16;
+  const padBottom = 30;
+  const delta = current - goal;
+
+  // 24 points along an ease-out-cubic curve mapping progress t → weight.
+  const pts = Array.from({ length: 25 }, (_, i) => {
+    const t = i / 24;
+    const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+    const x = padX + t * (W - padX * 2);
+    // For a loss, the line descends; for maintain/gain we just hold flat-ish.
+    const frac = delta !== 0 ? eased : 0;
+    const y = padTop + frac * (H - padTop - padBottom);
+    return [x, y] as const;
+  });
+  const d = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const [endX, endY] = pts[pts.length - 1];
+  const [startX, startY] = pts[0];
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Projected weight over time">
+        {/* baseline */}
+        <line x1={padX} y1={H - padBottom} x2={W - padX} y2={H - padBottom} stroke="currentColor" className="text-charcoal/10" strokeWidth="1" />
+        {/* the curve — draws in */}
+        <path
+          d={d}
+          pathLength={1}
+          fill="none"
+          stroke="currentColor"
+          className="text-gold riven-draw-curve"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        {/* start dot + label */}
+        <circle cx={startX} cy={startY} r="4" className="fill-charcoal" />
+        <text x={startX} y={startY - 9} className="fill-charcoal font-display" fontSize="15" textAnchor="start">
+          {current}
+        </text>
+        {/* goal dot + label */}
+        <circle cx={endX} cy={endY} r="5" className="fill-sage" />
+        <text x={endX} y={endY - 10} className="fill-sage font-display" fontSize="17" textAnchor="end">
+          {goal}
+        </text>
+      </svg>
+      <div className="flex justify-between font-body text-label-sm tracking-widest uppercase text-on-surface-variant px-1 -mt-1">
+        <span>Today</span>
+        <span className="text-sage">{goalDateLabel ? `Goal · ${goalDateLabel}` : "Your goal"}</span>
+      </div>
+    </div>
+  );
+}
+
+function PlanStat({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <div className="text-center">
+      <p className="font-display text-headline-md text-charcoal leading-none">
+        {value}
+        {unit ? <span className="font-body text-label-sm text-on-surface-variant/70"> {unit}</span> : null}
+      </p>
+      <p className="font-body text-label-sm tracking-wide uppercase text-on-surface-variant/70 mt-1">
+        {label}
+      </p>
     </div>
   );
 }

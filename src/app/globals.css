@@ -170,6 +170,29 @@ body {
   animation: riven-cell-fill 360ms ease-out both;
 }
 
+/* Onboarding plan-reveal: the weight curve draws itself in. pathLength is
+   normalized to 1 via the dasharray so this works regardless of the path's
+   real length. Reduced-motion shows the full line immediately. */
+@keyframes riven-draw-curve {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.riven-draw-curve {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: riven-draw-curve 1100ms ease-out 150ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .riven-draw-curve {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
 @keyframes riven-rise-in {
   0% {
     opacity: 0;
