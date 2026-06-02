@@ -41,8 +41,19 @@ Last touched: 2026-06-01 — **WORKING** (via Instagram Login pivot)
   links (utm_content=`ig_<id>`) on posts/stories. Sean's current posts use
   "Comment STORY" not links, so per-post funnel stays empty until link-based
   CTAs are used. Account-level funnel (THIS WEEK strip) works regardless.
-- **Phase 3:** transcribe reels (reuse Whisper) → extract hook → real pattern
-  detection (face-vs-result classification).
+- **Phase 3 — VISION (proven 2026-06-01, ready to build in):** Sean's content
+  is mostly silent (captions on screen, no talking), so Whisper/audio is
+  useless. Solution proven end-to-end: IMAGE → read media_url directly; VIDEO →
+  `ffmpeg-static` (bundled, added to deps) extracts ~4 frames → Claude vision
+  (`claude-sonnet-4-6`) reads on-screen text + visuals → returns
+  {hook, onScreenText, visualSummary, contentType, whyItWorks}. Test harness:
+  `scripts/test-vision.mjs`. TO BUILD: add IgPost.visionSummary + contentType
+  fields, formalize into `lib/vision.ts`, enrich via cron/button, then wire the
+  features below.
+- **Features to add (all server-side, no Sean setup):** B = "what to post next"
+  (seed riven-content-generator with winning hooks/topics); C = hook swipe file
+  (rank opening lines by reach); D = Monday digest push. A = per-post breakdown
+  UI (uses the vision fields).
 
 ## Account facts (for reference)
 - RIVEN IG: @itsseanwilliams · ig id `17841400082866724` (insights node) /
