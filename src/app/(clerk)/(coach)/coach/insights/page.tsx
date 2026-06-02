@@ -7,6 +7,7 @@ import {
 import { isInstagramConfigured } from "@/lib/instagram";
 import { SyncButton } from "./sync-button";
 import { QualifiedDmsField } from "./qualified-dms-field";
+import { PostIdeas } from "./post-ideas";
 
 // Always fresh — this is a low-traffic coach page and the numbers change daily.
 export const dynamic = "force-dynamic";
@@ -62,10 +63,10 @@ function PostRow({ post, rank }: { post: PostCard; rank: number }) {
                 rel="noopener noreferrer"
                 className="hover:text-gold transition-colors"
               >
-                {post.caption}
+                {post.hook || post.caption}
               </a>
             ) : (
-              post.caption
+              post.hook || post.caption
             )}
           </p>
           <p className="font-body text-label-md text-on-surface-variant mt-1">
@@ -76,6 +77,12 @@ function PostRow({ post, rank }: { post: PostCard; rank: number }) {
               post.trials === 1 ? "" : "s"
             }`}
           </p>
+          {/* AI breakdown — why it works, read off the screen (feature A). */}
+          {post.whyItWorks ? (
+            <p className="font-body text-label-md text-on-surface-variant/90 mt-1.5 italic">
+              🧠 {post.whyItWorks}
+            </p>
+          ) : null}
           {post.flopReason ? (
             <p className="font-body text-label-md text-soft-red mt-1.5">
               └─ {post.flopReason}
@@ -192,6 +199,37 @@ export default async function CoachInsightsPage() {
         )}
       </section>
 
+      {/* Hook swipe file (feature C) — your opening lines ranked by reach. */}
+      {(() => {
+        const hooks = cc.posts.filter((p) => p.hook).sort((a, b) => b.reach - a.reach).slice(0, 10);
+        if (hooks.length === 0) return null;
+        return (
+          <section className="space-y-3">
+            <h2 className="font-display text-headline-md text-charcoal">Your hooks, ranked by reach</h2>
+            <ul className="space-y-2">
+              {hooks.map((p) => (
+                <li
+                  key={p.igId}
+                  className="flex items-baseline gap-3 rounded-2xl border border-outline-variant/50 bg-white/40 px-gutter py-3"
+                >
+                  <span className="font-display text-body-lg text-charcoal w-16 shrink-0 tabular-nums">
+                    {fmt(p.reach)}
+                  </span>
+                  <span className="font-body text-body-md text-charcoal flex-1 min-w-0 truncate">
+                    {p.hook}
+                  </span>
+                  {p.contentType ? (
+                    <span className="font-body text-label-md text-on-surface-variant shrink-0">
+                      {p.contentType}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })()}
+
       {/* Pattern line */}
       {cc.pattern ? (
         <section className="rounded-2xl border border-charcoal/15 bg-charcoal/[0.03] px-gutter py-5">
@@ -201,6 +239,9 @@ export default async function CoachInsightsPage() {
           <p className="font-body text-body-md text-charcoal">{cc.pattern}</p>
         </section>
       ) : null}
+
+      {/* What to post next (feature B) */}
+      <PostIdeas />
     </main>
   );
 }

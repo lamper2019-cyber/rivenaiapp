@@ -29,6 +29,10 @@ export type PostCard = {
   score: number;
   // Plain-English diagnosis when a post underperformed. Null when it did fine.
   flopReason: string | null;
+  // Vision-engine output (null until analyzed).
+  hook: string | null;
+  contentType: string | null;
+  whyItWorks: string | null;
 };
 
 export type CommandCenter = {
@@ -132,6 +136,9 @@ export async function buildCommandCenter(): Promise<CommandCenter> {
       trials,
       score: scorePost({ reach, linkTaps, quizStarts, trials }),
       flopReason: diagnoseFlop({ reach, avgWatchSec, linkTaps, quizStarts, medianReach }),
+      hook: p.hook ?? null,
+      contentType: p.contentType ?? null,
+      whyItWorks: p.whyItWorks ?? null,
     };
   });
 
