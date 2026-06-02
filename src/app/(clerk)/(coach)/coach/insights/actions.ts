@@ -121,3 +121,74 @@ Give 3 NEW reel hooks that lean into what's clearly working above (story + trans
     return { ok: false, error: e instanceof Error ? e.message : "Generation failed." };
   }
 }
+
+export type PostFixResult =
+  | { ok: true; verdict: "win" | "ok" | "flop"; why: string; action: string }
+  | { ok: false; error: string };
+
+/**
+ * Post Autopsy — the adaptive "what do I do?" read for ONE post. Winners get
+ * "why it won + repeat this"; underperformers get "why it missed + redo it
+ * like this." Uses the stored vision read + the real metrics so the advice is
+ * grounded in what actually happened, in Sean/RIVEN's direct voice.
+ */
+export async function generatePostFix(igId: string): Promise<PostFixResult> {
+  const gate = await requireCoach();
+  if (!gate.ok) return { ok: false, error: gate.error };
+  if (!isAnthropicConfigured) return { ok: false, error: "ANTHROPIC_API_KEY not set." };
+
+  const post = await prisma.igPost.findUnique({
+    where: { igId },
+    include: { metrics: { orderBy: { capturedAt: "desc" }, take: 1 } },
+  });
+  if (!post) return { ok: false, error: "Post not found." };
+
+  // Typical reach baseline so the model can judge over/under-performance.
+  const recent = await prisma.igPostMetric.findMany({
+    orderBy: { capturedAt: "desc" },
+    take: 60,
+    select: { reach: true },
+  });
+  const reaches = recent.map((r) => r.reach ?? 0).filter((n) => n > 0).sort((a, b) => a - b);
+  const median = reaches.length ? reaches[Math.floor(reaches.length / 2)] : 0;
+
+  const m = post.metrics[0];
+  const reach = m?.reach ?? 0;
+  const watch = m?.avgWatchTimeMs != null ? `${(m.avgWatchTimeMs / 1000).toFixed(1)}s avg watch` : "n/a";
+  const did =
+    (m?.trials ?? 0) > 0 || (m?.quizStarts ?? 0) >= 5 || (median > 0 && reach >= median * 1.8)
+      ? "OVER-performed"
+      : (median > 0 && reach < median * 0.5) || (m?.avgWatchTimeMs != null && m.avgWatchTimeMs < 3000)
+        ? "UNDER-performed"
+        : "did okay";
+
+  try {
+    const client = getAnthropicClient();
+    const msg = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 350,
+      messages: [{
+        role: "user",
+        content: `You're the content strategist for RIVEN (weight-loss coaching for Black women 35+; calm, no-hype, culturally grounded voice). Analyze ONE Instagram post and tell the founder what to do.
+
+POST
+- Hook: "${post.hook ?? "(unknown)"}"
+- On-screen text: "${(post.onScreenText ?? "").slice(0, 400)}"
+- What's shown: "${post.visualSummary ?? ""}"
+- Type: ${post.contentType ?? "unknown"}
+- Numbers: ${reach.toLocaleString()} reach (your median is ~${median.toLocaleString()}), ${watch}, ${m?.saved ?? 0} saves, ${m?.quizStarts ?? 0} quiz starts, ${m?.trials ?? 0} trials.
+- It ${did}.
+
+Reply ONLY minified JSON:
+{"verdict":"win|ok|flop","why":"1-2 sentences: the REAL reason it did or didn't land for this audience","action":"if it won: how to repeat it. if it missed: redo it like THIS — a concrete, specific rewrite of the hook/approach for next time. Direct, no fluff, no clichés."}`,
+      }],
+    });
+    const text = msg.content[0]?.type === "text" ? msg.content[0].text : "{}";
+    const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const o = JSON.parse(cleaned);
+    const v = o.verdict === "win" || o.verdict === "flop" ? o.verdict : "ok";
+    return { ok: true, verdict: v, why: String(o.why ?? "").slice(0, 500), action: String(o.action ?? "").slice(0, 600) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Analysis failed." };
+  }
+}

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { buildCommandCenter, type PostCard } from "@/lib/insights";
+import { buildCommandCenter, type PostCard, type Cluster, type Swot } from "@/lib/insights";
 import {
   isPosthogQueryConfigured,
   fetchFunnelTotals,
@@ -9,6 +9,7 @@ import { isInstagramConfigured } from "@/lib/instagram";
 import { SyncButton } from "./sync-button";
 import { QualifiedDmsField } from "./qualified-dms-field";
 import { PostIdeas } from "./post-ideas";
+import { PostAutopsy, type AutopsyPost } from "./post-autopsy";
 
 // Always fresh — low-traffic coach page, numbers change on every sync.
 export const dynamic = "force-dynamic";
@@ -140,35 +141,88 @@ function HeroStat({ label, value, gold = false }: { label: string; value: string
   );
 }
 
-/* ── Compact leaderboard row ────────────────────────────────── */
-function PostRow({ p, rank }: { p: PostCard; rank: number }) {
-  const flop = !!p.flopReason;
+/* ── Pattern clusters (what TYPE wins) ──────────────────────── */
+function ClustersStrip({ clusters, note }: { clusters: Cluster[]; note: string | null }) {
+  if (clusters.length === 0) return null;
+  const max = Math.max(...clusters.map((c) => c.avgReach), 1);
+  const verdict = (t: Cluster["trend"]) =>
+    t === "up" ? { txt: "double down", cls: "text-sage" } : t === "down" ? { txt: "rethink", cls: "text-soft-red" } : { txt: "tune", cls: "text-gold" };
   return (
-    <div className={`flex items-center gap-4 py-3 ${flop ? "border-l-4 border-soft-red/40 pl-4" : ""}`}>
-      <span className="font-display text-on-surface-variant/30 text-body-lg w-6 shrink-0">
-        {String(rank).padStart(2, "0")}
-      </span>
-      <div className="flex-1 min-w-0">
-        <p className="font-body text-body-md font-medium text-charcoal truncate">{p.hook || p.caption}</p>
-        {flop ? (
-          <p className="font-body text-[10px] tracking-wide uppercase text-soft-red mt-0.5">{p.flopReason}</p>
-        ) : (
-          <p className="font-body text-[10px] tracking-wide uppercase text-on-surface-variant/70 mt-0.5">
-            {fmt(p.reach)} reach
-            {p.quizStarts > 0 ? ` · ${p.quizStarts} quiz` : ""}
-            {p.trials > 0 ? ` · ${p.trials} trial${p.trials === 1 ? "" : "s"}` : ""}
-          </p>
-        )}
+    <section className="riven-rise-in rounded-2xl border border-outline-variant/50 bg-white/50 px-gutter py-6">
+      <h3 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant mb-5">
+        What&apos;s working · by pattern
+      </h3>
+      <div className="space-y-3">
+        {clusters.map((c) => {
+          const v = verdict(c.trend);
+          return (
+            <div key={c.key} className="flex items-center gap-3">
+              <span className="w-20 sm:w-24 shrink-0 font-body text-body-md text-charcoal capitalize">{c.key}</span>
+              <div className="flex-1 h-2 rounded-full bg-charcoal/[0.06] overflow-hidden">
+                <div className="h-full rounded-full bg-gold" style={{ width: `${Math.max(6, (c.avgReach / max) * 100)}%` }} />
+              </div>
+              <span className="w-14 text-right font-display text-body-md text-charcoal">{fmt(c.avgReach)}</span>
+              <span className={`w-24 text-right font-body text-label-md ${v.cls}`}>{v.txt}</span>
+            </div>
+          );
+        })}
       </div>
-      <span
-        className={`shrink-0 rounded-full px-2 py-0.5 font-body text-[10px] tracking-widest uppercase ${
-          flop ? "bg-soft-red/10 text-soft-red" : "bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant"
-        }`}
-      >
-        {flop ? "Flop" : p.contentType || "post"}
-      </span>
+      {note ? <p className="mt-5 font-body text-label-md text-on-surface-variant">{note}</p> : null}
+    </section>
+  );
+}
+
+/* ── SWOT board ─────────────────────────────────────────────── */
+function SwotBoard({ swot }: { swot: Swot }) {
+  const quad = (title: string, items: string[], cls: string) => (
+    <div className="rounded-xl border border-outline-variant/40 p-4">
+      <p className={`font-body text-label-md tracking-widest uppercase ${cls} mb-2.5`}>{title}</p>
+      <ul className="space-y-1.5">
+        {items.length ? (
+          items.map((t, i) => (
+            <li key={i} className="font-body text-label-md text-charcoal flex gap-2">
+              <span className="text-on-surface-variant/40">•</span>
+              <span>{t}</span>
+            </li>
+          ))
+        ) : (
+          <li className="font-body text-label-md text-on-surface-variant/50">—</li>
+        )}
+      </ul>
     </div>
   );
+  return (
+    <section className="riven-rise-in rounded-2xl border border-outline-variant/50 bg-white/50 px-gutter py-6">
+      <h3 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant mb-5">
+        This month · SWOT
+      </h3>
+      <div className="grid md:grid-cols-2 gap-3">
+        {quad("Strengths", swot.strengths, "text-sage")}
+        {quad("Weaknesses", swot.weaknesses, "text-soft-red")}
+        {quad("Opportunities", swot.opportunities, "text-gold")}
+        {quad("Threats", swot.threats, "text-on-surface-variant")}
+      </div>
+    </section>
+  );
+}
+
+/* ── Map a PostCard → the client autopsy row's props ────────── */
+function toAutopsy(p: PostCard): AutopsyPost {
+  return {
+    igId: p.igId,
+    hook: p.hook || p.caption,
+    dateLabel: p.publishedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    contentType: p.contentType,
+    verdict: p.verdict,
+    reach: p.reach,
+    saved: p.saved,
+    avgWatchSec: p.avgWatchSec,
+    quizStarts: p.quizStarts,
+    trials: p.trials,
+    whyItWorks: p.whyItWorks,
+    flopReason: p.flopReason,
+    permalink: p.permalink,
+  };
 }
 
 export default async function CoachInsightsPage() {
@@ -194,8 +248,9 @@ export default async function CoachInsightsPage() {
 
   const needsSetup = !isInstagramConfigured || !isPosthogQueryConfigured;
   const top = cc.posts[0];
-  const rest = cc.posts.slice(1, 6);
   const hooks = cc.posts.filter((p) => p.hook).sort((a, b) => b.reach - a.reach).slice(0, 5);
+  // The feed shows EVERY post as it landed (chronological), not just top.
+  const feed = [...cc.posts].sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
 
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-6xl mx-auto py-10 pb-32 space-y-gutter">
@@ -249,28 +304,41 @@ export default async function CoachInsightsPage() {
         </div>
       </section>
 
-      {/* Leaderboard + right rail */}
+      {/* Pattern clusters — what TYPE wins */}
+      <ClustersStrip clusters={cc.clusters} note={cc.formatNote} />
+
+      {/* SWOT — the strategy read */}
+      {cc.hasData ? <SwotBoard swot={cc.swot} /> : null}
+
+      {/* Feed + right rail */}
       <section className="grid lg:grid-cols-12 gap-gutter items-start">
-        {/* Leaderboard */}
-        <div className="riven-rise-in lg:col-span-8 rounded-2xl border border-outline-variant/50 bg-white/50 px-gutter py-6">
-          <h3 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant mb-6">
-            Your posts · business leaderboard
-          </h3>
+        {/* Main column: top performer + chronological feed */}
+        <div className="lg:col-span-8 space-y-gutter">
           {cc.hasData && top ? (
-            <>
+            <div className="riven-rise-in rounded-2xl border border-gold/40 bg-white/50 px-gutter py-6">
+              <h3 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant mb-4">
+                Top performer
+              </h3>
               <HeroPost p={top} />
-              <div className="h-px bg-outline-variant/30 my-4" />
-              <div className="divide-y divide-outline-variant/20">
-                {rest.map((p, i) => (
-                  <PostRow key={p.igId} p={p} rank={i + 2} />
+            </div>
+          ) : null}
+
+          <div className="riven-rise-in rounded-2xl border border-outline-variant/50 bg-white/50 px-gutter py-6">
+            <h3 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant mb-3">
+              Content feed · as they land
+            </h3>
+            {cc.hasData ? (
+              <div className="space-y-1">
+                {feed.map((p) => (
+                  <PostAutopsy key={p.igId} post={toAutopsy(p)} />
                 ))}
               </div>
-            </>
-          ) : (
-            <p className="font-body text-body-md text-on-surface-variant py-8 text-center">
-              No posts synced yet. Hit <span className="text-charcoal">Sync now</span>.
-            </p>
-          )}
+            ) : (
+              <p className="font-body text-body-md text-on-surface-variant py-8 text-center">
+                No posts synced yet. Hit <span className="text-charcoal">Sync now</span>.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Right rail */}
