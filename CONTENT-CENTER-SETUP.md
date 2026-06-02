@@ -50,10 +50,15 @@ Last touched: 2026-06-01 — **WORKING** (via Instagram Login pivot)
   `scripts/test-vision.mjs`. TO BUILD: add IgPost.visionSummary + contentType
   fields, formalize into `lib/vision.ts`, enrich via cron/button, then wire the
   features below.
-- **Features to add (all server-side, no Sean setup):** B = "what to post next"
-  (seed riven-content-generator with winning hooks/topics); C = hook swipe file
-  (rank opening lines by reach); D = Monday digest push. A = per-post breakdown
-  UI (uses the vision fields).
+- **Features — ALL BUILT & SHIPPED 2026-06-01:**
+  - A = per-post AI breakdown ("🧠 why it works", hook as headline) — on the page
+  - B = "What to post next" — generatePostIdeas action + PostIdeas button
+  - C = "Your hooks, ranked by reach" swipe file — on the page
+  - D = `/api/cron/weekly-digest` — Monday push to Sean (NEEDS A CRON: duplicate
+    the sync-instagram cron, point at `/api/cron/weekly-digest`, schedule
+    `0 13 * * 1`). Optional.
+  - Vision runs automatically in the daily sync cron (6 posts/run). To backfill
+    all at once: `ANTHROPIC_API_KEY=... node --env-file=.env scripts/enrich-once.mjs 30`
 
 ## Account facts (for reference)
 - RIVEN IG: @itsseanwilliams · ig id `17841400082866724` (insights node) /
