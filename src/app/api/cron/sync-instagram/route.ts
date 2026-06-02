@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncInstagram } from "@/lib/instagram-sync";
+import { enrichPendingPosts } from "@/lib/post-enrich";
 import {
   isInstagramConfigured,
   refreshLongLivedToken,
@@ -53,8 +54,19 @@ export async function POST(req: Request) {
   }
 
   const result = await syncInstagram();
+
+  // Read the screen of any newly-synced posts (on-screen text + visuals via
+  // Claude vision). Bounded per run; catches up over days. Non-fatal.
+  let vision = { enriched: 0, errors: [] as string[] };
+  try {
+    vision = await enrichPendingPosts(6);
+  } catch (e) {
+    console.warn("[sync-instagram] enrich failed:", e);
+  }
+
   return NextResponse.json({
     ...result,
+    vision,
     tokenRefreshed: !!refreshedToken,
   });
 }

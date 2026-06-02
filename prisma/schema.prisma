@@ -590,11 +590,22 @@ model IgPost {
   mediaUrl     String? // video/image source — used by Phase 3 reel transcription
   publishedAt  DateTime
 
-  // Phase 3: Whisper transcript of the reel audio + the extracted hook
-  // (first line / opening claim). Lets the pattern engine correlate hook
-  // STYLE with performance instead of guessing. Null until transcribed.
-  transcript String? @db.Text
-  hook       String?
+  // VISION engine output (src/lib/vision.ts). Sean's content is mostly
+  // captions-on-screen with no talking, so we READ the screen rather than
+  // listen: images directly, videos via sampled frames → Claude vision.
+  //   hook         — the opening on-screen line (the scroll-stopper)
+  //   onScreenText — all text shown across the post/frames
+  //   visualSummary— what's physically shown (1 sentence)
+  //   contentType  — story | teaching | result | bts | other
+  //   whyItWorks   — why it does/doesn't grab attention (feeds the pattern engine)
+  // transcript stays reserved for audio (talking reels), unused for now.
+  transcript   String? @db.Text
+  hook         String?
+  onScreenText String? @db.Text
+  visualSummary String?
+  contentType  String?
+  whyItWorks   String? @db.Text
+  visionAt     DateTime? // when vision last ran; null = not yet analyzed
 
   // UTM tag we attach to this post's link (Story sticker / per-post bio
   // swap) so PostHog can attribute funnel events to it precisely. When
