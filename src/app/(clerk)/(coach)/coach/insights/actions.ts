@@ -69,7 +69,14 @@ export async function setQualifiedDms(count: number): Promise<SetDmsResult> {
   return { ok: true };
 }
 
-export type IdeasResult = { ok: true; ideas: string[] } | { ok: false; error: string };
+export type PostIdea = {
+  hook: string; // the opening line / scroll-stopper
+  format: string; // e.g. "Talking-head reel", "B-roll + captions", "Carousel"
+  shotList: string[]; // 2–4 concrete clips/shots to film
+  setup: string; // how to record it — angle, framing, where, lighting
+  onScreen: string; // the on-screen text / overlay caption
+};
+export type IdeasResult = { ok: true; ideas: PostIdea[] } | { ok: false; error: string };
 
 /**
  * "What to post next" — reads RIVEN's best-reaching analyzed posts and asks
@@ -101,22 +108,30 @@ export async function generatePostIdeas(): Promise<IdeasResult> {
     const client = getAnthropicClient();
     const msg = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 400,
+      max_tokens: 900,
       messages: [{
         role: "user",
-        content: `You write Instagram hooks for RIVEN, a weight-loss coach for Black women 35+. Voice: calm, direct, no hype, culturally grounded ("peaceful discipline, steady wins"). No therapy clichés, no "you got this".
+        content: `You're the content producer for RIVEN — a weight-loss coach for Black women 35+. Voice: calm, direct, no hype, culturally grounded ("peaceful discipline, steady wins"). No therapy clichés, no "you got this". His content is mostly short reels with on-screen captions (he often doesn't talk on camera) + b-roll.
 
 His best-reaching hooks so far:
 ${seed}
 
-Give 3 NEW reel hooks that lean into what's clearly working above (story + transformation + cultural-food angles beat generic tips). One line each, scroll-stopping, in his voice. Reply ONLY as a JSON array of 3 strings, nothing else.`,
+Give 3 NEW post concepts that lean into what's working above (story + transformation + cultural-food angles beat generic tips). Each must be SHOOTABLE — tell him exactly what to film, how, and what to put on screen. Reply ONLY as a JSON array of 3 objects, no markdown:
+[{"hook":"the scroll-stopping opening line","format":"e.g. B-roll + captions reel | Talking-head reel | Carousel","shotList":["clip 1 to film","clip 2","clip 3"],"setup":"how to record it — phone angle, framing, where, lighting, any props","onScreen":"the exact on-screen text/overlay to type"}]`,
       }],
     });
     const text = msg.content[0]?.type === "text" ? msg.content[0].text : "[]";
     const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    const ideas = JSON.parse(cleaned);
-    if (!Array.isArray(ideas)) throw new Error("bad format");
-    return { ok: true, ideas: ideas.map(String).slice(0, 3) };
+    const raw = JSON.parse(cleaned);
+    if (!Array.isArray(raw)) throw new Error("bad format");
+    const ideas: PostIdea[] = raw.slice(0, 3).map((o: Record<string, unknown>) => ({
+      hook: String(o.hook ?? "").slice(0, 200),
+      format: String(o.format ?? "Reel").slice(0, 60),
+      shotList: Array.isArray(o.shotList) ? o.shotList.map(String).slice(0, 5) : [],
+      setup: String(o.setup ?? "").slice(0, 400),
+      onScreen: String(o.onScreen ?? "").slice(0, 300),
+    }));
+    return { ok: true, ideas };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Generation failed." };
   }
