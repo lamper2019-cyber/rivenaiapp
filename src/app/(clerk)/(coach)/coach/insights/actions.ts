@@ -108,7 +108,7 @@ export async function generatePostIdeas(): Promise<IdeasResult> {
     const client = getAnthropicClient();
     const msg = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 900,
+      max_tokens: 1800,
       messages: [{
         role: "user",
         content: `You're the content producer for RIVEN — a weight-loss coach for Black women 35+. Voice: calm, direct, no hype, culturally grounded ("peaceful discipline, steady wins"). No therapy clichés, no "you got this". His content is mostly short reels with on-screen captions (he often doesn't talk on camera) + b-roll.
@@ -117,13 +117,28 @@ His best-reaching hooks so far:
 ${seed}
 
 Give 3 NEW post concepts that lean into what's working above (story + transformation + cultural-food angles beat generic tips). Each must be SHOOTABLE — tell him exactly what to film, how, and what to put on screen. Reply ONLY as a JSON array of 3 objects, no markdown:
-[{"hook":"the scroll-stopping opening line","format":"e.g. B-roll + captions reel | Talking-head reel | Carousel","shotList":["clip 1 to film","clip 2","clip 3"],"setup":"how to record it — phone angle, framing, where, lighting, any props","onScreen":"the exact on-screen text/overlay to type"}]`,
+[{"hook":"the scroll-stopping opening line","format":"e.g. B-roll + captions reel | Talking-head reel | Carousel","shotList":["clip 1 to film","clip 2","clip 3"],"setup":"how to record it — phone angle, framing, where, lighting, any props","onScreen":"the exact on-screen text/overlay to type"}]
+
+Keep it TIGHT so all three fit: shotList = exactly 3 clips, max ~8 words each; setup = ONE sentence; onScreen = under 12 words.`,
       }],
     });
     const text = msg.content[0]?.type === "text" ? msg.content[0].text : "[]";
     const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    const raw = JSON.parse(cleaned);
-    if (!Array.isArray(raw)) throw new Error("bad format");
+    let raw: unknown;
+    try {
+      raw = JSON.parse(cleaned);
+    } catch {
+      // Output may have been truncated mid-array — salvage the complete objects.
+      const lastClose = cleaned.lastIndexOf("}");
+      try {
+        raw = lastClose > 0 ? JSON.parse(cleaned.slice(0, lastClose + 1) + "]") : null;
+      } catch {
+        raw = null;
+      }
+    }
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return { ok: false, error: "That got cut off — tap Generate ideas again." };
+    }
     const ideas: PostIdea[] = raw.slice(0, 3).map((o: Record<string, unknown>) => ({
       hook: String(o.hook ?? "").slice(0, 200),
       format: String(o.format ?? "Reel").slice(0, 60),
