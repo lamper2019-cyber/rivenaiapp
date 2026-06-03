@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { SignOutButton } from "@clerk/nextjs";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -26,6 +27,12 @@ export default async function PricingPage({
   searchParams?: { canceled?: string };
 }) {
   const { userId } = auth();
+
+  // Apple requires that digital subscriptions sold inside the iOS app use their
+  // 30% in-app purchase — so when RIVEN runs inside the native shell (its
+  // WebView appends "RIVENApp" to the user-agent), we make the app USAGE-ONLY:
+  // no purchase button, no external buy link. Members subscribe on the web.
+  const isNativeApp = (headers().get("user-agent") ?? "").includes("RIVENApp");
 
   let signedIn = false;
   let alreadySubscribed = false;
@@ -158,6 +165,15 @@ export default async function PricingPage({
             >
               You&apos;re on RIVEN — open dashboard
             </Link>
+          ) : isNativeApp ? (
+            <div className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest px-6 py-5 text-center">
+              <p className="font-body text-body-md text-charcoal">
+                Your RIVEN membership is managed on the web.
+              </p>
+              <p className="font-body text-label-md text-on-surface-variant mt-1">
+                Visit rivenmethod.com to start or manage your plan.
+              </p>
+            </div>
           ) : signedIn ? (
             <form action={startCheckout}>
               <button
@@ -176,10 +192,12 @@ export default async function PricingPage({
             </Link>
           )}
 
-          <p className="font-body text-label-sm text-on-surface-variant/70 text-center">
-            Card is held during the trial. Charged $50 on day 8. Cancel any time
-            before then and pay nothing.
-          </p>
+          {!isNativeApp ? (
+            <p className="font-body text-label-sm text-on-surface-variant/70 text-center">
+              Card is held during the trial. Charged $50 on day 8. Cancel any time
+              before then and pay nothing.
+            </p>
+          ) : null}
         </div>
 
         <p className="font-body text-label-sm text-on-surface-variant/70 max-w-md mx-auto mt-4">
