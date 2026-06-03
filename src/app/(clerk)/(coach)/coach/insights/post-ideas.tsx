@@ -102,6 +102,16 @@ function IdeaCard({ idea }: { idea: PostIdea }) {
           <p className="font-body text-label-md text-charcoal italic">&ldquo;{idea.onScreen}&rdquo;</p>
         </div>
       ) : null}
+
+      {/* Why it'll work — grounded in his data */}
+      {idea.whyItWillWork ? (
+        <div className="rounded-lg bg-sage/10 border border-sage/30 px-3 py-2 mt-1">
+          <p className="font-body text-[10px] tracking-widest uppercase text-sage mb-0.5">
+            📊 Why it&apos;ll work
+          </p>
+          <p className="font-body text-label-md text-charcoal">{idea.whyItWillWork}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

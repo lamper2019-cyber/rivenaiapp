@@ -75,6 +75,7 @@ export type PostIdea = {
   shotList: string[]; // 2–4 concrete clips/shots to film
   setup: string; // how to record it — angle, framing, where, lighting
   onScreen: string; // the on-screen text / overlay caption
+  whyItWillWork: string; // data-backed reason, citing his own patterns
 };
 export type IdeasResult = { ok: true; ideas: PostIdea[] } | { ok: false; error: string };
 
@@ -104,11 +105,26 @@ export async function generatePostIdeas(): Promise<IdeasResult> {
     .slice(0, 8);
   const seed = top.map((t) => `- "${t.hook}" (${t.type}, ${t.reach} reach)`).join("\n");
 
+  // How each content TYPE performs — so the model's "why it'll work" cites real data.
+  const byType = new Map<string, { n: number; reach: number; trials: number }>();
+  for (const p of posts) {
+    const k = p.contentType ?? "other";
+    const e = byType.get(k) ?? { n: 0, reach: 0, trials: 0 };
+    e.n += 1;
+    e.reach += p.metrics[0]?.reach ?? 0;
+    e.trials += p.metrics[0]?.trials ?? 0;
+    byType.set(k, e);
+  }
+  const clusterSummary = Array.from(
+    byType,
+    ([k, e]) => `${k}: ~${Math.round(e.reach / e.n)} avg reach, ${e.trials} trials (${e.n} posts)`
+  ).join("; ");
+
   try {
     const client = getAnthropicClient();
     const msg = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1800,
+      max_tokens: 2200,
       messages: [{
         role: "user",
         content: `You're the content producer for RIVEN — a weight-loss coach for Black women 35+. Voice: calm, direct, no hype, culturally grounded ("peaceful discipline, steady wins"). No therapy clichés, no "you got this". His content is mostly short reels with on-screen captions (he often doesn't talk on camera) + b-roll.
@@ -116,10 +132,12 @@ export async function generatePostIdeas(): Promise<IdeasResult> {
 His best-reaching hooks so far:
 ${seed}
 
-Give 3 NEW post concepts that lean into what's working above (story + transformation + cultural-food angles beat generic tips). Each must be SHOOTABLE — tell him exactly what to film, how, and what to put on screen. Reply ONLY as a JSON array of 3 objects, no markdown:
-[{"hook":"the scroll-stopping opening line","format":"e.g. B-roll + captions reel | Talking-head reel | Carousel","shotList":["clip 1 to film","clip 2","clip 3"],"setup":"how to record it — phone angle, framing, where, lighting, any props","onScreen":"the exact on-screen text/overlay to type"}]
+How each content TYPE performs for him (his real numbers): ${clusterSummary}
 
-Keep it TIGHT so all three fit: shotList = exactly 3 clips, max ~8 words each; setup = ONE sentence; onScreen = under 12 words.`,
+Give 3 NEW post concepts that lean into what the DATA above shows is working (story + transformation + cultural-food angles beat generic tips). Each must be SHOOTABLE — tell him exactly what to film, how, what to put on screen, AND why it should work based on his numbers. Reply ONLY as a JSON array of 3 objects, no markdown:
+[{"hook":"the scroll-stopping opening line","format":"e.g. B-roll + captions reel | Talking-head reel | Carousel","shotList":["clip 1 to film","clip 2","clip 3"],"setup":"how to record it — phone angle, framing, where, lighting, any props","onScreen":"the exact on-screen text/overlay to type","whyItWillWork":"1 sentence citing his data — e.g. 'your story posts average X reach vs Y for tips'"}]
+
+Keep it TIGHT so all three fit: shotList = exactly 3 clips, max ~8 words each; setup = ONE sentence; onScreen = under 12 words; whyItWillWork = ONE sentence with a number from his data.`,
       }],
     });
     const text = msg.content[0]?.type === "text" ? msg.content[0].text : "[]";
@@ -145,6 +163,7 @@ Keep it TIGHT so all three fit: shotList = exactly 3 clips, max ~8 words each; s
       shotList: Array.isArray(o.shotList) ? o.shotList.map(String).slice(0, 5) : [],
       setup: String(o.setup ?? "").slice(0, 400),
       onScreen: String(o.onScreen ?? "").slice(0, 300),
+      whyItWillWork: String(o.whyItWillWork ?? "").slice(0, 300),
     }));
     return { ok: true, ideas };
   } catch (e) {
