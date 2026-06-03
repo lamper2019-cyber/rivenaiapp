@@ -17,6 +17,10 @@ const config: CapacitorConfig = {
   appId: "com.rivenmethod.app",
   appName: "RIVEN",
   webDir: "public", // placeholder; we serve the live site via server.url below
+  // Tags the WebView's user-agent so the live site can detect "running inside
+  // the iOS app" and go usage-only (no Subscribe button — Apple IAP rule).
+  // Must stay in sync with the `RIVENApp` check in src/app/(clerk)/pricing/page.tsx.
+  appendUserAgent: "RIVENApp",
   server: {
     url: "https://rivenmethod.com",
     cleartext: false,
