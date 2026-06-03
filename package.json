@@ -7,7 +7,9 @@
     "build": "prisma generate && next build",
     "start": "prisma migrate deploy && next start",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "cap:sync": "cap sync ios",
+    "cap:open": "cap open ios"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
@@ -28,6 +30,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/ios": "^6.2.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
