@@ -324,8 +324,9 @@ async function processOneClient(
   try {
     const result = await generateMondayCheckin({ clientUserId: client.id });
     if (!result.ok) {
+      // Log the opaque user id, never the email — keeps PII out of Railway logs.
       console.error(
-        `[monday-checkin] generation failed for ${client.email}:`,
+        `[monday-checkin] generation failed for user ${client.id}:`,
         result.error,
       );
       return { sent: false, error: { clientId: client.id, reason: result.error } };
@@ -350,13 +351,13 @@ async function processOneClient(
         tag: `monday-checkin-${message.id}`,
       });
     } catch (pushErr) {
-      console.error(`[monday-checkin] push failed for ${client.email}:`, pushErr);
+      console.error(`[monday-checkin] push failed for user ${client.id}:`, pushErr);
     }
 
     return { sent: true };
   } catch (err) {
     const reason = err instanceof Error ? err.message : "unknown";
-    console.error(`[monday-checkin] unexpected error for ${client.email}:`, err);
+    console.error(`[monday-checkin] unexpected error for user ${client.id}:`, err);
     return { sent: false, error: { clientId: client.id, reason } };
   }
 }

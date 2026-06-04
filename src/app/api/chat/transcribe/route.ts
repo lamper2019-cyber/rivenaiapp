@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth, isClerkConfigured } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { isWhisperConfigured, transcribeAudio } from "@/lib/whisper";
 
 export const runtime = "nodejs";
@@ -34,6 +35,17 @@ export async function POST(req: Request) {
           : "Add real Clerk keys to .env.local to use voice messages.",
       },
       { status: 401 }
+    );
+  }
+
+  // Whisper calls cost money per request — cap per-user throughput so a stuck
+  // recorder loop or abuse can't run up an OpenAI bill. 20/min is well above
+  // any real voice-logging pace.
+  const rl = rateLimit(`transcribe:${userId}`, 20, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `Slow down a moment — try again in ${rl.retryAfterSeconds}s.` },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
     );
   }
 

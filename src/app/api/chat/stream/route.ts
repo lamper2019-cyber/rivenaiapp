@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import { startOfCentralDay } from "@/lib/dates";
 import { getAnthropicClient, isAnthropicConfigured } from "@/lib/anthropic";
 import {
@@ -71,6 +72,17 @@ export async function POST(req: Request) {
           : "Add real Clerk keys to .env.local to chat with RIVEN.",
       },
       { status: 401 },
+    );
+  }
+
+  // Guard the wallet: each Claude chat turn costs real money, so cap how fast a
+  // single account can fire them. 20/min is far above normal human pace but
+  // stops a runaway client loop or abuse from racking up an Anthropic bill.
+  const rl = rateLimit(`chat:${userId}`, 20, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `Slow down a moment — try again in ${rl.retryAfterSeconds}s.` },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
     );
   }
 

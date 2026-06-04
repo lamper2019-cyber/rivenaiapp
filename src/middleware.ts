@@ -15,6 +15,8 @@ const isPublicRoute = createRouteMatcher([
   "/api/stripe/webhook",
   // Cron endpoints are protected by CRON_SECRET, not Clerk session.
   "/api/cron/(.*)",
+  // Public health check for uptime monitors — returns only ok/degraded.
+  "/api/health",
   "/manifest.json",
   "/sw.js",
 ]);

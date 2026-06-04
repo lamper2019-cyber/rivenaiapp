@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { isR2Configured, presignUpload, buildR2Key } from "@/lib/r2";
 
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -76,6 +77,16 @@ export async function POST(req: Request) {
           : "Add real Clerk keys to .env.local to upload.",
       },
       { status: 401 }
+    );
+  }
+
+  // Cap presign requests so a user can't spam upload URLs and DOS the R2
+  // bucket. 30/min comfortably covers a check-in with several photos/videos.
+  const rl = rateLimit(`r2sign:${userId}`, 30, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `Too many uploads at once — try again in ${rl.retryAfterSeconds}s.` },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
     );
   }
 
