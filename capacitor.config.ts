@@ -24,6 +24,17 @@ const config: CapacitorConfig = {
   server: {
     url: "https://rivenmethod.com",
     cleartext: false,
+    // Let the WebView navigate to Clerk's auth domain in-app instead of
+    // bouncing out to Safari. Without this, the sign-in/handshake pages on
+    // clerk.rivenmethod.com can break the session loop. (Google OAuth still
+    // opens externally by Google's own policy — use Email + Sign in with Apple
+    // inside the app.) Pair this with adding `capacitor://localhost` to Clerk's
+    // allowed_origins via the Backend API, or sign-in returns authorization_invalid.
+    allowNavigation: [
+      "rivenmethod.com",
+      "clerk.rivenmethod.com",
+      "*.rivenmethod.com",
+    ],
   },
   ios: {
     contentInset: "always",
