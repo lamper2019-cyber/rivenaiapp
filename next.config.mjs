@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Never ship browser source maps to production. This is Next's default
+  // (false), but we set it explicitly so a future change can't silently turn
+  // it on — .map files would let anyone reconstruct our original source,
+  // comments, and logic from the live site. Server-side code is never sent to
+  // the browser regardless.
+  productionBrowserSourceMaps: false,
   images: {
     // Welcome hero is now self-hosted in /public; no remote patterns needed.
     // Add entries here later if we ever serve R2 media through next/image
