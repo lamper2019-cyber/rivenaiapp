@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { WelcomeAuthRedirect } from "./welcome-auth-redirect";
+import { HideInNativeApp } from "./hide-in-native-app";
 
 // Self-hosted welcome hero. Previously sourced from lh3.googleusercontent.com,
 // which forced Railway's image optimizer to fetch upstream → re-encode →
@@ -56,12 +57,16 @@ export default function WelcomePage() {
         >
           Sign in
         </Link>
-        <Link
-          href="/sign-up"
-          className="block w-full text-center bg-transparent text-charcoal py-5 rounded-full font-body text-label-md tracking-widest uppercase border border-charcoal transition-all active:scale-95 hover:bg-charcoal/5"
-        >
-          I&apos;m new — start here
-        </Link>
+        {/* "I'm new" is web-only. Inside the iOS app we hide it (Netflix model:
+            new members join + pay on the web, the app is sign-in only). */}
+        <HideInNativeApp>
+          <Link
+            href="/sign-up"
+            className="block w-full text-center bg-transparent text-charcoal py-5 rounded-full font-body text-label-md tracking-widest uppercase border border-charcoal transition-all active:scale-95 hover:bg-charcoal/5"
+          >
+            I&apos;m new — start here
+          </Link>
+        </HideInNativeApp>
         <div className="flex items-center justify-center gap-2 text-on-primary-container/60 pt-3">
           <span className="material-symbols-outlined text-[18px]">verified_user</span>
           <span className="font-body text-label-sm tracking-wide">

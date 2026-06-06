@@ -23,6 +23,10 @@ export default function SignInPage() {
               ? {
                   socialButtonsBlockButton__google: "hidden",
                   socialButtonsIconButton__google: "hidden",
+                  // Netflix model: no account creation inside the iOS app, so
+                  // hide Clerk's "Don't have an account? Sign up" footer link.
+                  // New members join on the web; the app is sign-in only.
+                  footerAction: "hidden",
                 }
               : {}),
           },
