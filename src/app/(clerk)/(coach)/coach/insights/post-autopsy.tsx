@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import {
+  ChevronDown, ChevronUp, Eye, Bookmark, Clock, Rocket, Sparkles, Lightbulb,
+  type LucideIcon,
+} from "lucide-react";
 import { generatePostFix, type PostFixResult } from "./actions";
 
 export type AutopsyPost = {
@@ -19,10 +23,15 @@ export type AutopsyPost = {
   permalink: string | null;
 };
 
+// Post Lab palette (matches the page).
+const C = {
+  cream: "#FAF7F2", card: "#FFFFFF", charcoal: "#1A1A1A", gold: "#C9A961",
+  sage: "#7C9A7E", red: "#C76B5C", mute: "#8A8378", line: "#E7E0D4",
+};
 const VERDICT = {
-  win: { dot: "bg-sage", emoji: "🟢", label: "Winner", text: "text-sage" },
-  ok: { dot: "bg-gold", emoji: "🟡", label: "Okay", text: "text-gold" },
-  flop: { dot: "bg-soft-red", emoji: "🔴", label: "Flop", text: "text-soft-red" },
+  win: { label: "Winner", color: C.sage },
+  ok: { label: "Okay", color: C.gold },
+  flop: { label: "Flop", color: C.red },
 } as const;
 
 function fmt(n: number): string {
@@ -30,10 +39,9 @@ function fmt(n: number): string {
 }
 
 /**
- * One post in the chronological feed. Collapsed: verdict + hook + metric line.
- * Expanded: the quick vision read + a one-tap deeper analysis that adapts —
- * "why it won / repeat" for winners, "why it missed / redo it like this" for
- * the ones that didn't land.
+ * One post card in the feed. Collapsed: title + tags + metric row.
+ * Expanded: "What worked" (stored vision read) + "Tweak next time" (the
+ * one-tap adaptive deep read via generatePostFix — unchanged wiring).
  */
 export function PostAutopsy({ post }: { post: AutopsyPost }) {
   const [open, setOpen] = useState(false);
@@ -48,89 +56,90 @@ export function PostAutopsy({ post }: { post: AutopsyPost }) {
   }
 
   return (
-    <div className={`rounded-xl border ${open ? "border-outline-variant/60 bg-white/50" : "border-transparent"}`}>
-      {/* Collapsed row */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-3 py-3 px-2 text-left"
-      >
-        <span className={`w-2 h-2 rounded-full shrink-0 ${v.dot}`} aria-hidden />
-        <div className="flex-1 min-w-0">
-          <p className="font-body text-body-md text-charcoal truncate">{post.hook}</p>
-          <p className="font-body text-[10px] tracking-wide uppercase text-on-surface-variant/70 mt-0.5">
-            {post.dateLabel} · {post.contentType ?? "post"} · {fmt(post.reach)} reach
-            {post.trials > 0 ? ` · ${post.trials} trial${post.trials === 1 ? "" : "s"}` : ""}
-          </p>
+    <div style={{ background: C.card, borderRadius: 16, border: `1px solid ${C.line}`, overflow: "hidden" }}>
+      {/* Collapsed header */}
+      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full text-left" style={{ padding: 18 }}>
+        <div className="flex items-center justify-between gap-3">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span style={{ fontSize: 15.5, fontWeight: 700, color: C.charcoal }}>{post.hook}</span>
+              <Tag text={v.label} color={v.color} solid />
+              {post.contentType ? <Tag text={post.contentType} color={C.mute} /> : null}
+            </div>
+            <div style={{ fontSize: 12, color: C.mute, marginTop: 4 }}>{post.dateLabel}</div>
+          </div>
+          {open ? <ChevronUp size={20} color={C.mute} /> : <ChevronDown size={20} color={C.mute} />}
         </div>
-        <span className={`material-symbols-outlined text-on-surface-variant/50 transition-transform ${open ? "rotate-180" : ""}`}>
-          expand_more
-        </span>
+
+        <div className="flex" style={{ gap: 22, marginTop: 16 }}>
+          <Metric Icon={Eye} label="Reach" value={fmt(post.reach)} />
+          <Metric Icon={Clock} label="Watch" value={post.avgWatchSec != null ? `${post.avgWatchSec}s` : "—"} />
+          <Metric Icon={Bookmark} label="Saves" value={fmt(post.saved)} hot />
+          <Metric Icon={Rocket} label="Trials" value={String(post.trials)} hot={post.trials > 0} />
+        </div>
       </button>
 
-      {/* Expanded autopsy */}
+      {/* Expanded */}
       {open ? (
-        <div className="px-3 pb-4 pt-1 space-y-3">
-          {/* metrics */}
-          <div className="grid grid-cols-4 gap-2 text-center">
-            <Metric label="Reach" value={fmt(post.reach)} />
-            <Metric label="Watch" value={post.avgWatchSec != null ? `${post.avgWatchSec}s` : "—"} />
-            <Metric label="Saves" value={fmt(post.saved)} />
-            <Metric label="Trials" value={String(post.trials)} gold={post.trials > 0} />
-          </div>
-
-          {/* quick stored read */}
+        <div style={{ padding: "0 18px 18px" }}>
+          {/* What worked */}
           {post.whyItWorks ? (
-            <p className="font-body text-label-md text-on-surface-variant italic">
-              🧠 {post.whyItWorks}
-            </p>
+            <div style={{ background: "#F1F5F1", borderRadius: 14, padding: 16, marginBottom: 12 }}>
+              <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+                <Sparkles size={15} color={C.sage} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.sage }}>What worked</span>
+              </div>
+              <p style={{ fontSize: 13.5, color: C.charcoal, lineHeight: 1.5 }}>{post.whyItWorks}</p>
+            </div>
           ) : null}
 
-          {/* the adaptive deep read */}
-          {fix?.ok ? (
-            <div className="rounded-xl bg-charcoal/[0.03] border border-outline-variant/30 px-4 py-3 space-y-2">
-              <div>
-                <p className={`font-body text-label-md tracking-widest uppercase ${VERDICT[fix.verdict].text}`}>
-                  {fix.verdict === "win" ? "Why it won" : fix.verdict === "flop" ? "Why it missed" : "The read"}
-                </p>
-                <p className="font-body text-body-md text-charcoal mt-0.5">{fix.why}</p>
-              </div>
-              <div>
-                <p className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-                  {fix.verdict === "win" ? "↻ Repeat this" : "→ Redo it like this"}
-                </p>
-                <p className="font-body text-body-md text-charcoal mt-0.5">{fix.action}</p>
-              </div>
+          {/* Tweak next time — the adaptive deep read */}
+          <div style={{ background: "#FBF3EF", borderRadius: 14, padding: 16 }}>
+            <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+              <Lightbulb size={15} color={C.red} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.red }}>
+                {won ? "Why it won + how to repeat" : "Tweak next time"}
+              </span>
             </div>
-          ) : fix && !fix.ok ? (
-            <p className="font-body text-label-md text-soft-red">{fix.error}</p>
-          ) : (
-            <button
-              type="button"
-              onClick={getFix}
-              disabled={isPending}
-              className="rounded-full bg-charcoal text-cream px-4 py-2 font-body text-label-md tracking-widest uppercase transition-all active:scale-95 disabled:opacity-50 inline-flex items-center gap-2"
-            >
-              {isPending ? (
-                <>
-                  <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
-                  Reading…
-                </>
-              ) : won ? (
-                "Why it won + how to repeat →"
-              ) : (
-                "Why it missed + how to redo →"
-              )}
-            </button>
-          )}
+
+            {fix?.ok ? (
+              <div className="flex flex-col gap-2.5">
+                <div>
+                  <p style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: C.mute, fontWeight: 700 }}>
+                    {fix.verdict === "win" ? "Why it won" : fix.verdict === "flop" ? "Why it missed" : "The read"}
+                  </p>
+                  <p style={{ fontSize: 13.5, color: C.charcoal, lineHeight: 1.5, marginTop: 2 }}>{fix.why}</p>
+                </div>
+                <div>
+                  <p style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: C.mute, fontWeight: 700 }}>
+                    {fix.verdict === "win" ? "↻ Repeat this" : "→ Redo it like this"}
+                  </p>
+                  <p style={{ fontSize: 13.5, color: C.charcoal, lineHeight: 1.5, marginTop: 2 }}>{fix.action}</p>
+                </div>
+              </div>
+            ) : fix && !fix.ok ? (
+              <p style={{ fontSize: 13, color: C.red }}>{fix.error}</p>
+            ) : (
+              <>
+                {post.flopReason ? (
+                  <p style={{ fontSize: 13.5, color: C.charcoal, lineHeight: 1.5, marginBottom: 10 }}>{post.flopReason}</p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={getFix}
+                  disabled={isPending}
+                  className="active:scale-95 transition-transform"
+                  style={{ background: C.charcoal, color: C.cream, fontWeight: 600, fontSize: 12.5, padding: "9px 16px", borderRadius: 999, opacity: isPending ? 0.5 : 1 }}
+                >
+                  {isPending ? "Reading…" : won ? "Why it won + how to repeat →" : "Why it missed + how to redo →"}
+                </button>
+              </>
+            )}
+          </div>
 
           {post.permalink ? (
-            <a
-              href={post.permalink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block font-body text-label-md text-on-surface-variant/70 hover:text-gold transition-colors"
-            >
+            <a href={post.permalink} target="_blank" rel="noopener noreferrer"
+              style={{ display: "block", fontSize: 12.5, color: C.mute, marginTop: 12 }}>
               View on Instagram ↗
             </a>
           ) : null}
@@ -140,11 +149,27 @@ export function PostAutopsy({ post }: { post: AutopsyPost }) {
   );
 }
 
-function Metric({ label, value, gold = false }: { label: string; value: string; gold?: boolean }) {
+function Tag({ text, color, solid }: { text: string; color: string; solid?: boolean }) {
   return (
-    <div>
-      <p className={`font-display text-body-lg ${gold ? "text-gold" : "text-charcoal"}`}>{value}</p>
-      <p className="font-body text-[10px] tracking-widest uppercase text-on-surface-variant/60">{label}</p>
+    <span style={{
+      fontSize: 10.5, fontWeight: 600, color: solid ? "#fff" : color,
+      background: solid ? color : "transparent", border: `1px solid ${color}`,
+      padding: "2px 8px", borderRadius: 999, textTransform: "capitalize",
+    }}>{text}</span>
+  );
+}
+
+function Metric({
+  Icon, label, value, hot,
+}: {
+  Icon: LucideIcon;
+  label: string; value: string; hot?: boolean;
+}) {
+  return (
+    <div className="text-center">
+      <Icon size={14} color={hot ? C.red : C.mute} style={{ margin: "0 auto" }} />
+      <div className="font-display" style={{ fontSize: 18, color: hot ? C.red : C.charcoal, marginTop: 2 }}>{value}</div>
+      <div style={{ fontSize: 10, color: C.mute }}>{label}</div>
     </div>
   );
 }
