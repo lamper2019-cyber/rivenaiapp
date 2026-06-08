@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { submitQuiz } from "../actions";
+import { captureEvent } from "@/components/posthog";
 import {
   PRACTICE_QUESTIONS,
   Q11,
@@ -14,20 +15,25 @@ import {
 } from "@/lib/quiz";
 
 /**
- * Two-phase quiz flow:
- *   step 0   → contact (first name + email + optional phone)
- *   step 1-10 → practice questions q1..q10 (yes/no, auto-advance)
+ * Quiz flow — reordered for conversion (the email gate moved to the END).
+ *
+ *   step 0     → name only ("What should I call you?") — one friendly field
+ *   step 1-10  → practice questions q1..q10 (yes/no, auto-advance)
  *   step 11-13 → multiple-choice qualifying questions (auto-advance)
- *   step 14  → final multiple-choice (Q14) + submit
+ *   step 14    → final multiple-choice Q14 (auto-advance → email gate)
+ *   step 15    → email + optional phone ("Where do I send your results?")
+ *                → "See my results" submits.
  *
- * State persists to localStorage so a closed tab resumes where she left
- * off (same pattern as onboarding). Auto-advance keeps momentum on the
- * easy questions; contact step needs an explicit Continue. The last
- * question (Q14) auto-fires submit on selection.
+ * Why this order: asking for the email FIRST was the drop-off — a real
+ * visitor bounced at the old contact gate before answering a thing. The
+ * questions build investment (the yes/no's are frictionless momentum; Q11–Q13
+ * make her feel seen), so by the time the score exists, the email is the *key*
+ * to a result she earned, not a toll at the door. First name stays up front as
+ * a low-friction, conversational opener that also lets us greet her by name.
  *
- * Q15 (open textarea) used to live at step 15 — removed per Sean: the
- * textarea was unreliable on mobile and the answer was never used
- * downstream. Total step count drops from 16 to 15 (contact + 14 q's).
+ * State persists to localStorage so a closed tab resumes where she left off.
+ * Each step fires a `quiz_step` PostHog event so we can see exactly where
+ * people drop off going forward.
  */
 
 type FlowState = {
@@ -36,9 +42,14 @@ type FlowState = {
   answers: Partial<Answers>;
 };
 
-const STORAGE_KEY = "riven_quiz_state_v1";
+const STORAGE_KEY = "riven_quiz_state_v2"; // v2: reordered flow (email at end)
 const TOTAL_QUESTIONS = 14;
-const TOTAL_STEPS = TOTAL_QUESTIONS + 1; // +1 for the contact step
+// Steps: 0 = name, 1..14 = questions, 15 = email gate.
+const NAME_STEP = 0;
+const FIRST_QUESTION_STEP = 1;
+const LAST_QUESTION_STEP = TOTAL_QUESTIONS; // 14
+const EMAIL_STEP = TOTAL_QUESTIONS + 1; // 15
+const TOTAL_STEPS = EMAIL_STEP + 1; // 16
 
 const DEFAULT_STATE: FlowState = {
   step: 0,
@@ -47,6 +58,13 @@ const DEFAULT_STATE: FlowState = {
 };
 
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Readable label for the per-step analytics event. */
+function stepName(step: number): string {
+  if (step === NAME_STEP) return "name";
+  if (step === EMAIL_STEP) return "email_gate";
+  return `q${step}`;
+}
 
 export function QuizFlow({ initialError }: { initialError?: string }) {
   const [state, setState] = useState<FlowState>(DEFAULT_STATE);
@@ -82,6 +100,16 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
     }
   }, [state, hydrated]);
 
+  // Per-step drop-off tracking. Fires once we've hydrated (so a resumed flow
+  // reports the step she actually lands on, not a flash of step 0).
+  useEffect(() => {
+    if (!hydrated) return;
+    void captureEvent("quiz_step", {
+      step: state.step,
+      name: stepName(state.step),
+    });
+  }, [state.step, hydrated]);
+
   function setContact<K extends keyof FlowState["contact"]>(
     key: K,
     value: string,
@@ -107,26 +135,27 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
   }
 
   const canContinue = useMemo(() => {
-    if (state.step === 0) {
-      return (
-        state.contact.firstName.trim().length >= 1 &&
-        EMAIL_RX.test(state.contact.email.trim())
-      );
+    if (state.step === NAME_STEP) {
+      return state.contact.firstName.trim().length >= 1;
     }
-    if (state.step >= 1 && state.step <= 10) {
+    if (state.step >= FIRST_QUESTION_STEP && state.step <= 10) {
       return !!state.answers[`q${state.step}` as keyof Answers];
     }
     if (state.step === 11) return !!state.answers.q11;
     if (state.step === 12) return !!state.answers.q12;
     if (state.step === 13) return !!state.answers.q13;
     if (state.step === 14) return !!state.answers.q14;
+    if (state.step === EMAIL_STEP) {
+      return EMAIL_RX.test(state.contact.email.trim());
+    }
     return true;
   }, [state]);
 
-  const isLast = state.step === TOTAL_STEPS - 1;
+  const isEmailGate = state.step === EMAIL_STEP;
 
   function handleSubmit() {
     if (!formRef.current) return;
+    void captureEvent("quiz_completed");
     const payload = {
       contact: {
         firstName: state.contact.firstName.trim(),
@@ -156,6 +185,13 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
 
   const progressPct = Math.round((state.step / (TOTAL_STEPS - 1)) * 100);
 
+  const headerLabel =
+    state.step === NAME_STEP
+      ? "Quick intro"
+      : state.step === EMAIL_STEP
+        ? "Last step"
+        : `Question ${state.step} of ${TOTAL_QUESTIONS}`;
+
   return (
     <main className="relative min-h-screen flex flex-col px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-8">
       {/* Header — logo + progress */}
@@ -168,9 +204,7 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
             RIVEN
           </Link>
           <p className="font-body text-label-sm text-on-surface-variant">
-            {state.step === 0
-              ? "Quick intro"
-              : `Question ${state.step} of ${TOTAL_QUESTIONS}`}
+            {headerLabel}
           </p>
         </div>
         <div
@@ -187,7 +221,7 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
         </div>
       </header>
 
-      {initialError && state.step === 0 && (
+      {initialError && state.step === EMAIL_STEP && (
         <div className="rounded-md bg-soft-red/10 border border-soft-red/40 px-gutter py-3 mb-6">
           <p className="font-body text-body-md text-charcoal">
             Something didn&apos;t go through. Try again — your answers are saved.
@@ -197,15 +231,15 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
 
       {/* Step content */}
       <section className="flex-1 flex flex-col">
-        {state.step === 0 && (
-          <ContactStep
-            contact={state.contact}
-            onChange={setContact}
+        {state.step === NAME_STEP && (
+          <NameStep
+            value={state.contact.firstName}
+            onChange={(v) => setContact("firstName", v)}
             onContinue={() => canContinue && next()}
           />
         )}
 
-        {state.step >= 1 && state.step <= 10 && (
+        {state.step >= FIRST_QUESTION_STEP && state.step <= 10 && (
           <PracticeStep
             text={PRACTICE_QUESTIONS[state.step - 1].text}
             value={state.answers[`q${state.step}` as keyof Answers] as
@@ -239,21 +273,28 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
             onSelect={(v) => selectAndAdvance("q13", v)}
           />
         )}
-        {state.step === 14 && (
+        {state.step === LAST_QUESTION_STEP && (
           <ChoiceStep
             question={Q14}
             value={state.answers.q14}
-            // Q14 is the last question — just set the answer (no auto-
-            // advance since there's no next step). The footer's "See my
-            // results" button takes over once she's picked.
-            onSelect={(v) => setAnswer("q14", v)}
+            // Q14 now auto-advances to the email gate (it's no longer the
+            // final step — the email ask comes after it).
+            onSelect={(v) => selectAndAdvance("q14", v)}
+          />
+        )}
+
+        {state.step === EMAIL_STEP && (
+          <ContactGateStep
+            firstName={state.contact.firstName.trim()}
+            email={state.contact.email}
+            phone={state.contact.phone}
+            onChange={setContact}
+            onSubmit={() => canContinue && handleSubmit()}
           />
         )}
 
         {/* Back button sits right under the answer area for any non-zero
-            step. Per Sean: the back button was buried at the bottom of
-            the screen and felt unreachable; moving it close to the
-            answers means she doesn't have to scroll to correct a tap. */}
+            step so she doesn't have to scroll to correct a tap. */}
         {state.step > 0 && (
           <div className="mt-6">
             <button
@@ -269,19 +310,20 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
         )}
       </section>
 
-      {/* Footer — Continue (step 0) / See my results (step 14) */}
+      {/* Footer — Continue (name step) / See my results (email gate).
+          Question steps auto-advance, so they need no footer button. */}
       <footer className="mt-8 space-y-3">
         {/* Hidden form for the submit action. handleSubmit fires it via formRef. */}
         <form ref={formRef} className="hidden" />
 
-        {(state.step === 0 || (isLast && !!state.answers.q14)) && (
+        {(state.step === NAME_STEP || isEmailGate) && (
           <button
             type="button"
-            onClick={isLast ? handleSubmit : next}
+            onClick={isEmailGate ? handleSubmit : next}
             disabled={!canContinue || pending}
             className="w-full bg-charcoal text-cream py-4 rounded-full font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-95 hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {isLast
+            {isEmailGate
               ? pending
                 ? "Crunching your answers…"
                 : "See my results"
@@ -297,53 +339,89 @@ export function QuizFlow({ initialError }: { initialError?: string }) {
 
 // ─────────────────────────── Step components ───────────────────────────
 
-function ContactStep({
-  contact,
+function NameStep({
+  value,
   onChange,
   onContinue,
 }: {
-  contact: { firstName: string; email: string; phone: string };
-  onChange: (k: "firstName" | "email" | "phone", v: string) => void;
+  value: string;
+  onChange: (v: string) => void;
   onContinue: () => void;
 }) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="font-display text-display-sm md:text-display-md text-charcoal leading-tight text-balance">
-          First, who am I talking to?
+          First — what should I call you?
         </h1>
         <p className="font-body text-body-md text-on-surface-variant">
-          So I can send your results and follow up with the right next step. No
-          spam — promise.
+          So this feels like a conversation, not a form.
+        </p>
+      </div>
+
+      <Field label="First name">
+        <input
+          type="text"
+          autoComplete="given-name"
+          autoCapitalize="words"
+          autoFocus
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onContinue();
+            }
+          }}
+          className="w-full rounded-md border border-outline-variant/60 bg-surface-container-lowest px-gutter py-3.5 font-body text-body-md text-charcoal focus:border-charcoal focus:outline-none transition-colors"
+          placeholder="Your name"
+        />
+      </Field>
+    </div>
+  );
+}
+
+function ContactGateStep({
+  firstName,
+  email,
+  phone,
+  onChange,
+  onSubmit,
+}: {
+  firstName: string;
+  email: string;
+  phone: string;
+  onChange: (k: "firstName" | "email" | "phone", v: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h1 className="font-display text-display-sm md:text-display-md text-charcoal leading-tight text-balance">
+          {firstName
+            ? `Your readiness score is ready, ${firstName}.`
+            : "Your readiness score is ready."}
+        </h1>
+        <p className="font-body text-body-md text-on-surface-variant">
+          Where should I send it? No spam — promise.
         </p>
       </div>
 
       <div className="space-y-4">
-        <Field label="First name">
-          <input
-            type="text"
-            autoComplete="given-name"
-            autoCapitalize="words"
-            value={contact.firstName}
-            onChange={(e) => onChange("firstName", e.target.value)}
-            className="w-full rounded-md border border-outline-variant/60 bg-surface-container-lowest px-gutter py-3.5 font-body text-body-md text-charcoal focus:border-charcoal focus:outline-none transition-colors"
-            placeholder="Your name"
-          />
-        </Field>
-
         <Field label="Email">
           <input
             type="email"
             autoComplete="email"
             inputMode="email"
-            value={contact.email}
+            autoFocus
+            value={email}
             onChange={(e) => onChange("email", e.target.value)}
             className="w-full rounded-md border border-outline-variant/60 bg-surface-container-lowest px-gutter py-3.5 font-body text-body-md text-charcoal focus:border-charcoal focus:outline-none transition-colors"
             placeholder="you@example.com"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                onContinue();
+                onSubmit();
               }
             }}
           />
@@ -354,7 +432,7 @@ function ContactStep({
             type="tel"
             autoComplete="tel"
             inputMode="tel"
-            value={contact.phone}
+            value={phone}
             onChange={(e) => onChange("phone", e.target.value)}
             className="w-full rounded-md border border-outline-variant/60 bg-surface-container-lowest px-gutter py-3.5 font-body text-body-md text-charcoal focus:border-charcoal focus:outline-none transition-colors"
             placeholder="If you'd like Sean to text you with notes"
@@ -486,6 +564,3 @@ function ChoiceStep({
     </div>
   );
 }
-
-// TextareaStep removed alongside Q15 — the open-answer step was unused
-// downstream and unreliable on mobile.
