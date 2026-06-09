@@ -225,11 +225,12 @@ POST
 - Hook (from video frames): "${post.hook ?? "(not analyzed yet)"}"
 - On-screen text (from frames): "${(post.onScreenText ?? "").slice(0, 400)}"
 - What's shown (from frames): "${post.visualSummary ?? "(not analyzed yet)"}"
+- What he SAYS (audio transcript): "${(post.transcript ?? "").slice(0, 1500) || "(none — silent post, or not transcribed yet)"}"
 - Type: ${post.contentType ?? "unknown"}
 - Numbers: ${reach.toLocaleString()} reach (your median is ~${median.toLocaleString()}), ${watch}, ${m?.saved ?? 0} saves, ${m?.quizStarts ?? 0} quiz starts, ${m?.trials ?? 0} trials.
 - It ${did}.
 
-Ground your read in what THIS post is actually about — use the caption, on-screen text, and visuals above. Name the real topic. Do NOT give generic advice and do NOT say "without knowing the hook." If the frame analysis says "(not analyzed yet)", lean on the caption to understand the content.
+Ground your read in what THIS post is actually about — use the caption, what he SAYS (transcript), the on-screen text, and the visuals above. Name the real topic and quote/paraphrase a specific moment when you can. Do NOT give generic advice and do NOT say "without knowing the hook." If the frame analysis says "(not analyzed yet)", lean on the caption and transcript.
 
 Reply ONLY minified JSON:
 {"verdict":"win|ok|flop","why":"1-2 sentences naming the REAL, content-specific reason it did/didn't land for Black women 35+","action":"if it won: how to repeat THIS topic/angle. if it missed: redo it like THIS — a concrete rewrite of the hook for this exact topic. Direct, no fluff, no clichés."}`,

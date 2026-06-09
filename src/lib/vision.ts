@@ -19,6 +19,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import ffmpegPath from "ffmpeg-static";
 import { getAnthropicClient, isAnthropicConfigured } from "@/lib/anthropic";
+import { isWhisperConfigured, transcribeAudio } from "@/lib/whisper";
 
 const run = promisify(execFile);
 const VISION_MODEL = "claude-sonnet-4-6";
@@ -31,6 +32,7 @@ export type PostVision = {
   visualSummary: string;
   contentType: string; // story | teaching | result | bts | other
   whyItWorks: string;
+  transcript: string; // what he SAYS (talking videos); "" for silent reels/images
 };
 
 type ImageBlock = {
@@ -45,13 +47,22 @@ async function fetchBuffer(url: string): Promise<Buffer> {
   return Buffer.from(await res.arrayBuffer());
 }
 
-/** Sample frames from a video URL via bundled ffmpeg. Returns JPEG buffers. */
-async function sampleVideoFrames(mediaUrl: string, timestamps = [0.5, 2.5, 4.5, 6.5]): Promise<Buffer[]> {
+/**
+ * Download a video ONCE, then sample frames AND (if Whisper is configured)
+ * extract + transcribe the audio. Talking videos (restaurant vlogs, talking-
+ * head reels) get a real transcript; silent reels just fail the audio step
+ * harmlessly and return an empty transcript.
+ */
+async function processVideo(
+  mediaUrl: string,
+  timestamps = [0.5, 2.5, 4.5, 6.5],
+): Promise<{ frames: Buffer[]; transcript: string }> {
   if (!ffmpegPath) throw new Error("ffmpeg-static binary not found.");
   const dir = await mkdtemp(join(tmpdir(), "riven-vision-"));
   const mp4 = join(dir, "v.mp4");
   try {
     await writeFile(mp4, await fetchBuffer(mediaUrl));
+
     const frames: Buffer[] = [];
     for (const t of timestamps) {
       const out = join(dir, `f_${t}.jpg`);
@@ -65,19 +76,41 @@ async function sampleVideoFrames(mediaUrl: string, timestamps = [0.5, 2.5, 4.5, 
         // a timestamp past the end of a short clip — skip it
       }
     }
-    return frames;
+
+    let transcript = "";
+    if (isWhisperConfigured) {
+      try {
+        const wav = join(dir, "a.wav");
+        // mono 16kHz PCM WAV — needs no codec library (always works with the
+        // bundled ffmpeg), stays small, and Whisper accepts it directly.
+        await run(ffmpegPath, ["-y", "-i", mp4, "-vn", "-ac", "1", "-ar", "16000", "-f", "wav", wav]);
+        const audio = await readFile(wav);
+        if (audio.length > 1024 && audio.length < 25 * 1024 * 1024) {
+          const text = await transcribeAudio(new Blob([audio], { type: "audio/wav" }), "post-audio.wav");
+          transcript = text.trim().slice(0, 4000);
+        }
+      } catch {
+        // no audio track (silent reel) or transcription failed — leave empty
+      }
+    }
+
+    return { frames, transcript };
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
 }
 
-const PROMPT = (caption: string) =>
-  `These are frames (in order) from an Instagram post by a weight-loss coach (RIVEN) for Black women 35+. His brand voice is calm, no-hype, culturally grounded ("peaceful discipline, steady wins"). Caption: "${caption.slice(0, 300)}".
+const PROMPT = (caption: string, transcript: string) =>
+  `These are frames (in order) from an Instagram post by a weight-loss coach (RIVEN) for Black women 35+. His brand voice is calm, no-hype, culturally grounded ("peaceful discipline, steady wins"). Caption: "${caption.slice(0, 300)}".${
+    transcript
+      ? `\n\nHe's TALKING in this one — transcript of what he says: "${transcript.slice(0, 1500)}"`
+      : ""
+  }
 
-Read what's ON SCREEN (the captions/text and the visuals — he often doesn't talk). Reply ONLY with minified JSON, no markdown:
-{"hook":"the opening on-screen line, verbatim","onScreenText":"all text shown across the frames, in order","visualSummary":"what's physically shown, 1 sentence","contentType":"story|teaching|result|bts|other","whyItWorks":"1-2 sentences: why this does or doesn't stop the scroll for his audience"}`;
+Read what's actually happening — the on-screen captions/text, the visuals, AND what he says if there's a transcript. Reply ONLY with minified JSON, no markdown:
+{"hook":"the line that stops the scroll (on-screen text, or his first spoken line if he's talking), verbatim","onScreenText":"all text shown across the frames, in order","visualSummary":"what's physically shown, 1 sentence","contentType":"story|teaching|result|bts|other","whyItWorks":"1-2 sentences: why this does or doesn't stop the scroll for his audience"}`;
 
-function parseJson(text: string): PostVision {
+function parseJson(text: string): Omit<PostVision, "transcript"> {
   // Strip ```json fences if present, then parse.
   const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
   const o = JSON.parse(cleaned);
@@ -104,10 +137,13 @@ export async function analyzePostVision(post: {
 
   const isVideo = post.mediaType === "REELS" || post.mediaType === "VIDEO";
   const blocks: ImageBlock[] = [];
+  let transcript = "";
 
   if (isVideo) {
     if (!post.mediaUrl) throw new Error("no media_url for video");
-    for (const buf of await sampleVideoFrames(post.mediaUrl)) {
+    const { frames, transcript: t } = await processVideo(post.mediaUrl);
+    transcript = t;
+    for (const buf of frames) {
       blocks.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: buf.toString("base64") } });
     }
   } else {
@@ -123,8 +159,8 @@ export async function analyzePostVision(post: {
   const msg = await client.messages.create({
     model: VISION_MODEL,
     max_tokens: 600,
-    messages: [{ role: "user", content: [...blocks, { type: "text", text: PROMPT(post.caption ?? "") }] }],
+    messages: [{ role: "user", content: [...blocks, { type: "text", text: PROMPT(post.caption ?? "", transcript) }] }],
   });
   const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-  return parseJson(text);
+  return { ...parseJson(text), transcript };
 }

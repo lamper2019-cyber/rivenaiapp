@@ -36,6 +36,7 @@ export async function enrichPendingPosts(limit = 6): Promise<EnrichResult> {
           visualSummary: v.visualSummary,
           contentType: v.contentType,
           whyItWorks: v.whyItWorks,
+          transcript: v.transcript,
           visionAt: new Date(),
         },
       });
