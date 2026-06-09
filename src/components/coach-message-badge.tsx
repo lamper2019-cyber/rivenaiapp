@@ -65,7 +65,7 @@ export function CoachMessageBadge({ messages }: { messages: CoachMessageSummary[
           aria-hidden
           className="flex w-7 h-7 rounded-full bg-cream text-charcoal items-center justify-center font-display text-[16px] leading-none"
         >
-          S
+          R
         </span>
         {isUnread && (
           <span

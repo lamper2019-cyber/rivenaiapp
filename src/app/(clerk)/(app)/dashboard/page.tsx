@@ -10,7 +10,6 @@ import { NotificationOptIn } from "@/components/notification-opt-in";
 import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
 import { getMealPacing, type MealPacingTier } from "@/lib/meal-pacing";
 import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
-import { getCollectiveStats } from "@/lib/collective-counter";
 import { getCheerCandidates } from "@/lib/cheer";
 import { getPeerWinCandidates } from "@/lib/peer-wins";
 import { getCheerReceivedThisWeek } from "@/lib/cheer-received";
@@ -23,7 +22,6 @@ import { getSundayRitualSnapshot } from "@/lib/sunday-ritual";
 // the underlying queries remain for any future surface.
 import { PresenceIndicator } from "@/components/presence-indicator";
 import { CoachMessageBadge } from "@/components/coach-message-badge";
-import { CollectiveCounter } from "@/components/collective-counter";
 import { CheerPrompts } from "@/components/cheer-prompts";
 import { PeerWins } from "@/components/peer-wins";
 import { CheerReceivedCard } from "@/components/cheer-received-card";
@@ -97,7 +95,6 @@ export default async function DashboardPage() {
   // never blocks the rest of the dashboard. Run in parallel because none
   // of them depend on each other.
   const [
-    collectiveStats,
     cheerCandidates,
     peerWinCandidates,
     sundaySnapshot,
@@ -105,7 +102,6 @@ export default async function DashboardPage() {
     cheerCeremony,
     monthlyWeightSnapshot,
   ] = await Promise.all([
-    getCollectiveStats().catch(() => null),
     getCheerCandidates(clientUserId).catch(() => []),
     getPeerWinCandidates(clientUserId).catch(() => []),
     getSundayRitualSnapshot(clientUserId).catch(() => null),
@@ -259,15 +255,9 @@ export default async function DashboardPage() {
       {peerWinCandidates.length > 0 && (
         <PeerWins candidates={peerWinCandidates} />
       )}
-      {/* Pulse toasts ("So-and-so just logged a meal" pop-ups) retired
-          2026-05-27 — RIVEN asked to remove the activity feed entirely.
-          The aggregate "Together" stats below still show. */}
-      {collectiveStats && (
-        <CollectiveCounter
-          stats={collectiveStats}
-          viewerFirstName={profile.name.split(/\s+/)[0]}
-        />
-      )}
+      {/* The aggregate "Together" stats card was removed per RIVEN — the
+          collective protein/calorie tally lived here. Cheer/rose features
+          between members stay; the community feed is the social surface now. */}
 
       {/* Today's targets — three progress cards */}
       <section className="space-y-3">
@@ -474,8 +464,8 @@ function reminderCopyFor(tier: MealPacingTier): { eyebrow: string; body: string 
       };
     case "afternoon":
       return {
-        eyebrow: "Half the day's gone",
-        body: "Catch up the morning and lunch before you forget the details.",
+        eyebrow: "Still time to catch up",
+        body: "Run through breakfast and lunch before the details slip.",
       };
     case "evening":
       return {
