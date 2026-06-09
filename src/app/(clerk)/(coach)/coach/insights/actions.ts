@@ -221,15 +221,18 @@ export async function generatePostFix(igId: string): Promise<PostFixResult> {
         content: `You're the content strategist for RIVEN (weight-loss coaching for Black women 35+; calm, no-hype, culturally grounded voice). Analyze ONE Instagram post and tell the founder what to do.
 
 POST
-- Hook: "${post.hook ?? "(unknown)"}"
-- On-screen text: "${(post.onScreenText ?? "").slice(0, 400)}"
-- What's shown: "${post.visualSummary ?? ""}"
+- Caption (what he wrote): "${(post.caption ?? "").slice(0, 700)}"
+- Hook (from video frames): "${post.hook ?? "(not analyzed yet)"}"
+- On-screen text (from frames): "${(post.onScreenText ?? "").slice(0, 400)}"
+- What's shown (from frames): "${post.visualSummary ?? "(not analyzed yet)"}"
 - Type: ${post.contentType ?? "unknown"}
 - Numbers: ${reach.toLocaleString()} reach (your median is ~${median.toLocaleString()}), ${watch}, ${m?.saved ?? 0} saves, ${m?.quizStarts ?? 0} quiz starts, ${m?.trials ?? 0} trials.
 - It ${did}.
 
+Ground your read in what THIS post is actually about — use the caption, on-screen text, and visuals above. Name the real topic. Do NOT give generic advice and do NOT say "without knowing the hook." If the frame analysis says "(not analyzed yet)", lean on the caption to understand the content.
+
 Reply ONLY minified JSON:
-{"verdict":"win|ok|flop","why":"1-2 sentences: the REAL reason it did or didn't land for this audience","action":"if it won: how to repeat it. if it missed: redo it like THIS — a concrete, specific rewrite of the hook/approach for next time. Direct, no fluff, no clichés."}`,
+{"verdict":"win|ok|flop","why":"1-2 sentences naming the REAL, content-specific reason it did/didn't land for Black women 35+","action":"if it won: how to repeat THIS topic/angle. if it missed: redo it like THIS — a concrete rewrite of the hook for this exact topic. Direct, no fluff, no clichés."}`,
       }],
     });
     const text = msg.content[0]?.type === "text" ? msg.content[0].text : "{}";

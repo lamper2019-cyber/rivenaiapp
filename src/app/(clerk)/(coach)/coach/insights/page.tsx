@@ -31,7 +31,6 @@ const C = {
   gold: "#C9A961", sage: "#7C9A7E", red: "#C76B5C", mute: "#8A8378",
   line: "#E7E0D4", blue: "#6F8FA3",
 };
-const FUNNEL_COLORS = [C.sage, C.gold, C.blue, C.red];
 
 function fmt(n: number | null | undefined): string {
   if (n == null) return "—";
@@ -67,13 +66,17 @@ function Kpi({
 
 /* ── Views → Trial funnel (real PostHog totals) ─────────────── */
 function FunnelView({ t }: { t: FunnelTotals | null }) {
+  // The real on-site journey: everyone who landed → quiz → trial. (IG visitors
+  // is shown as its own KPI above — it's a traffic SOURCE, not a funnel step,
+  // and is smaller than total site visits, which would invert the funnel.)
   const steps = [
-    { s: "IG visitors", v: t?.igVisitors ?? 0 },
     { s: "Site visits", v: t?.sessions ?? 0 },
     { s: "Quiz starts", v: t?.quizStarts ?? 0 },
     { s: "Trials", v: t?.trials ?? 0 },
   ];
-  const top = Math.max(steps[0].v, 1);
+  const colors = [C.sage, C.gold, C.red];
+  // Base widths on the largest step so a bar can never exceed the card.
+  const top = Math.max(...steps.map((s) => s.v), 1);
 
   // Real biggest-leak: lowest step-to-step conversion where the prior step > 0.
   let leakIdx = -1, leakConv = 101;
@@ -99,7 +102,8 @@ function FunnelView({ t }: { t: FunnelTotals | null }) {
 
       <div className="flex flex-col items-center gap-1">
         {steps.map((f, i) => {
-          const pctOfTop = Math.max((f.v / top) * 100, 26);
+          // Clamp 14–100% so tiny/zero steps stay visible and big ones never overflow.
+          const pctOfTop = Math.min(Math.max((f.v / top) * 100, 14), 100);
           const conv = i === 0 || steps[i - 1].v === 0 ? null : ((f.v / steps[i - 1].v) * 100).toFixed(1);
           return (
             <div key={f.s} className="w-full flex flex-col items-center">
@@ -109,7 +113,7 @@ function FunnelView({ t }: { t: FunnelTotals | null }) {
                 </div>
               ) : null}
               <div style={{
-                width: `${pctOfTop}%`, minWidth: 200, background: FUNNEL_COLORS[i],
+                width: `${pctOfTop}%`, minWidth: 180, maxWidth: "100%", background: colors[i],
                 borderRadius: 12, padding: "14px 18px", color: "#fff",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
                 boxShadow: "0 4px 14px rgba(0,0,0,.06)",
