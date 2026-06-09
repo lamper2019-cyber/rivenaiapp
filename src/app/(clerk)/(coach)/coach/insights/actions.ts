@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { syncInstagram, type SyncResult } from "@/lib/instagram-sync";
+import { enrichPendingPosts } from "@/lib/post-enrich";
 import { getAnthropicClient, isAnthropicConfigured } from "@/lib/anthropic";
 
 /** Guard: only a COACH may run these. Returns the userId on success. */
@@ -19,10 +20,13 @@ async function requireCoach(): Promise<{ ok: true } | { ok: false; error: string
 }
 
 export type ManualSyncResult =
-  | { ok: true; postsSynced: number; errors: string[] }
+  | { ok: true; postsSynced: number; enriched: number; errors: string[] }
   | { ok: false; error: string };
 
-/** Manual "Sync now" — same job the daily cron runs, on demand. */
+/** Manual "Sync now" — same job the daily cron runs, on demand: refresh the
+ *  posts/metrics, then run vision + audio transcription over the newest
+ *  unanalyzed ones so the reads are grounded in real content. Enrichment is
+ *  bounded per click (it can't time out); tap again to catch up the rest. */
 export async function runManualSync(): Promise<ManualSyncResult> {
   const gate = await requireCoach();
   if (!gate.ok) return { ok: false, error: gate.error };
@@ -35,8 +39,15 @@ export async function runManualSync(): Promise<ManualSyncResult> {
   }
   if (!result.ok) return { ok: false, error: result.errors[0] ?? "Sync failed." };
 
+  let enriched = 0;
+  try {
+    enriched = (await enrichPendingPosts(8)).enriched;
+  } catch {
+    /* best-effort — sync still succeeded */
+  }
+
   revalidatePath("/coach/insights");
-  return { ok: true, postsSynced: result.postsSynced, errors: result.errors };
+  return { ok: true, postsSynced: result.postsSynced, enriched, errors: result.errors };
 }
 
 export type SetDmsResult = { ok: true } | { ok: false; error: string };

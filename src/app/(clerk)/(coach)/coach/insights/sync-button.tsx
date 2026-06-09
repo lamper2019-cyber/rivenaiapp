@@ -37,6 +37,7 @@ export function SyncButton() {
       {result?.ok ? (
         <span className="font-body text-label-md text-sage">
           Synced {result.postsSynced} post{result.postsSynced === 1 ? "" : "s"}
+          {result.enriched > 0 ? ` · ${result.enriched} read + transcribed` : ""}
           {result.errors.length ? ` · ${result.errors.length} skipped` : ""}
         </span>
       ) : result && !result.ok ? (
