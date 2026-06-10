@@ -93,3 +93,59 @@ export async function getRollingWeeklyAverage(
   const sum = rows.reduce((a, r) => a + r.weightLb, 0);
   return { avg: Math.round((sum / rows.length) * 10) / 10, count: rows.length };
 }
+
+export type SundayWrap = {
+  /** This week's 7-day average. */
+  thisAvg: number;
+  /** Last week's average, or null on the very first week. */
+  lastAvg: number | null;
+  /** thisAvg − lastAvg (negative = down). 0 when no last week. */
+  deltaLb: number;
+  /** Which read RIVEN gives her. */
+  direction: "building" | "first" | "down" | "flat" | "up";
+  /** Recent daily weights oldest→newest, for the trend line. */
+  series: number[];
+};
+
+const avgOf = (a: number[]): number | null =>
+  a.length ? Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 10) / 10 : null;
+
+/**
+ * The Sunday full-screen wrap data. Returns null on any day that ISN'T Sunday
+ * (Central), or when she has no weigh-ins yet. Compares this week's average to
+ * last week's so the wrap can show the trend — the emotional payoff.
+ */
+export async function getSundayWrap(userId: string): Promise<SundayWrap | null> {
+  // Only fires on Sundays (Central time).
+  const weekday = new Date().toLocaleString("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "short",
+  });
+  if (weekday !== "Sun") return null;
+
+  const rows = await prisma.dailyWeighIn.findMany({
+    where: { userId },
+    orderBy: { day: "desc" },
+    take: 14,
+    select: { weightLb: true },
+  });
+  if (rows.length === 0) return null;
+
+  const weights = rows.map((r) => r.weightLb);
+  const thisAvg = avgOf(weights.slice(0, 7))!; // non-null: rows.length ≥ 1
+  const lastAvg = avgOf(weights.slice(7, 14));
+
+  let direction: SundayWrap["direction"];
+  let deltaLb = 0;
+  if (weights.slice(0, 7).length < 3) {
+    direction = "building"; // not enough data this week to call a trend
+  } else if (lastAvg == null) {
+    direction = "first"; // first real week — set the baseline
+  } else {
+    deltaLb = Math.round((thisAvg - lastAvg) * 10) / 10;
+    direction = deltaLb <= -0.3 ? "down" : deltaLb >= 0.3 ? "up" : "flat";
+  }
+
+  return { thisAvg, lastAvg, deltaLb, direction, series: [...weights].reverse() };
+}
+

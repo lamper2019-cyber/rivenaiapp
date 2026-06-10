@@ -30,7 +30,8 @@ import { SundayRitual } from "@/components/sunday-ritual";
 import { MonthlyWeightCheckinCard } from "@/components/monthly-weight-checkin-card";
 import { getMonthlyWeightSnapshot } from "@/lib/monthly-weight-checkin";
 import { DailyWeightCheckinCard } from "@/components/daily-weight-checkin-card";
-import { getDailyWeighSnapshot } from "@/lib/daily-weigh-in";
+import { getDailyWeighSnapshot, getSundayWrap } from "@/lib/daily-weigh-in";
+import { SundayWeightWrap } from "@/components/sunday-weight-wrap";
 import { SubscribedTracker } from "@/components/subscribed-tracker";
 
 // Force a fresh server render on every request. The page reads `auth()` so
@@ -104,6 +105,7 @@ export default async function DashboardPage() {
     cheerCeremony,
     monthlyWeightSnapshot,
     dailyWeighSnapshot,
+    sundayWrap,
   ] = await Promise.all([
     getCheerCandidates(clientUserId).catch(() => []),
     getPeerWinCandidates(clientUserId).catch(() => []),
@@ -112,6 +114,7 @@ export default async function DashboardPage() {
     getCheerCeremonyState(clientUserId).catch(() => null),
     getMonthlyWeightSnapshot(clientUserId).catch(() => null),
     getDailyWeighSnapshot(clientUserId).catch(() => null),
+    getSundayWrap(clientUserId).catch(() => null),
   ]);
 
   // Only render the Sunday surface when there IS a prompt AND we're
@@ -176,6 +179,10 @@ export default async function DashboardPage() {
           isFirstCeremony={cheerCeremony.isFirstCeremony}
         />
       )}
+
+      {/* Sunday weekly wrap — full-screen, once a Sunday. Server only returns
+          wrap data on Sundays; the component shows it once per week (localStorage). */}
+      {sundayWrap && <SundayWeightWrap wrap={sundayWrap} />}
 
       {/* Top-right "Message from RIVEN" pill — solid charcoal, serif
           S monogram, red unread count dot. Routes to /chat where she
