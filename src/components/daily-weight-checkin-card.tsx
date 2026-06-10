@@ -34,11 +34,18 @@ export function DailyWeightCheckinCard({
         return;
       }
       setDone(true);
-      setTimeout(() => router.refresh(), 700);
+      // Refresh swaps this card for the persistent "locked in" strip the
+      // server renders once weighedToday is true.
+      setTimeout(() => router.refresh(), 1200);
     });
   }
 
   const lbsToGoal = roundTo(weight - snapshot.goalWeight, 1);
+
+  // Just submitted — confirm, then the refresh takes over.
+  if (done) {
+    return <DailyWeighDone weight={weight} />;
+  }
 
   return (
     <section
@@ -103,6 +110,32 @@ export function DailyWeightCheckinCard({
       </button>
 
       {error && <p className="font-body text-label-sm text-soft-red">{error}</p>}
+    </section>
+  );
+}
+
+/**
+ * The "locked in" strip — shown right after she submits AND on every later
+ * visit today (the dashboard renders it when the snapshot says weighedToday).
+ * Sage = the brand's "you did it" color.
+ */
+export function DailyWeighDone({ weight }: { weight: number }) {
+  return (
+    <section
+      aria-label="Daily weigh-in complete"
+      className="rounded-md bg-sage/15 border border-sage/50 px-gutter py-4 flex items-center gap-3"
+    >
+      <span className="material-symbols-outlined text-sage" aria-hidden>
+        check_circle
+      </span>
+      <div>
+        <p className="font-body text-body-md text-charcoal">
+          You locked it in for today — {weight.toFixed(1)} lb.
+        </p>
+        <p className="font-body text-label-sm text-on-surface-variant">
+          Same time tomorrow. Steady wins.
+        </p>
+      </div>
     </section>
   );
 }

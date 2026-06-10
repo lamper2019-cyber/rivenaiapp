@@ -8,7 +8,7 @@ import { pickQuoteForDate } from "@/lib/daily-quotes";
 import { PwaInstallBanner } from "@/components/pwa-install-banner";
 import { NotificationOptIn } from "@/components/notification-opt-in";
 import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
-import { getMealPacing, type MealPacingTier } from "@/lib/meal-pacing";
+import { getMealPacing } from "@/lib/meal-pacing";
 import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
 import { getCheerCandidates } from "@/lib/cheer";
 import { getPeerWinCandidates } from "@/lib/peer-wins";
@@ -27,7 +27,7 @@ import { PeerWins } from "@/components/peer-wins";
 import { CheerReceivedCard } from "@/components/cheer-received-card";
 import { CheerCeremony } from "@/components/cheer-ceremony";
 import { SundayRitual } from "@/components/sunday-ritual";
-import { DailyWeightCheckinCard } from "@/components/daily-weight-checkin-card";
+import { DailyWeightCheckinCard, DailyWeighDone } from "@/components/daily-weight-checkin-card";
 import { getDailyWeighSnapshot, getSundayWrap } from "@/lib/daily-weigh-in";
 import { SundayWeightWrap } from "@/components/sunday-weight-wrap";
 import { getMonthlyRecap, getYearlyRecap } from "@/lib/weight-recaps";
@@ -220,12 +220,15 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* DAILY weight check-in — the one-number slider RIVEN now asks for
-          every day. Self-hides once she's logged today's number. Weight only;
-          the 7-day average of these is what we coach. */}
-      {dailyWeighSnapshot && (
-        <DailyWeightCheckinCard snapshot={dailyWeighSnapshot} />
-      )}
+      {/* DAILY weight check-in — the one-number slider, every day. Once she's
+          logged today's number it swaps to the "locked in for today" strip.
+          The 7-day average of these is what we coach. */}
+      {dailyWeighSnapshot &&
+        (dailyWeighSnapshot.weighedToday ? (
+          <DailyWeighDone weight={dailyWeighSnapshot.todayWeight ?? 0} />
+        ) : (
+          <DailyWeightCheckinCard snapshot={dailyWeighSnapshot} />
+        ))}
 
       {/* Monthly waist/photo check-in removed per RIVEN — the daily weigh-in
           + the weekly/monthly average wraps are the whole weight story now. */}
@@ -239,7 +242,9 @@ export default async function DashboardPage() {
         vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
       />
 
-      {pacing?.isBehind && <MealReminderCard tier={pacing.tier} />}
+      {/* The behind-on-logging reminder card removed per RIVEN — the coach
+          pushes already tell her to log; the sticky pill below still goes
+          gold when she's behind. */}
 
       {/* Ambient community surfaces. Each one self-hides on empty data,
           so on a quiet morning none of them render and the dashboard
@@ -453,54 +458,8 @@ function UnauthedPlaceholder({ children }: { children: React.ReactNode }) {
 // pickGreeting() removed — the time-aware ritual card now provides the
 // greeting + per-slot copy. Recoverable from git if needed.
 
-function MealReminderCard({ tier }: { tier: MealPacingTier }) {
-  const { eyebrow, body } = reminderCopyFor(tier);
-  return (
-    <Link
-      href="/log"
-      className="block rounded-md bg-gold/15 border border-gold/60 px-gutter py-4 shadow-elevation-1 hover:bg-gold/20 transition-colors"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="font-body text-label-md tracking-widest uppercase text-on-secondary-container">
-            {eyebrow}
-          </p>
-          <p className="font-body text-body-md text-charcoal mt-1">{body}</p>
-        </div>
-        <span className="material-symbols-outlined text-charcoal/70 shrink-0">
-          arrow_forward
-        </span>
-      </div>
-    </Link>
-  );
-}
-
-function reminderCopyFor(tier: MealPacingTier): { eyebrow: string; body: string } {
-  switch (tier) {
-    case "midday":
-      return {
-        eyebrow: "Haven't logged yet",
-        body: "What did breakfast look like? Takes 5 seconds with voice.",
-      };
-    case "afternoon":
-      return {
-        eyebrow: "Still time to catch up",
-        body: "Run through breakfast and lunch before the details slip.",
-      };
-    case "evening":
-      return {
-        eyebrow: "Light day on the log",
-        body: "Run through what you ate today — even rough numbers beat zero.",
-      };
-    // Early/late tiers shouldn't trigger isBehind, but keep the type exhaustive.
-    case "early":
-    case "late":
-      return {
-        eyebrow: "Log a meal",
-        body: "Voice or text — it takes a few seconds.",
-      };
-  }
-}
+// MealReminderCard + reminderCopyFor removed per RIVEN — the RIVEN coach
+// pushes cover "you need to log"; the dashboard card was redundant nagging.
 
 function StickyLogPill({ behind }: { behind: boolean }) {
   // Floats above the bottom nav. Charcoal pill on a calm day, gold when she's

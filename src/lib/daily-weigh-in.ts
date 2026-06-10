@@ -9,6 +9,10 @@ import { startOfCentralDay } from "@/lib/dates";
  */
 
 export type DailyWeighSnapshot = {
+  /** True once she's logged today's number — render the "locked in" strip. */
+  weighedToday: boolean;
+  /** Today's logged weight, when weighedToday. */
+  todayWeight: number | null;
   /** Pre-fill for the slider — her most recent weight. */
   prefillWeight: number;
   /** Goal weight, for the "X lb to goal" label. */
@@ -16,13 +20,23 @@ export type DailyWeighSnapshot = {
 };
 
 /**
- * Show the daily weight slider on /dashboard only if she HASN'T weighed today.
- * Returns null once she's logged today's number so the card self-hides.
+ * Today's calendar date in Central, as YYYY-MM-DD. The DailyWeighIn.day
+ * column is @db.Date — Postgres keeps only the date and Prisma reads it back
+ * as midnight UTC, so comparing it to startOfCentralDay() with getTime()
+ * NEVER matches (that bug kept the slider card up after she locked in).
+ * Calendar-string comparison sidesteps the offset entirely.
+ */
+function centralDateKey(d: Date = new Date()): string {
+  return d.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+}
+
+/**
+ * Daily weigh-in state for /dashboard: the slider when she hasn't logged
+ * today, the "locked in for today" strip once she has.
  */
 export async function getDailyWeighSnapshot(
   userId: string,
 ): Promise<DailyWeighSnapshot | null> {
-  const today = startOfCentralDay();
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -39,10 +53,14 @@ export async function getDailyWeighSnapshot(
   if (!user?.profile) return null;
 
   const last = user.dailyWeighIns[0] ?? null;
-  // Already weighed today → hide the card.
-  if (last && last.day.getTime() === today.getTime()) return null;
+  // The stored @db.Date round-trips as midnight UTC, so its ISO date IS the
+  // calendar day she logged. Compare calendars, not instants.
+  const weighedToday =
+    last != null && last.day.toISOString().slice(0, 10) === centralDateKey();
 
   return {
+    weighedToday,
+    todayWeight: weighedToday ? last!.weightLb : null,
     prefillWeight: last?.weightLb ?? user.profile.currentWeight ?? user.profile.startWeight,
     goalWeight: user.profile.goalWeight,
   };
