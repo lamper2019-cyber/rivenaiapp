@@ -33,7 +33,7 @@ export default async function LogPage() {
           What did you eat?
         </h1>
         <p className="font-body text-body-md text-on-surface-variant max-w-md">
-          Tell RIVEN like you&apos;d tell RIVEN. We&apos;ll handle the macros.
+          Say it like you&apos;d say it to a friend. We&apos;ll handle the macros.
         </p>
       </header>
 

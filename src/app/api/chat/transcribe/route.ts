@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
-import { isWhisperConfigured, transcribeAudio } from "@/lib/whisper";
+import {
+  isWhisperConfigured,
+  transcribeAudio,
+  EmptyTranscriptionError,
+} from "@/lib/whisper";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,6 +72,16 @@ export async function POST(req: Request) {
     );
   }
 
+  // A sub-3KB blob is a fraction of a second of audio — a mis-tap, not a
+  // meal description. Bail with the friendly message before spending an
+  // OpenAI call on it.
+  if (file.size < 3 * 1024) {
+    return NextResponse.json(
+      { error: "That was too quick. Hold the mic, say the meal, then stop." },
+      { status: 422 }
+    );
+  }
+
   // MediaRecorder commonly produces webm/opus on Chrome, mp4 on Safari.
   // Strip codec parameters before allowlist lookup — iOS Safari sends
   // "audio/mp4;codecs=mp4a.40.2" which our previous code silently fell
@@ -86,11 +100,23 @@ export async function POST(req: Request) {
     const text = await transcribeAudio(wrapped, fileName);
     return NextResponse.json({ text });
   } catch (err) {
+    // "No words heard" is a user-fixable situation (silent mic, too short,
+    // phone muffled) — production logs show it's the dominant failure. Give
+    // her a do-this-instead message, not a server error.
+    if (err instanceof EmptyTranscriptionError) {
+      console.warn(
+        `[transcribe] empty audio for user ${userId}, size=${file.size}B, declared=${declaredType}`,
+      );
+      return NextResponse.json(
+        { error: "Didn't catch any words. Get the phone close, say the meal, then stop — and try again." },
+        { status: 422 }
+      );
+    }
     const msg = err instanceof Error ? err.message : "Transcription failed.";
     // Log to server console so the actual upstream Whisper error surfaces
     // in Railway logs — a bare 502 in the client is opaque otherwise.
     console.error(
-      `[transcribe] failed for user ${userId}, declared=${declaredType}, resolved=${mime}:`,
+      `[transcribe] failed for user ${userId}, size=${file.size}B, declared=${declaredType}, resolved=${mime}:`,
       msg,
     );
     return NextResponse.json({ error: msg }, { status: 502 });
