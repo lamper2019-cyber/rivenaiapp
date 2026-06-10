@@ -5,6 +5,7 @@ import { runRivenCoach, type RivenSlot } from "@/lib/riven-coach";
  * The RIVEN coach cron — runs the decision tree. Call it from Railway cron at
  * three times of day with a ?slot= param:
  *   ?slot=morning    ~10:30a CT  (weigh nudge)
+ *   ?slot=midday     ~12:30p CT  (breakfast/food nudge)
  *   ?slot=afternoon  ~3:00p CT   (final weigh nudge)
  *   ?slot=evening    ~7:30p CT   (food nudge)
  * Gated by CRON_SECRET (Bearer), same as the other cron routes.
@@ -12,7 +13,7 @@ import { runRivenCoach, type RivenSlot } from "@/lib/riven-coach";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SLOTS: RivenSlot[] = ["morning", "afternoon", "evening"];
+const SLOTS: RivenSlot[] = ["morning", "midday", "afternoon", "evening"];
 
 export async function POST(req: Request) {
   const expected = process.env.CRON_SECRET;
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   const slot = new URL(req.url).searchParams.get("slot") ?? "";
   if (!SLOTS.includes(slot as RivenSlot)) {
     return NextResponse.json(
-      { error: "slot must be one of: morning | afternoon | evening" },
+      { error: "slot must be one of: morning | midday | afternoon | evening" },
       { status: 400 },
     );
   }
