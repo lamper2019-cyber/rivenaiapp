@@ -30,6 +30,9 @@ import { SundayRitual } from "@/components/sunday-ritual";
 import { DailyWeightCheckinCard } from "@/components/daily-weight-checkin-card";
 import { getDailyWeighSnapshot, getSundayWrap } from "@/lib/daily-weigh-in";
 import { SundayWeightWrap } from "@/components/sunday-weight-wrap";
+import { getMonthlyRecap, getYearlyRecap } from "@/lib/weight-recaps";
+import { MonthlyRecapOverlay } from "@/components/monthly-recap-overlay";
+import { YearlyRecapOverlay } from "@/components/yearly-recap-overlay";
 import { SubscribedTracker } from "@/components/subscribed-tracker";
 
 // Force a fresh server render on every request. The page reads `auth()` so
@@ -103,6 +106,8 @@ export default async function DashboardPage() {
     cheerCeremony,
     dailyWeighSnapshot,
     sundayWrap,
+    monthlyRecap,
+    yearlyRecap,
   ] = await Promise.all([
     getCheerCandidates(clientUserId).catch(() => []),
     getPeerWinCandidates(clientUserId).catch(() => []),
@@ -111,6 +116,8 @@ export default async function DashboardPage() {
     getCheerCeremonyState(clientUserId).catch(() => null),
     getDailyWeighSnapshot(clientUserId).catch(() => null),
     getSundayWrap(clientUserId).catch(() => null),
+    getMonthlyRecap(clientUserId).catch(() => null),
+    getYearlyRecap(clientUserId).catch(() => null),
   ]);
 
   // Only render the Sunday surface when there IS a prompt AND we're
@@ -176,9 +183,16 @@ export default async function DashboardPage() {
         />
       )}
 
-      {/* Sunday weekly wrap — full-screen, once a Sunday. Server only returns
-          wrap data on Sundays; the component shows it once per week (localStorage). */}
-      {sundayWrap && <SundayWeightWrap wrap={sundayWrap} />}
+      {/* Full-screen wraps, longest horizon wins so they never stack:
+          yearly (1×/yr) > monthly staircase (1×/mo) > Sunday weekly. Each
+          self-gates to once-per-period via localStorage. */}
+      {yearlyRecap ? (
+        <YearlyRecapOverlay recap={yearlyRecap} />
+      ) : monthlyRecap ? (
+        <MonthlyRecapOverlay recap={monthlyRecap} />
+      ) : sundayWrap ? (
+        <SundayWeightWrap wrap={sundayWrap} />
+      ) : null}
 
       {/* Top-right "Message from RIVEN" pill — solid charcoal, serif
           S monogram, red unread count dot. Routes to /chat where she
