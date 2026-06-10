@@ -10,13 +10,12 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  // Four tabs. RIVEN's coaching surfaces through the Message-from-RIVEN
-  // bubble at the top of /dashboard (tap it → opens /chat thread, no
-  // bottom-nav slot needed). RIVEN AI is the user ↔ AI assistant for
-  // voice meal logging + nutrition questions.
+  // Four tabs. ALL of RIVEN's AI now lives in the "Message from RIVEN" bubble
+  // at the top of /dashboard (tap it → /chat thread) — so the old "RIVEN AI"
+  // tab is replaced by "Circle", the community room everyone is in.
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/log", label: "Log", icon: "edit_note" },
-  { href: "/ai", label: "RIVEN AI", icon: "auto_awesome" },
+  { href: "/circle", label: "Circle", icon: "diversity_3" },
   { href: "/profile", label: "Profile", icon: "person" },
 ];
 

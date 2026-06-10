@@ -281,6 +281,73 @@ model DailyWeighIn {
   @@index([userId, day])
 }
 
+/// ── Community ("The Circle") — one room everyone is in. Author names/colors
+/// are denormalized onto posts + replies so the feed needs no User joins, and
+/// userIds are stored as plain strings (no FK back to User) to keep the User
+/// model untouched. Moderation: reportCount + hiddenAt (auto-hide) and a
+/// blocklist (CommunityBlock) satisfy Apple's UGC requirements.
+model CommunityPost {
+  id          String    @id @default(cuid())
+  authorId    String
+  authorName  String
+  authorColor String
+  kind        String // walk | meal | win | heavy | note
+  text        String    @db.Text
+  createdAt   DateTime  @default(now())
+  hiddenAt    DateTime? // set when auto-hidden by reports (or by coach)
+  reportCount Int       @default(0)
+
+  hearts  CommunityHeart[]
+  replies CommunityReply[]
+
+  @@index([createdAt])
+  @@index([hiddenAt])
+}
+
+model CommunityHeart {
+  id        String        @id @default(cuid())
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime      @default(now())
+
+  @@unique([postId, userId])
+  @@index([postId])
+}
+
+model CommunityReply {
+  id         String        @id @default(cuid())
+  postId     String
+  post       CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId   String
+  authorName String
+  text       String        @db.Text
+  createdAt  DateTime      @default(now())
+
+  @@index([postId])
+}
+
+model CommunityReport {
+  id         String   @id @default(cuid())
+  postId     String
+  reporterId String
+  reason     String
+  createdAt  DateTime @default(now())
+
+  @@unique([postId, reporterId])
+  @@index([postId])
+}
+
+model CommunityBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+}
+
 model ContentSubmission {
   id     String @id @default(cuid())
   userId String

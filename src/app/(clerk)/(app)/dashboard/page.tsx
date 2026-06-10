@@ -27,8 +27,6 @@ import { PeerWins } from "@/components/peer-wins";
 import { CheerReceivedCard } from "@/components/cheer-received-card";
 import { CheerCeremony } from "@/components/cheer-ceremony";
 import { SundayRitual } from "@/components/sunday-ritual";
-import { MonthlyWeightCheckinCard } from "@/components/monthly-weight-checkin-card";
-import { getMonthlyWeightSnapshot } from "@/lib/monthly-weight-checkin";
 import { DailyWeightCheckinCard } from "@/components/daily-weight-checkin-card";
 import { getDailyWeighSnapshot, getSundayWrap } from "@/lib/daily-weigh-in";
 import { SundayWeightWrap } from "@/components/sunday-weight-wrap";
@@ -103,7 +101,6 @@ export default async function DashboardPage() {
     sundaySnapshot,
     cheerReceived,
     cheerCeremony,
-    monthlyWeightSnapshot,
     dailyWeighSnapshot,
     sundayWrap,
   ] = await Promise.all([
@@ -112,7 +109,6 @@ export default async function DashboardPage() {
     getSundayRitualSnapshot(clientUserId).catch(() => null),
     getCheerReceivedThisWeek(clientUserId).catch(() => null),
     getCheerCeremonyState(clientUserId).catch(() => null),
-    getMonthlyWeightSnapshot(clientUserId).catch(() => null),
     getDailyWeighSnapshot(clientUserId).catch(() => null),
     getSundayWrap(clientUserId).catch(() => null),
   ]);
@@ -217,12 +213,8 @@ export default async function DashboardPage() {
         <DailyWeightCheckinCard snapshot={dailyWeighSnapshot} />
       )}
 
-      {/* 30-day waist/photo check-in (still monthly). Surfaces only when
-          getMonthlyWeightSnapshot says she's due. Recomp shows up in the waist
-          before the scale, so this stays alongside the daily weigh-in. */}
-      {monthlyWeightSnapshot && (
-        <MonthlyWeightCheckinCard snapshot={monthlyWeightSnapshot} />
-      )}
+      {/* Monthly waist/photo check-in removed per RIVEN — the daily weigh-in
+          + the weekly/monthly average wraps are the whole weight story now. */}
 
       {/* Self-hides if already installed as PWA or dismissed. */}
       <PwaInstallBanner />
