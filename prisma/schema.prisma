@@ -100,6 +100,7 @@ model User {
   mealLogs           MealLog[]
   dailyTotals        DailyTotals[]
   weeklyCheckIns     WeeklyCheckIn[]
+  dailyWeighIns      DailyWeighIn[]
   contentSubmissions ContentSubmission[]
   chatMessages       ChatMessage[]          @relation("ChatRecipient")
   sentChatMessages   ChatMessage[]          @relation("ChatSender")
@@ -262,6 +263,22 @@ model WeeklyCheckIn {
 
   @@unique([userId, weekStart])
   @@index([userId, weekStart])
+}
+
+/// Daily weight check-in — the one-number slider on /dashboard. Kept separate
+/// from WeeklyCheckIn (which carries waist/photos/sleep/etc.) so the daily
+/// weigh-in stays frictionless: just a weight + a day. One row per user per
+/// day (upsert); the 7-day rolling average is computed from the last 7 rows.
+model DailyWeighIn {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day       DateTime @db.Date
+  weightLb  Float
+  createdAt DateTime @default(now())
+
+  @@unique([userId, day])
+  @@index([userId, day])
 }
 
 model ContentSubmission {

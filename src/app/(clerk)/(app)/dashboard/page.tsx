@@ -29,6 +29,8 @@ import { CheerCeremony } from "@/components/cheer-ceremony";
 import { SundayRitual } from "@/components/sunday-ritual";
 import { MonthlyWeightCheckinCard } from "@/components/monthly-weight-checkin-card";
 import { getMonthlyWeightSnapshot } from "@/lib/monthly-weight-checkin";
+import { DailyWeightCheckinCard } from "@/components/daily-weight-checkin-card";
+import { getDailyWeighSnapshot } from "@/lib/daily-weigh-in";
 import { SubscribedTracker } from "@/components/subscribed-tracker";
 
 // Force a fresh server render on every request. The page reads `auth()` so
@@ -101,6 +103,7 @@ export default async function DashboardPage() {
     cheerReceived,
     cheerCeremony,
     monthlyWeightSnapshot,
+    dailyWeighSnapshot,
   ] = await Promise.all([
     getCheerCandidates(clientUserId).catch(() => []),
     getPeerWinCandidates(clientUserId).catch(() => []),
@@ -108,6 +111,7 @@ export default async function DashboardPage() {
     getCheerReceivedThisWeek(clientUserId).catch(() => null),
     getCheerCeremonyState(clientUserId).catch(() => null),
     getMonthlyWeightSnapshot(clientUserId).catch(() => null),
+    getDailyWeighSnapshot(clientUserId).catch(() => null),
   ]);
 
   // Only render the Sunday surface when there IS a prompt AND we're
@@ -199,13 +203,16 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* 30-day weight check-in. Surfaces only when getMonthlyWeightSnapshot
-          says she's due (30+ days since last check-in / signup). Slider-only
-          — two numbers, no photos, no questionnaire. Submitting writes a
-          WeeklyCheckIn row + updates Profile.currentWeight, and the card
-          self-hides on next render. The full /check-in route still exists
-          for clients who want the heavier form, but this is now the
-          default monthly cadence. */}
+      {/* DAILY weight check-in — the one-number slider RIVEN now asks for
+          every day. Self-hides once she's logged today's number. Weight only;
+          the 7-day average of these is what we coach. */}
+      {dailyWeighSnapshot && (
+        <DailyWeightCheckinCard snapshot={dailyWeighSnapshot} />
+      )}
+
+      {/* 30-day waist/photo check-in (still monthly). Surfaces only when
+          getMonthlyWeightSnapshot says she's due. Recomp shows up in the waist
+          before the scale, so this stays alongside the daily weigh-in. */}
       {monthlyWeightSnapshot && (
         <MonthlyWeightCheckinCard snapshot={monthlyWeightSnapshot} />
       )}
