@@ -13,6 +13,7 @@ import {
 import { SyncButton } from "./sync-button";
 import { QualifiedDmsField } from "./qualified-dms-field";
 import { PostIdeas } from "./post-ideas";
+import { AskData } from "./ask-data";
 import { PostAutopsy, type AutopsyPost } from "./post-autopsy";
 
 // Always fresh — low-traffic coach page, numbers change on every sync.
@@ -396,6 +397,9 @@ export default async function CoachInsightsPage() {
         <p style={{ fontSize: 11.5, color: C.mute, textAlign: "center", marginTop: 24 }}>
           Live data — Instagram performance + your real signup funnel. Steady wins.
         </p>
+
+        {/* "Ask your data" — floating Q&A bubble answering from the real numbers. */}
+        <AskData />
       </div>
     </div>
   );

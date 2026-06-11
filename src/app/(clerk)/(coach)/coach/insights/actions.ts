@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { syncInstagram, type SyncResult } from "@/lib/instagram-sync";
 import { enrichPendingPosts } from "@/lib/post-enrich";
 import { getAnthropicClient, isAnthropicConfigured } from "@/lib/anthropic";
+import { buildCommandCenter } from "@/lib/insights";
+import { isPosthogQueryConfigured, fetchFunnelTotals } from "@/lib/posthog-insights";
 
 /** Guard: only a COACH may run these. Returns the userId on success. */
 async function requireCoach(): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -254,5 +256,98 @@ Reply ONLY minified JSON:
     return { ok: true, verdict: v, why: String(o.why ?? "").slice(0, 500), action: String(o.action ?? "").slice(0, 600) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Analysis failed." };
+  }
+}
+
+export type AskTurn = { role: "user" | "assistant"; content: string };
+export type AskResult = { ok: true; answer: string } | { ok: false; error: string };
+
+/**
+ * "Ask your data" — the Q&A bubble on /coach/insights. Gathers the real
+ * numbers (posts + funnel + member activity), hands them to Claude with the
+ * question, and answers ONLY from that data. History is the last few turns so
+ * follow-ups ("which one?" "why?") work without persisting anything.
+ */
+export async function askInsights(
+  question: string,
+  history: AskTurn[] = [],
+): Promise<AskResult> {
+  const gate = await requireCoach();
+  if (!gate.ok) return { ok: false, error: gate.error };
+  if (!isAnthropicConfigured) return { ok: false, error: "ANTHROPIC_API_KEY not set." };
+
+  const q = question.trim().slice(0, 500);
+  if (!q) return { ok: false, error: "Ask a question first." };
+
+  // ── Gather the data context (best-effort on each source) ──────────
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const [cc, funnel7, funnel30, members, weighs7, meals7, circle7, leads] =
+    await Promise.all([
+      buildCommandCenter().catch(() => null),
+      isPosthogQueryConfigured ? fetchFunnelTotals(7).catch(() => null) : null,
+      isPosthogQueryConfigured ? fetchFunnelTotals(30).catch(() => null) : null,
+      prisma.user
+        .count({
+          where: {
+            role: "CLIENT",
+            subscriptionStatus: { in: ["trialing", "active", "comped"] },
+          },
+        })
+        .catch(() => null),
+      prisma.dailyWeighIn.count({ where: { createdAt: { gte: weekAgo } } }).catch(() => null),
+      prisma.mealLog.count({ where: { createdAt: { gte: weekAgo } } }).catch(() => null),
+      prisma.communityPost.count({ where: { createdAt: { gte: weekAgo } } }).catch(() => null),
+      prisma.lead.count().catch(() => null),
+    ]);
+
+  const postLines = (cc?.posts ?? [])
+    .slice(0, 30)
+    .map(
+      (p) =>
+        `- ${p.publishedAt.toISOString().slice(0, 10)} [${p.contentType ?? "?"}/${p.verdict}] "${(p.hook || p.caption).slice(0, 90)}" reach=${p.reach} watch=${p.avgWatchSec ?? "—"}s saves=${p.saved} shares=${p.shares} quiz=${p.quizStarts} trials=${p.trials}`,
+    )
+    .join("\n");
+
+  const context = `
+== FUNNEL (site, internal traffic excluded) ==
+Last 7d: ${funnel7 ? `pageSessions=${funnel7.sessions} igVisitors=${funnel7.igVisitors} quizStarts=${funnel7.quizStarts} trials=${funnel7.trials}` : "unavailable"}
+Last 30d: ${funnel30 ? `pageSessions=${funnel30.sessions} igVisitors=${funnel30.igVisitors} quizStarts=${funnel30.quizStarts} trials=${funnel30.trials}` : "unavailable"}
+
+== INSTAGRAM ACCOUNT ==
+Followers: ${cc?.account.followers ?? "?"} · Reach 7d: ${cc?.account.reach7d ?? "?"} · Qualified DMs this week: ${cc?.account.qualifiedDmsWeek ?? "?"}
+Pattern read: ${cc?.pattern ?? "—"}
+Format note: ${cc?.formatNote ?? "—"}
+Type clusters: ${(cc?.clusters ?? []).map((c) => `${c.key}(n=${c.count}, avgReach=${c.avgReach}, trials=${c.trials}, trend=${c.trend})`).join(" · ") || "—"}
+SWOT — S: ${cc?.swot.strengths.join(" / ") || "—"} | W: ${cc?.swot.weaknesses.join(" / ") || "—"} | O: ${cc?.swot.opportunities.join(" / ") || "—"} | T: ${cc?.swot.threats.join(" / ") || "—"}
+
+== POSTS (newest-first metrics) ==
+${postLines || "(no posts synced)"}
+
+== APP / MEMBERS ==
+Active members (trialing+active+comped): ${members ?? "?"}
+Weigh-ins logged last 7d: ${weighs7 ?? "?"} · Meals logged last 7d: ${meals7 ?? "?"} · Circle posts last 7d: ${circle7 ?? "?"}
+Quiz leads all-time: ${leads ?? "?"}`.trim();
+
+  const turns = history.slice(-8).map((t) => ({
+    role: t.role,
+    content: String(t.content).slice(0, 1000),
+  }));
+
+  try {
+    const client = getAnthropicClient();
+    const msg = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 800,
+      system: `You are the data analyst for RIVEN's founder (his coaching app for Black women 35+). Answer his questions USING ONLY the data below. Be direct and specific — lead with the number or the answer, then one or two sentences of "so what." If the data can't answer the question, say exactly what's missing — never invent numbers. Plain English, no fluff, no headers unless comparing several things.
+
+${context}`,
+      messages: [...turns, { role: "user" as const, content: q }],
+    });
+    const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+    if (!text.trim()) return { ok: false, error: "No answer came back — try again." };
+    return { ok: true, answer: text.trim().slice(0, 4000) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Ask failed." };
   }
 }
