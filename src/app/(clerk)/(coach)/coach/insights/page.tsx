@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { buildCommandCenter, type PostCard, type Cluster, type Swot } from "@/lib/insights";
+import { buildCommandCenter, type PostCard, type Cluster, type Winner } from "@/lib/insights";
 import {
   isPosthogQueryConfigured,
   fetchFunnelTotals,
@@ -8,7 +8,7 @@ import {
 import { isInstagramConfigured } from "@/lib/instagram";
 import {
   Eye, UserPlus, MousePointerClick, Rocket, Target, GraduationCap,
-  Check, Sparkles, Compass, ArrowUpRight, type LucideIcon,
+  Check, Sparkles, Compass, ArrowUpRight, Trophy, RefreshCw, type LucideIcon,
 } from "lucide-react";
 import { SyncButton } from "./sync-button";
 import { QualifiedDmsField } from "./qualified-dms-field";
@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 /**
  * "Post Lab" design — the look Sean built. All DATA and WIRING are unchanged:
  * real PostHog funnel (fetchFunnelTotals), real Instagram posts + AI verdicts
- * (buildCommandCenter), real SWOT/clusters, real follower snapshots. Only the
+ * (buildCommandCenter), real winners/clusters, real follower snapshots. Only the
  * presentation changed to this end-to-end funnel layout.
  */
 
@@ -189,28 +189,70 @@ function ClustersView({ clusters, note }: { clusters: Cluster[]; note: string | 
   );
 }
 
-/* ── SWOT (real) ────────────────────────────────────────────── */
-function SwotView({ swot }: { swot: Swot }) {
-  const quad = (title: string, items: string[], color: string) => (
-    <div style={{ border: `1px solid ${C.line}`, borderRadius: 14, padding: 16 }}>
-      <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color, fontWeight: 700, marginBottom: 10 }}>{title}</p>
-      <ul className="flex flex-col gap-1.5">
-        {items.length ? items.map((t, i) => (
-          <li key={i} style={{ fontSize: 13, color: C.charcoal, lineHeight: 1.45, display: "flex", gap: 8 }}>
-            <span style={{ color: C.mute }}>•</span><span>{t}</span>
-          </li>
-        )) : <li style={{ fontSize: 13, color: C.mute }}>—</li>}
-      </ul>
+/* ── All-time winners + how to remix them (real) ────────────── */
+function WinnersView({ winners }: { winners: Winner[] }) {
+  if (winners.length === 0) return null;
+
+  // One stat chip — gold-filled when it's the post's strongest driver.
+  const Stat = ({ Icon, value, label, active }: { Icon: LucideIcon; value: number; label: string; active: boolean }) => (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 999,
+      background: active ? "rgba(201,169,97,.16)" : C.cream,
+      border: `1px solid ${active ? C.gold : C.line}`,
+    }}>
+      <Icon size={13} color={active ? C.gold : C.mute} />
+      <span className="font-display" style={{ fontSize: 14, color: C.charcoal }}>{value.toLocaleString()}</span>
+      <span style={{ fontSize: 10.5, color: C.mute, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</span>
     </div>
   );
+
   return (
     <div style={{ ...cardStyle, borderRadius: 20, padding: 24 }}>
-      <h2 className="font-display" style={{ fontSize: 20, color: C.charcoal, marginBottom: 16 }}>This month · SWOT</h2>
-      <div className="grid md:grid-cols-2 gap-3">
-        {quad("Strengths", swot.strengths, C.sage)}
-        {quad("Weaknesses", swot.weaknesses, C.red)}
-        {quad("Opportunities", swot.opportunities, C.gold)}
-        {quad("Threats", swot.threats, C.mute)}
+      <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
+        <Trophy size={18} color={C.gold} />
+        <h2 className="font-display" style={{ fontSize: 20, color: C.charcoal }}>All-time winners · remix these</h2>
+      </div>
+      <p style={{ fontSize: 13, color: C.mute, marginBottom: 18 }}>
+        Ranked by what grows the business — follows, profile visits, and link taps. Each one&apos;s got a remix play.
+      </p>
+
+      <div className="flex flex-col gap-3">
+        {winners.map((w, i) => (
+          <div key={w.igId} style={{ border: `1px solid ${C.line}`, borderRadius: 14, padding: 16 }}>
+            <div className="flex items-start gap-3">
+              <span className="font-display" style={{ fontSize: 22, color: C.gold, lineHeight: 1, flexShrink: 0, width: 26 }}>{i + 1}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="flex items-center justify-between gap-2" style={{ marginBottom: 8 }}>
+                  <p style={{ fontSize: 14, color: C.charcoal, fontWeight: 600, lineHeight: 1.35 }}>{w.hook}</p>
+                  {w.permalink ? (
+                    <a href={w.permalink} target="_blank" rel="noopener noreferrer"
+                      style={{ flexShrink: 0, fontSize: 11.5, color: C.blue, display: "inline-flex", alignItems: "center", gap: 2 }}>
+                      view <ArrowUpRight size={12} />
+                    </a>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: C.mute }}>{w.dateLabel}</span>
+                  {w.contentType ? (
+                    <span style={{ fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: C.mute }}>· {w.contentType}</span>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 8 }}>
+                  <Stat Icon={UserPlus} value={w.follows} label="follows" active={w.driver === "follows"} />
+                  <Stat Icon={Eye} value={w.profileVisits} label="visits" active={w.driver === "profile visits"} />
+                  <Stat Icon={MousePointerClick} value={w.linkTaps} label="taps" active={w.driver === "link taps"} />
+                </div>
+                <div style={{
+                  marginTop: 12, background: "rgba(201,169,97,.10)", border: `1px solid rgba(201,169,97,.30)`,
+                  borderRadius: 10, padding: "10px 12px", display: "flex", gap: 8,
+                }}>
+                  <RefreshCw size={14} color={C.gold} style={{ marginTop: 2, flexShrink: 0 }} />
+                  <p style={{ fontSize: 12.5, color: C.charcoal, lineHeight: 1.45 }}>{w.remix}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -294,8 +336,11 @@ export default async function CoachInsightsPage() {
   const read: string[] = [];
   if (cc.pattern) read.push(cc.pattern);
   if (cc.formatNote) read.push(cc.formatNote);
-  for (const s of cc.swot.strengths.slice(0, 2)) read.push(s);
-  for (const o of cc.swot.opportunities.slice(0, 1)) read.push(o);
+  const topWinner = cc.winners[0];
+  if (topWinner) {
+    read.push(`Your all-time winner: "${topWinner.hook}" — ${topWinner.follows} follows, ${topWinner.profileVisits} profile visits, ${topWinner.linkTaps} link taps.`);
+    read.push(topWinner.remix);
+  }
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh" }}>
@@ -358,10 +403,10 @@ export default async function CoachInsightsPage() {
           </div>
         ) : null}
 
-        {/* SWOT */}
-        {cc.hasData ? (
+        {/* All-time winners + remix plays */}
+        {cc.hasData && cc.winners.length ? (
           <div className="riven-rise-in" style={{ marginBottom: 18 }}>
-            <SwotView swot={cc.swot} />
+            <WinnersView winners={cc.winners} />
           </div>
         ) : null}
 

@@ -1,6 +1,6 @@
 # RIVEN — Session Handoff Context
 
-Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated 2026-05-27, end of the "unified Sean thread + village feel" sprint (delayed AI auto-replies on a single coach thread, 60s voice moments on monthly check-in, 3x/day proactive prompts with tap chips, time-aware dashboard ritual, presence indicator, peer wins broadcast, first names in the collective counter, coach messaging dashboard, dashboard / profile chill-pass).
+Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated **2026-06-11**, end of the "RIVEN rebrand + App Store prep + daily weigh-in + The Circle + coach decision tree" sprint. The newest section is directly below this line — **read the 2026-06-11 section first**; everything under it is older and may describe behavior that has since changed (notably: the coach voice is now "RIVEN," not "Sean"; weight tracking is daily, not monthly; there's a real community tab).
 
 Also read `CLAUDE.md` at the repo root — it captures the design system and Sean-voice rules in a form that auto-loads into every Claude Code session.
 
@@ -16,7 +16,299 @@ This rule does NOT apply when he asks for a build directly (the visual is implie
 
 ---
 
-## Session updates (since 2026-05-23 — through 2026-05-27) — current
+## Session updates (2026-06-11) — CURRENT — read this first
+
+> **Who this is for:** a coding agent (possibly not Claude Code) picking up
+> RIVEN cold. By the end of this section you should know what shipped this
+> sprint, what's half-done, what's wired but unverified, and the exact
+> next moves. A SWOT is at the end of this section.
+
+### The one-paragraph state of the world
+
+RIVEN is live at **rivenmethod.com** (Railway, GitHub `main` → auto-deploy).
+The in-app coaching voice was **rebranded from "Sean" to "RIVEN"** this
+sprint — the human founder is still Sean Williams, but the app speaks as
+"RIVEN." The database **moved from Railway Postgres to Neon** (free PITR /
+backups). An **iOS Capacitor shell** is ~90% ready for the App Store
+(icon, privacy manifest, permission strings, Apple Sign In done; needs
+screenshots + listing text + TestFlight submit). Weight tracking was
+**rebuilt around a daily weight slider** (monthly waist/photo removed
+entirely) with Sunday / monthly / yearly full-screen recaps. The old
+"RIVEN AI" nav tab was **replaced by a real persistent community, "The
+Circle,"** with Apple-compliant moderation. A **coach decision tree** was
+written and **wired into a new `riven-coach` cron** (4 daily slots). The
+biggest unsolved problem is **top-of-funnel attention** — in-app usage is
+healthy (~4–11 sessions/day, several daily weigh-ins) but PostHog shows
+near-zero quiz starts / trials. Sean posts video daily; the bottleneck is
+clicks/reach, not volume.
+
+### ⚠️ Security TODO — do this first (keys were exposed in chat)
+
+Two live secrets were pasted into a chat transcript and **must be rotated**:
+- **Neon DB password** (the `npg_…` in `DATABASE_URL`) — rotate in the Neon
+  console, update `DATABASE_URL` in Railway Variables.
+- **Clerk `sk_live_…` secret key** — rotate in Clerk dashboard, update
+  `CLERK_SECRET_KEY` in Railway Variables.
+House rule going forward: **live keys are never pasted into chat** — paste
+them straight into Railway's Variables tab.
+
+---
+
+### 1. RIVEN rebrand (Sean → RIVEN in the app voice)
+
+The app no longer speaks as "Sean." The coaching persona is "RIVEN."
+- `src/components/coach-message-badge.tsx`: monogram **"S" → "R."**
+- `src/app/(clerk)/(app)/log/page.tsx`: "Tell RIVEN like you'd tell RIVEN"
+  (a bad find-replace artifact) → **"Say it like you'd say it to a friend."**
+- New coach engine (`src/lib/riven-coach.ts`) signs pushes as **"RIVEN."**
+- **Not yet done:** `CLAUDE.md` (repo root) still says "the coach is Sean
+  Williams" and the gotcha "Coach name is hardcoded to Sean." Those design
+  docs are stale on the name now — update them when you touch voice/copy.
+  Code paths that still hardcode "Sean" for legacy COACH-kind messages are
+  intentionally untouched (don't leak the founder's test name into client
+  accounts — see old gotcha #6).
+
+### 2. Database → Neon (zero data loss)
+
+Migrated Railway Postgres → **Neon** (free tier gives PITR + backups;
+Railway charged $20/mo for backups). Dump/restore via libpq; verified
+**20 tables / 57 indexes / 19 FKs** match. `DATABASE_URL` in Railway now
+points at Neon. **Known tradeoff:** Neon free tier scales to zero → ~2s
+cold-start on first login after idle. If logins feel slow, that's why —
+options are Neon's paid tier (~$19/mo, no scale-to-zero) or accept it.
+Also confirm Railway's "Serverless" toggle is OFF on the `rivenaiapp`
+service so the web app itself doesn't cold-start.
+
+### 3. iOS App Store prep (Capacitor shell)
+
+The iOS app is a Capacitor webview loading live rivenmethod.com via
+`server.url` + `appendUserAgent: "RIVENApp"` (so the web app can detect
+"running inside the native app").
+- **Clerk-in-webview login fixed:** Clerk's `allowed_origins` were PATCHed
+  (Backend API) to include `capacitor://localhost` etc. `capacitor.config.ts`
+  got `allowNavigation: ["rivenmethod.com","clerk.rivenmethod.com","*.rivenmethod.com"]`.
+- **Google sign-in hidden in-app** (Google blocks webview OAuth + Apple
+  rules): sign-in/sign-up pages detect the `RIVENApp` UA (`isNativeApp`) and
+  apply Clerk `appearance` classes `socialButtonsBlockButton__google: "hidden"`
+  and `socialButtonsIconButton__google: "hidden"`.
+- **Apple Sign In** configured in Clerk + Apple Developer (Services ID,
+  key, callback `https://clerk.rivenmethod.com/v1/oauth_callback`). Live.
+- **Privacy + permissions done:** `ios/App/App/Info.plist` has
+  NSMicrophone/NSCamera/NSPhotoLibrary usage strings +
+  `ITSAppUsesNonExemptEncryption=false`. New `PrivacyInfo.xcprivacy`
+  (NSPrivacyTracking false, UserDefaults reason CA92.1) wired into
+  `project.pbxproj`.
+- **App icon:** real RIVEN wordmark, 1024×1024 opaque cream, no alpha
+  (`AppIcon-512@2x.png`), generated from the desktop RIVEN logo SVG.
+- **Still TODO (Phase 3/4):** App Store Connect screenshots + listing copy;
+  Archive → TestFlight → submit for review; **a reviewer demo account**
+  (the app is sign-in-only / Netflix model, so Apple needs creds to get in).
+
+### 4. Production hardening
+
+- `src/lib/rate-limit.ts` (new): in-memory sliding-window
+  `rateLimit(key, limit, windowMs)`. (Uses `store.forEach`, not `for…of` —
+  Map iteration tripped TS `downlevelIteration`.) Tested:
+  `src/lib/rate-limit.test.ts` + `vitest.config.ts`; `npm test` = `vitest run`.
+- Branded error surfaces: `src/app/error.tsx`, `global-error.tsx`,
+  `not-found.tsx`. Skeleton loaders: `src/components/skeleton.tsx` + 6
+  `loading.tsx` files.
+- Health check: `src/app/api/health/route.ts` (`SELECT 1` → ok/degraded);
+  `/api/health` added to the middleware public allowlist.
+- `next.config.mjs`: `productionBrowserSourceMaps: false` (don't ship maps).
+
+### 5. Quiz funnel rebuild (email asked LAST)
+
+`src/app/quiz/start/quiz-flow.tsx` rebuilt because asking email FIRST was
+killing conversion. New order: **NAME_STEP (0, name only) → steps 1–14
+questions → EMAIL_STEP (15, email + phone gate).** `STORAGE_KEY` bumped to
+`"riven_quiz_state_v2"`. Fires `captureEvent("quiz_step", {step, name})`
+per step and `quiz_completed` on submit, so we can finally see **where**
+people drop. New `NameStep` + `ContactGateStep` components.
+
+### 6. Coach insights "Post Lab" reskin + Ask-your-data
+
+`/coach/insights` (`page.tsx`) fully reskinned to Sean's "Post Lab" design
+(palette adds blue `#6F8FA3`, mute `#8A8378`, line `#E7E0D4`; uses
+`lucide-react`, installed this sprint). Sections: FunnelView, YourRead
+(dark card), ClustersView, SwotView, HooksView, PostAutopsy feed.
+- **Funnel bug fixed:** an IG-visitors step (value 1) below Site visits
+  (36) produced a 3600%-width bar. Funnel is now 3 monotonic steps
+  (Site visits → Quiz starts → Trials), width clamped 14–100%.
+- **Ask-your-data:** new `ask-data.tsx` floating bubble + chat panel.
+  Server action `askInsights(question, history)` in `actions.ts` gathers
+  `buildCommandCenter` + funnel totals (7/30d) + member/weigh/meal/circle/
+  lead counts and has Claude answer **from app data only**.
+- `generatePostFix` now feeds Claude the post caption + video transcript
+  (see §7) instead of guessing from the thumbnail.
+
+### 7. Vision: post reads use real video content (audio transcript)
+
+`src/lib/vision.ts` gained `processVideo()` — downloads the video once,
+extracts frames **and** WAV audio, runs audio through Whisper, returns a
+`transcript`. So post "reads" reflect what was actually said, not a guess
+from a frame. `src/lib/whisper.ts` got `EmptyTranscriptionError`, retries
+once on 5xx/429, throws on empty text. `api/chat/transcribe/route.ts`:
+sub-3KB uploads → 422 "too quick"; empty transcription → friendly 422
+("Didn't catch any words…") instead of the old **502** users were hitting.
+(Root cause of the reported 502s: one user's silent/short recordings.)
+
+### 8. Weight tracking overhaul (daily, not monthly)
+
+**Monthly waist + progress-photo check-in was removed entirely** (Sean's
+call — he doesn't want waist/photo at all). Replaced with a **daily weight
+slider.**
+- `prisma/schema.prisma`: new `DailyWeighIn` (id, userId, `day @db.Date`,
+  weightLb, `@@unique([userId, day])`). Migration
+  `20260609090000_add_daily_weigh_in`.
+- `src/lib/daily-weigh-in.ts`: `getDailyWeighSnapshot`, `submitDailyWeight`,
+  `getRollingWeeklyAverage`, `getSundayWrap`.
+- `src/components/daily-weight-checkin-card.tsx`: weight-only slider; also
+  exports `DailyWeighDone` (the sage "You locked it in for today — X lb"
+  strip shown after submitting).
+- **Recaps (all full-screen overlays, localStorage period-gated):**
+  `sunday-weight-wrap.tsx` (weekly trend), `monthly-recap-overlay.tsx`
+  (the "staircase" — option B), `yearly-recap-overlay.tsx` (the "story" —
+  option C). Logic in `src/lib/weight-recaps.ts` (`getMonthlyRecap`,
+  `getYearlyRecap`). Dashboard renders **the longest horizon that's due**
+  (yearly > monthly > Sunday).
+- **⚠️ The `@db.Date` gotcha that bit us (don't repeat):** `@db.Date`
+  columns round-trip as **midnight UTC**. Comparing that to
+  `startOfCentralDay().getTime()` (midnight Central = 5–6am UTC) **never
+  matches**, so the daily card never disappeared after submit and
+  reappeared on every nav. Fix: compare **calendar date strings**
+  (`last.day.toISOString().slice(0,10) === centralDateKey()`), never
+  `getTime()`, for `@db.Date` values. Members were weighing in fine — it
+  was a ghost-card display bug for everyone.
+
+### 9. The Circle — real persistent community (replaces "RIVEN AI" tab)
+
+The "RIVEN AI" bottom-nav tab is gone; in its place is **The Circle**, a
+real persistent feed. (AI coaching moved into "Message from RIVEN.")
+- `prisma/schema.prisma`: `CommunityPost`, `CommunityHeart`,
+  `CommunityReply`, `CommunityReport`, `CommunityBlock` (author names are
+  **denormalized** onto rows — no User FK). Migration
+  `20260609100000_add_community`.
+- `src/lib/community.ts` + `circle/page.tsx` + `circle/actions.ts` +
+  `src/components/circle-feed.tsx`. Actions: `createCirclePost`,
+  `toggleCircleHeart`, `addCircleReply`, `reportCirclePost`
+  (**`AUTO_HIDE_AT = 2` reports auto-hides a post** — Apple UGC rule),
+  `blockCircleAuthor`. Sticky bottom composer.
+- `src/components/bottom-nav.tsx`: tab is now
+  `{ href: "/circle", label: "Circle", icon: "diversity_3" }`.
+
+### 10. Coach decision tree → `riven-coach` cron
+
+`docs/RIVEN-COACH-DECISION-TREE.md` (v2) is the **canonical coach brain** —
+morning / midday / afternoon / evening checkpoints, explicit weigh + food
+"ladders" (what RIVEN says at 1 / 2 / 3–4 / 5+ days missed), Sunday wrap,
+community nudges, frequency caps. Voice is explicit and directive ("you
+need to weigh in," "you need to log") — **this is RIVEN talking, not Sean.**
+- Wired in `src/lib/riven-coach.ts`: `runRivenCoach(slot)` reads
+  `DailyWeighIn` + `MealLog` days-since, applies the ladders, enforces a
+  **two-track daily cap** (≤1 `riven_weigh_*` + ≤1 `riven_food_*` per day),
+  sends a `ChatMessage` (category `riven_${track}_${slot}`) + push titled
+  "RIVEN."
+- Route: `src/app/api/cron/riven-coach/route.ts`, CRON_SECRET-gated,
+  `?slot=morning|midday|afternoon|evening`.
+- **Sean must create 4 Railway cron services** (one per slot) pointing at
+  that route. Each service = Custom Start Command
+  `sh -c "curl -sS -X POST -H 'Authorization: Bearer ${CRON_SECRET}' '<route-url>?slot=morning'"`
+  (change only the `slot=` word per service) + a Cron Schedule. Suggested
+  fifth-grader-simple service names: e.g. "Morning weigh-in nudge,"
+  "Midday food check," "Afternoon catch-up," "Evening wrap."
+- **Decision-tree gaps NOT yet wired** (tree describes them; code doesn't
+  do them yet): coach-flag to Sean on 5+/4+ missed days; RIVEN's in-Circle
+  behavior (private line on a heavy day, invite after 7 days silent);
+  non-response handling (48h step-down, 7-day-dark re-engagement); the
+  weekly frequency band. Verify against the tree before claiming parity.
+
+### 11. Smaller fixes this sprint
+
+- Removed the dashboard "Together" collective counter, the monthly weight
+  check-in card, and the meal-reminder card (`dashboard/page.tsx`).
+- "Light day on the log" copy removed (Sean asked).
+- "Half the day's gone" → "Still time to catch up."
+- **Rora's goal set to 175** (test account — Sean has two: Lamper and Rora).
+
+---
+
+## SWOT — where RIVEN stands (2026-06-11)
+
+**Strengths**
+- Product is genuinely live and used daily (~4–11 sessions/day, multiple
+  daily weigh-ins). The core loop — weigh in, log a meal, hear from RIVEN —
+  works and people return to it.
+- Strong, consistent brand and voice (cream/charcoal/gold/sage, DM Serif +
+  Jakarta, the RIVEN persona). Design discipline is encoded in CLAUDE.md /
+  BRAND.md so it survives across agents.
+- Real infra maturity now: Neon (PITR/backups), health check, rate limiting,
+  error boundaries, skeletons, tests, source maps off, error-friendly
+  transcribe. Not a prototype anymore.
+- The new instrumentation (per-step quiz tracking, funnel, ask-your-data)
+  means decisions can finally be data-driven instead of guessed.
+- iOS is one push from TestFlight — a second distribution channel is close.
+
+**Weaknesses**
+- **Top-of-funnel is empty.** PostHog shows ~0 quiz starts / trials despite
+  daily content. The front door gets no clicks — this gates everything else.
+- Several decision-tree behaviors are documented but **not wired** (coach
+  flags, in-Circle nudges, non-response step-down). The tree currently
+  overstates what the code does.
+- The Circle is built but **cold** — a community with no members is a ghost
+  town; needs seeding to feel alive (or it reads as abandoned).
+- Stale design docs: CLAUDE.md still says the coach is "Sean," which now
+  contradicts the live RIVEN voice — a new agent could regress the rebrand.
+- Two live keys still need rotating (see top of section). Operational risk
+  until done.
+- Solo founder + AI; no second set of eyes on production behavior.
+
+**Opportunities**
+- **Distribution is the unlock.** Sean posts daily and gets reach but not
+  clicks — the leverage is in the hook/CTA bridge (the "2-second app-in-use
+  CTA" idea), not more volume. A working funnel turns existing reach into
+  trials.
+- iOS App Store presence = credibility + a discovery channel + push
+  notifications that actually land.
+- Ask-your-data could grow into a real coach copilot for Sean (what's
+  working, who's slipping, who to message) — operational leverage for a
+  solo founder.
+- Daily weigh-in + recaps (Sunday/monthly/yearly) are strong retention and
+  shareable moments — the yearly "story" is organic-marketing fuel.
+- The Circle, once seeded, is the moat: a coaching app where members feel
+  each other is hard to copy and raises switching cost.
+
+**Threats**
+- If the funnel stays dry, none of the product depth matters — RIVEN could
+  be excellent and still starve for users.
+- Apple review risk: UGC moderation must be airtight (report/hide/block is
+  in — keep it that way), and reviewers need a working demo account or it's
+  an instant rejection.
+- Platform dependence: Instagram already throttled API access once
+  ("API access blocked" at the account level); reach can be cut off
+  unilaterally. Clerk/Neon/Railway/R2/Anthropic/OpenAI are all external.
+- A new coding agent without this handoff could regress the rebrand, the
+  `@db.Date` fix, or the funnel order. **This section is the guardrail —
+  keep it current.**
+- Neon cold-start could read as "the app is slow" to first impressions on
+  the very users we worked to acquire.
+
+### Immediate next moves (in order)
+
+1. **Rotate the two exposed keys** (Neon password + Clerk `sk_live`).
+2. **Create the 4 `riven-coach` Railway crons** (one per slot).
+3. **Fix the funnel/CTA** — the empty top-of-funnel is the #1 business
+   problem. Everything else is secondary until clicks → quiz starts move.
+4. Finish iOS: screenshots + listing copy + reviewer demo account →
+   TestFlight → submit.
+5. Wire the remaining decision-tree behaviors (coach flags, in-Circle
+   nudges, non-response handling) so code matches the tree one-to-one.
+6. Seed The Circle so it doesn't read as empty.
+7. Update CLAUDE.md to reflect the RIVEN (not "Sean") app voice.
+
+---
+
+## Session updates (since 2026-05-23 — through 2026-05-27)
 
 Read this BEFORE the older sections below. A lot has shifted in the
 last week and the older sections reflect earlier behavior in places

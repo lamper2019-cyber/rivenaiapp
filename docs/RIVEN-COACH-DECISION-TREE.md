@@ -1,154 +1,124 @@
-# RIVEN Coach — Decision Tree
+# RIVEN — The Full Coach Brain (v2 — explicit voice)
 
-How "Message from RIVEN" decides **what to say, when, and when to stay quiet** —
-so it feels like a real coach, not a notification machine. This is the logic
-behind the daily check-in + weekly average + community.
+One member, top to bottom. The DAY runs first, then the LADDERS (repeat misses),
+then the WEEK, the COMMUNITY, the RULES.
 
----
+Voice rule (your change): **be explicit. Tell her what to do.** Not "you good?" —
+say "you need to weigh in." Straight, in RIVEN's calm voice, no guilt.
 
-## The guardrails (read these first — they govern everything below)
-
-1. **Max 1 proactive RIVEN push per day** per member (the Sunday wrap is the
-   one exception). Her own replies in chat never count against this.
-2. **Silence is a valid move.** A quiet, on-track day gets *no* message. We do
-   not message just to message — that's how coaches get muted.
-3. **Earned escalation.** Gentle → check-in → concern, based on days missed.
-   We never open with worry.
-4. **One message = one job + one optional tap.** Never a wall of text.
-5. **Voice = peaceful discipline.** No guilt, no cheerleading, no therapy
-   clichés. "That's data, not a problem." "Steady wins."
-6. **Target band: 3–5 RIVEN touches per week.** Under 2 → she feels forgotten.
-   Over 6 → she mutes us.
-
----
-
-## 1. THE DAILY LOOP (runs each morning, per member)
+Legend:  ◇ = decision   ▶ = RIVEN says/does this   · (silent) = says nothing on purpose
 
 ```
-MORNING (~8a her time)
-│
-├─ Did she log her WEIGHT yesterday?
-│
-├─ YES ───────────────────────────────────────────────────────────────┐
-│   • Streak intact.                                                    │
-│   • Dashboard shows today's weigh-in slider (one number, no waist).   │
-│   • RIVEN message?  → USUALLY SILENT. Don't reward showing up with    │
-│        noise. Exceptions only:                                        │
-│          - 7-day milestone  → light nod ("A full week logged. That's  │
-│            the part most people skip.")                               │
-│          - trend shift (see §3)                                       │
-│                                                                       │
-└─ NO ──► how many days in a row has she missed?                        │
-    │                                                                   │
-    ├─ 1 day   → NO push. Dashboard just shows the slider.              │
-    │             (One miss is not a problem. Don't flinch.)            │
-    │                                                                   │
-    ├─ 2 days  → GENTLE (push + chip):                                  │
-    │             "Two quiet days. No numbers needed — just tap your    │
-    │              weight when you're up."                              │
-    │                                                                   │
-    ├─ 3–4 days → CHECK-IN (push + chip):                               │
-    │             "Haven't seen you since [day]. You good? One tap and  │
-    │              we're back on track."                                │
-    │                                                                   │
-    └─ 5+ days  → RE-ENGAGE + flag to coach dashboard:                  │
-                  "Real talk — life happens. The scale's not the point, │
-                   showing up is. Start fresh today?"                   │
+═══════════════════════════════════════════════════════════════════════════════
+ PART 1 — THE DAY   (top = morning, bottom = night)
+═══════════════════════════════════════════════════════════════════════════════
+
+   ┌──────────────────── ☀ MORNING WEIGH CHECK  ~10:30a ────────────────────┐
+   │  (we wait till mid-morning — if she weighed by ~10a, no nudge at all)   │
+   │                                                                        │
+   │  ◇ Has she logged today's WEIGHT?                                      │
+   │  ├─ YES ▶ · silent. (Dashboard shows nothing — she's done.)            │
+   │  └─ NO  ▶ MORNING WEIGH NUDGE:                                         │
+   │           "Morning. You haven't logged today's weight yet. Step on     │
+   │            the scale — one number, that's it."                         │
+   └────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+   ┌──────────────────── 🍳 MIDDAY FOOD CHECK  ~12:30p ─────────────────────┐
+   │  ◇ Has she logged BREAKFAST?                                           │
+   │  ├─ YES ▶ · silent                                                     │
+   │  └─ NO  ▶ BREAKFAST NUDGE (explicit):                                  │
+   │           "You need to log your breakfast. Not sure what counts?       │
+   │            Ask me — that's what I'm here for."                         │
+   └────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+   ┌──────────────────── 🌤 AFTERNOON WEIGH CHECK  ~3:00p ──────────────────┐
+   │  (the 2nd + FINAL weigh reminder of the day)                           │
+   │  ◇ Has she weighed today?                                              │
+   │  ├─ YES ▶ · silent                                                     │
+   │  └─ NO  ▶ AFTERNOON WEIGH NUDGE (explicit, final):                     │
+   │           "We still don't have today's weight. You need to weigh in    │
+   │            today — do it before the day gets away."                    │
+   │           ── after this: NO more weigh reminders today ──              │
+   └────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+   ┌──────────────────── 🌙 EVENING FOOD CHECK  ~7:30p ─────────────────────┐
+   │  ◇ Did she log ANY food today?                                         │
+   │  ├─ YES ▶ · silent                                                     │
+   │  └─ NO  ▶ EVENING FOOD NUDGE (explicit, final food nudge):             │
+   │           "It's evening and your log's still empty. You need to log    │
+   │            what you ate today — voice it, takes 5 seconds."            │
+   └────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+   ┌──────────────────── 🛏 NIGHT  ~9:30p ──────────────────────────────────┐
+   │  ▶ · silent. Day closed, tomorrow resets.                              │
+   │  Hard rule: ≤ 1 PHONE PUSH per day (dashboard cards don't count).      │
+   └────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ PART 2 — THE LADDERS   (repeat misses, day over day — explicit now)
+═══════════════════════════════════════════════════════════════════════════════
+
+   ── WEIGH-IN missed (days in a row) ─────────────────────────────────────
+     1 day   ▶ · silent. Just the slider. (One miss ≠ a problem.)
+     2 days  ▶ "Two days, no weight. You need to weigh in today — one number."
+     3–4 days▶ "Haven't seen a weight since [day]. You need to weigh in. One tap."
+     5+ days ▶ 🚩 flag coach + "It's been [N] days. No shame — but you need to
+               get back on the scale. Start today."
+
+   ── FOOD-LOG missed (days in a row) ─────────────────────────────────────
+     1 day   ▶ evening nudge only (Part 1).
+     2 days  ▶ "You haven't logged in a while. You need to log your food —
+               every meal. Start with the next one."
+     3 days  ▶ "Real talk: I can't coach what I can't see. You need to log —
+               start now, the next meal."
+     4+ days ▶ 🚩 flag coach + "It's been [N] days off the log. You need to log.
+               Just the next meal. That's the win."
+
+   (the two ladders run INDEPENDENTLY — she's never scolded for both at once)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ PART 3 — THE WEEK   (Sunday: 7-day AVERAGE + full-screen wrap — BUILT)
+═══════════════════════════════════════════════════════════════════════════════
+
+   We coach the 7-DAY AVERAGE, never the daily wiggle (water/salt/cycle = noise).
+
+   ◇ How many weigh-ins this week?
+   ├─ 0–2 (not enough) ▶ "We've only got a few days on the scale. Log all
+   │                       week and next Sunday we'll see your real trend."
+   └─ 3+ ▶ this week's avg vs last week's:
+          FIRST WEEK ▶ "Starting line: avg [X] lb. The baseline we build from."
+          DOWN ▶ "Down [X] lb on your 7-day average. That's real progress —
+                  not water, not luck. Keep stacking the same week."
+          FLAT ▶ "You held steady. That's fine — we just maintain. Keep your
+                  logging accurate so we can see the next move."
+          UP   ▶ "Average is up — we're good, that's not a problem. One thing
+                  this week: watch your calories. Clamp down a little."
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ PART 4 — THE COMMUNITY   (how RIVEN behaves in the circle — coming in Phase 3)
+═══════════════════════════════════════════════════════════════════════════════
+   HEAVY-day post → no public reply; the room witnesses. ONE private line maybe.
+   Win/walk/meal  → · silent. Peers carry the wins (keeps the room THEIRS).
+   Silent 7+ days → soft morning line: "The room's been asking about you."
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ PART 5 — THE RULES   (what makes it feel like a real coach)
+═══════════════════════════════════════════════════════════════════════════════
+   • ≤ 1 phone push/day  (+ Sunday wrap on Sundays)
+   • 2 weigh reminders/day MAX (morning ~10:30a + afternoon ~3p)
+   • 1 food reminder/day (evening) + 1 light breakfast nudge midday
+   • never two reminders back-to-back
+   • target 3–5 RIVEN touches/week  ·  under 2 = forgotten, over 6 = muted
+   • her own chat replies NEVER count against the ledger
+   • 48h no-reply → step down, wait for the next real trigger (don't chase)
+   • 7 days dark → ONE "the door's open," then quiet + 🚩 flag coach
+   • voice: explicit + calm. Tell her what to do. No guilt, no cheerleading.
 ```
-
----
-
-## 2. MEAL LOGGING (a separate signal — don't blend with weight)
-
-```
-By EVENING (~7p)
-│
-├─ Logged at least one meal today?
-│   ├─ YES → silent. (Optional: ≤2×/week one light affirmation —
-│   │        "Protein's on point. Stack more plates like this.")
-│   └─ NO  → ONE evening nudge only (never all day):
-│            "Light day on the log. Even rough numbers beat zero."
-```
-
----
-
-## 3. WEIGHT TREND (the weekly average — what we actually coach)
-
-```
-Every weigh-in feeds a 7-DAY ROLLING AVERAGE. We coach the average, never the
-daily wiggle (water, salt, cycle move the scale 2–3 lb — that's noise).
-
-SUNDAY WRAP (full-screen, once a week):
-│
-├─ First week        → "Here's your starting line: avg [X] lb. No judgment —
-│                        just the baseline we build from."
-├─ Down vs last wk   → "Down [X] lb on the 7-day average. That's real. Steady wins."
-├─ Flat              → "Held steady. Maintenance is a skill — now we nudge."
-└─ Up vs last wk     → "Up a touch on the average. That's data, not a problem.
-                        One thing to clamp down this week: [protein / steps]."
-```
-
----
-
-## 4. WHAT IF SHE DOESN'T RESPOND TO A RIVEN MESSAGE?
-
-```
-RIVEN sent a message →
-│
-├─ She opened or replied within 48h  → normal loop, ledger resets.
-│
-└─ No open within 48h → STEP DOWN, don't pile on.
-   • Next touch waits for the next *real* trigger (a missed day, the Sunday
-     wrap) — never an immediate follow-up nag.
-   • 7 days fully dark → ONE "the door's open" message, then go quiet and
-     flag the coach. We don't chase; we leave the porch light on.
-```
-
----
-
-## 5. THE COMMUNITY (the circle) — how RIVEN behaves there
-
-```
-A member posts in the circle →
-│
-├─ HEAVY-DAY post  → RIVEN never "fixes" it. The room witnesses (peer cheers).
-│                    RIVEN may drop ONE private line, not a public reply:
-│                    "Saw you in the circle. Heavy days are data, not failure."
-│
-├─ WIN / walk / meal post → RIVEN says nothing. Peer cheers carry it. RIVEN
-│                           staying out of the wins is what makes the room feel
-│                           like *theirs*, not a feed it's performing on.
-│
-└─ Silent in the circle 7+ days → soft invite inside the morning RIVEN card
-                                  ("The room's been asking about you"), never a
-                                  guilt trip, never a push.
-```
-
----
-
-## 6. THE FREQUENCY LEDGER (the "real coach" rule, summarized)
-
-| Window | Limit |
-|---|---|
-| Per member / day | ≤ 1 proactive RIVEN push (+ the Sunday wrap on Sundays) |
-| Per member / week | **3–5 touches** is the target band |
-| Too quiet | < 2/week → she feels forgotten |
-| Too loud | > 6/week → she mutes us |
-| Never counts | her own chat replies (those are always welcome) |
-
----
-
-## How this maps to what already runs in the app
-
-These existing crons are the "clock" — the tree above is the *decision* layer
-that sits on top of them:
-
-- `morning-checkin`, `midday-checkin`, `evening-checkin` — time-of-day triggers
-- `sean-messages` — the proactive message picker (this is where §1–§2 live)
-- `monday-checkin` / `sunday-recap` / `sunday-reminder` — the weekly wrap (§3)
-- `weekly-digest` — coach-side rollup
-- `process-ai-replies` — handles her replies back to RIVEN
-
-**To build the daily loop:** the missed-day escalation (§1) and the 7-day
-average (§3) are the two new pieces; everything else is re-pointing existing
-crons from a monthly to a daily cadence.

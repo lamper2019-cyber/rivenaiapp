@@ -722,7 +722,9 @@ model IgPostMetric {
   plays            Int?
   avgWatchTimeMs   Int? // ig_reels_avg_watch_time (milliseconds)
   totalWatchTimeMs Int?
-  // Profile/link actions attributed to the post by IG.
+  // Profile/link actions attributed to the post by IG. These three are the
+  // "winner" signals on /coach/insights: follows + profile visits + link taps.
+  follows          Int?
   profileVisits    Int?
   linkTaps         Int?
 

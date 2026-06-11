@@ -33,16 +33,16 @@ const SLIDES: Slide[] = [
   },
   {
     eyebrow: "Step 3 of 4",
-    title: "Monthly check-in.",
-    body: "On the 1st of each month, you'll complete a quick check-in — weight, waist, photos, sleep, how the month went. Once a month, ten minutes. This is how RIVEN tracks the real trend and adjusts your plan.",
-    icon: "calendar_month",
+    title: "Weigh in every day.",
+    body: "Every morning, slide to today's weight — one number, five seconds. Daily is the whole game: it lets RIVEN see your real trend through the day-to-day noise and adjust your plan. Don't skip it.",
+    icon: "monitor_weight",
     ctaLabel: "Next",
   },
   {
     eyebrow: "Step 4 of 4",
-    title: "Your weekly prompt.",
-    body: "Each week, you'll get one short content prompt — a quick video or voice memo. It helps RIVEN see how you're feeling and what's working. Takes thirty seconds.",
-    icon: "videocam",
+    title: "You're not doing this alone.",
+    body: "The Circle is your private community inside RIVEN — real women on the same journey. Share a win, vent a hard day, or just read along. No strangers, no judgment.",
+    icon: "diversity_3",
     ctaLabel: "Let's begin",
   },
 ];
@@ -118,8 +118,9 @@ export function TutorialSlides({ startSlide }: { startSlide: number }) {
         </button>
       </div>
 
-      {/* Slide body — centered vertically */}
-      <div className="flex-1 flex flex-col justify-center pb-24">
+      {/* Slide body — centered vertically; scrolls instead of clipping when a
+          slide's copy is tall on a short viewport (was getting cut off). */}
+      <div className="flex-1 flex flex-col justify-center pb-24 overflow-y-auto">
         <div
           className={`transition-all duration-[280ms] ease-out ${slideContentClasses}`}
           aria-live="polite"

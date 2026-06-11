@@ -46,6 +46,7 @@ export type IgMediaInsights = {
   plays?: number;
   avgWatchTimeMs?: number;
   totalWatchTimeMs?: number;
+  follows?: number;
   profileVisits?: number;
   linkTaps?: number;
 };
@@ -123,6 +124,25 @@ export async function fetchMediaInsights(
       case "ig_reels_video_view_total_time": out.totalWatchTimeMs = v; break;
     }
   }
+
+  // The "winner" signals — follows + profile visits a post drove — live behind
+  // separate media metrics that IG only exposes for some media types/ages. A
+  // rejected metric errors the WHOLE call (see note above), so we fetch these
+  // in their own try/catch: if they fail, the core metrics above still land.
+  try {
+    const act = await graphGet<{
+      data: Array<{ name: string; values?: Array<{ value: number }>; total_value?: { value: number } }>;
+    }>(`${igId}/insights`, { metric: "follows,profile_visits" });
+    for (const row of act.data ?? []) {
+      const v = row.values?.[0]?.value ?? row.total_value?.value;
+      if (v == null) continue;
+      if (row.name === "follows") out.follows = v;
+      if (row.name === "profile_visits") out.profileVisits = v;
+    }
+  } catch {
+    // non-fatal — older posts / unsupported media types just won't have these.
+  }
+
   return out;
 }
 

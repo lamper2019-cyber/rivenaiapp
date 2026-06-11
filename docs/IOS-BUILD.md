@@ -78,10 +78,32 @@ npx cap open ios            # opens the project in Xcode
 ---
 
 ## Open items for Claude to build (in code, this branch)
-- [ ] iOS auth: Sign in with Apple + email; Google via system browser
-- [ ] Hide `/pricing` purchase CTAs when `Capacitor.isNativePlatform()`
-- [ ] `/privacy` page (privacy policy) — required for the listing
-- [ ] Native push (later — replaces web push for a better iOS experience)
+- [x] Hide purchase CTAs in-app — done via the `RIVENApp` user-agent gate in
+      `pricing/page.tsx`, `sign-in`, `sign-up`. (2026-06-11: also removed the
+      "visit rivenmethod.com to start your plan" line — Apple 3.1.1 forbids
+      steering to an external purchase from inside the app.)
+- [x] `/privacy` page (privacy policy) — built at `src/app/(clerk)/privacy`.
+      Wire `rivenmethod.com/privacy` into the App Store Connect listing.
+- [~] iOS auth: Google is hidden in-app; email sign-in carries the app. Sign in
+      with Apple is only REQUIRED if a social login is shown in-app — since
+      Google is hidden, email-only is compliant. VERIFY on TestFlight that the
+      in-app sign-in actually renders email login (not a blank social-only card).
+- [ ] Native push (later — replaces web push, which can't fire in the WebView).
+
+## Pre-submission checklist (from the 2026-06-11 App Store review pass)
+- [ ] **Demo account in Review Notes** (REQUIRED — sign-in-only paywalled app):
+      give a working email + password for an account with an active/comped sub.
+- [ ] **Review Notes** also list the native features so it doesn't read as a
+      bare website: voice meal logging (mic), progress/meal photos (camera +
+      library), daily coaching, community. Mitigates Guideline 4.2.
+- [ ] **App Privacy label** in ASC: declare email, health/fitness inputs
+      (weight, waist, photos), and usage. (The binary's PrivacyInfo manifest is
+      correct as-is; the label is a separate ASC questionnaire.)
+- [ ] **Privacy Policy URL** = `https://rivenmethod.com/privacy`.
+- [ ] Build with **current Xcode** (iOS 18 SDK) — required regardless of the
+      13.0 deployment target.
+- [ ] Optional cleanup: `UIRequiredDeviceCapabilities` in Info.plist is the
+      Capacitor default `armv7`; `arm64` is the modern value.
 
 ## Notes
 - The shell loads the LIVE site, so every web deploy updates the app instantly —

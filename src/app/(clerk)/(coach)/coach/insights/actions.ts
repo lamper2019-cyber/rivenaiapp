@@ -319,7 +319,7 @@ Followers: ${cc?.account.followers ?? "?"} · Reach 7d: ${cc?.account.reach7d ??
 Pattern read: ${cc?.pattern ?? "—"}
 Format note: ${cc?.formatNote ?? "—"}
 Type clusters: ${(cc?.clusters ?? []).map((c) => `${c.key}(n=${c.count}, avgReach=${c.avgReach}, trials=${c.trials}, trend=${c.trend})`).join(" · ") || "—"}
-SWOT — S: ${cc?.swot.strengths.join(" / ") || "—"} | W: ${cc?.swot.weaknesses.join(" / ") || "—"} | O: ${cc?.swot.opportunities.join(" / ") || "—"} | T: ${cc?.swot.threats.join(" / ") || "—"}
+All-time winners (by follows + profile visits + link taps): ${(cc?.winners ?? []).map((w) => `"${w.hook}" (follows=${w.follows}, visits=${w.profileVisits}, taps=${w.linkTaps})`).join(" · ") || "—"}
 
 == POSTS (newest-first metrics) ==
 ${postLines || "(no posts synced)"}

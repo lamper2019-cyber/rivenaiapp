@@ -5,7 +5,8 @@
  *
  * Pure read + arithmetic over our own DB (the cron fills the tables), PLUS the
  * derived intelligence layer: a per-post verdict (win/ok/flop), pattern
- * clusters (which content TYPE wins), and an auto SWOT for the strategy read.
+ * clusters (which content TYPE wins), and the all-time winners — the posts
+ * that drove follows + profile visits + link taps — each with a remix play.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -23,6 +24,8 @@ export type PostCard = {
   saved: number;
   shares: number;
   avgWatchSec: number | null; // null for non-reels
+  follows: number; // new followers IG credited to this post
+  profileVisits: number; // profile visits this post drove
   linkTaps: number;
   quizStarts: number;
   trials: number;
@@ -43,11 +46,23 @@ export type Cluster = {
   trend: "up" | "flat" | "down";
 };
 
-export type Swot = {
-  strengths: string[];
-  weaknesses: string[];
-  opportunities: string[];
-  threats: string[];
+/**
+ * An "all-time winner" — a post that drove the three signals Sean cares most
+ * about: follows + profile visits + link taps. Each carries a concrete remix
+ * play so the leaderboard answers "make more like this — here's how."
+ */
+export type Winner = {
+  igId: string;
+  hook: string; // the scroll-stopping line (or caption fallback)
+  contentType: string | null;
+  permalink: string | null;
+  dateLabel: string;
+  follows: number;
+  profileVisits: number;
+  linkTaps: number;
+  winScore: number; // composite of the three signals
+  driver: "follows" | "profile visits" | "link taps"; // the strongest signal
+  remix: string; // how to remix it — one concrete play in Sean's voice
 };
 
 export type CommandCenter = {
@@ -61,7 +76,7 @@ export type CommandCenter = {
   pattern: string | null;
   clusters: Cluster[];
   formatNote: string | null; // reels vs images one-liner
-  swot: Swot;
+  winners: Winner[]; // all-time winners by follows + profile visits + link taps
 };
 
 function scorePost(p: { reach: number; linkTaps: number; quizStarts: number; trials: number }): number {
@@ -113,10 +128,8 @@ export async function buildCommandCenter(): Promise<CommandCenter> {
     reach7d: account?.reach7d ?? null,
     qualifiedDmsWeek: account?.qualifiedDmsWeek ?? null,
   };
-  const emptySwot: Swot = { strengths: [], weaknesses: [], opportunities: [], threats: [] };
-
   if (posts.length === 0) {
-    return { hasData: false, account: acct, posts: [], pattern: null, clusters: [], formatNote: null, swot: emptySwot };
+    return { hasData: false, account: acct, posts: [], pattern: null, clusters: [], formatNote: null, winners: [] };
   }
 
   const reaches = posts.map((p) => p.metrics[0]?.reach ?? 0).sort((a, b) => a - b);
@@ -126,6 +139,8 @@ export async function buildCommandCenter(): Promise<CommandCenter> {
     const m = p.metrics[0];
     const reach = m?.reach ?? 0;
     const avgWatchSec = m?.avgWatchTimeMs != null ? Math.round((m.avgWatchTimeMs / 1000) * 10) / 10 : null;
+    const follows = m?.follows ?? 0;
+    const profileVisits = m?.profileVisits ?? 0;
     const linkTaps = m?.linkTaps ?? 0;
     const quizStarts = m?.quizStarts ?? 0;
     const trials = m?.trials ?? 0;
@@ -141,6 +156,8 @@ export async function buildCommandCenter(): Promise<CommandCenter> {
       saved: m?.saved ?? 0,
       shares: m?.shares ?? 0,
       avgWatchSec,
+      follows,
+      profileVisits,
       linkTaps,
       quizStarts,
       trials,
@@ -163,7 +180,7 @@ export async function buildCommandCenter(): Promise<CommandCenter> {
     pattern: derivePattern(cards),
     clusters,
     formatNote: formatNote(cards),
-    swot: buildSwot(cards, clusters, acct),
+    winners: buildWinners(cards),
   };
 }
 
@@ -198,41 +215,60 @@ function formatNote(cards: PostCard[]): string | null {
   return `${winner} reach further — ${r.toLocaleString()} avg (reels) vs ${i.toLocaleString()} avg (images).`;
 }
 
-/** Rule-based SWOT from the clusters + funnel reality. Honest, not generic. */
-function buildSwot(cards: PostCard[], clusters: Cluster[], acct: { followers: number | null }): Swot {
-  const totalTrials = cards.reduce((s, c) => s + c.trials, 0);
-  const totalReach = cards.reduce((s, c) => s + c.reach, 0);
-  const flops = cards.filter((c) => c.verdict === "flop").length;
-  const winnerCluster = clusters.find((c) => c.trend === "up");
-  const loserCluster = [...clusters].reverse().find((c) => c.trend === "down");
-  const untested = clusters.filter((c) => c.count <= 1).map((c) => c.key);
+/**
+ * All-time winners — the posts that drove the three signals Sean cares about
+ * most: follows, profile visits, link taps. We score each post on a composite
+ * of those three (weighted so the rarer, higher-intent actions matter more),
+ * keep the ones that actually moved a needle, and attach a concrete "remix"
+ * play built from the post's strongest signal + its content type.
+ *
+ * Weights: follows are the rarest and most valuable (someone joined the
+ * audience), link taps are pure intent (they went looking for RIVEN), profile
+ * visits are high-volume curiosity — so follows ×10, link taps ×6, visits ×1.
+ */
+function buildWinners(cards: PostCard[]): Winner[] {
+  const scored = cards
+    .map((c) => {
+      const winScore = c.follows * 10 + c.linkTaps * 6 + c.profileVisits * 1;
+      // The single signal that contributed the most to this post's score.
+      const contributions: Array<[Winner["driver"], number]> = [
+        ["follows", c.follows * 10],
+        ["link taps", c.linkTaps * 6],
+        ["profile visits", c.profileVisits * 1],
+      ];
+      const driver = contributions.sort((a, b) => b[1] - a[1])[0][0];
+      return { c, winScore, driver };
+    })
+    // A winner has to have actually driven one of the three signals.
+    .filter((x) => x.winScore > 0)
+    .sort((a, b) => b.winScore - a.winScore)
+    .slice(0, 5);
 
-  const strengths: string[] = [];
-  if (winnerCluster) strengths.push(`${cap(winnerCluster.key)} posts travel — ~${winnerCluster.avgReach.toLocaleString()} avg reach.`);
-  if (totalTrials > 0) strengths.push(`Your content is converting — ${totalTrials} trial${totalTrials === 1 ? "" : "s"} traced to posts.`);
-  if (strengths.length === 0) strengths.push("Consistent posting — the data engine is running.");
-
-  const weaknesses: string[] = [];
-  if (loserCluster) weaknesses.push(`${cap(loserCluster.key)} posts underperform — ~${loserCluster.avgReach.toLocaleString()} avg reach, ${loserCluster.trials} trials.`);
-  if (flops > 0) weaknesses.push(`${flops} post${flops === 1 ? "" : "s"} flopped — weak hooks or early drop-off.`);
-  const savesNoTrials = cards.filter((c) => c.saved > 5 && c.trials === 0).length;
-  if (savesNoTrials > 0) weaknesses.push(`${savesNoTrials} post${savesNoTrials === 1 ? "" : "s"} earned saves but 0 trials — no clear next step.`);
-
-  const opportunities: string[] = [];
-  if (untested.length) opportunities.push(`${untested.map(cap).join(" & ")} barely tested — room to explore what lands.`);
-  opportunities.push("Add a link sticker to Stories → real per-post attribution (not just bio).");
-  opportunities.push("Cultural-food angle (Sunday dinner, soul food) — high ICP fit, underused.");
-
-  const threats: string[] = [];
-  if (totalReach > 0 && totalTrials === 0) threats.push("Reach is happening but 0 trials traced — top-of-funnel leak.");
-  threats.push("Only one link source (bio) — most per-post attribution is blind.");
-  if ((acct.followers ?? 0) > 0) threats.push("Token rotation due ~late July — sync stops if it lapses.");
-
-  return { strengths, weaknesses, opportunities, threats };
+  return scored.map(({ c, winScore, driver }) => ({
+    igId: c.igId,
+    hook: c.hook || c.caption,
+    contentType: c.contentType,
+    permalink: c.permalink,
+    dateLabel: c.publishedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    follows: c.follows,
+    profileVisits: c.profileVisits,
+    linkTaps: c.linkTaps,
+    winScore,
+    driver,
+    remix: remixPlay(c, driver),
+  }));
 }
 
-function cap(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+/** The concrete "make more like this" play, built from what actually drove it. */
+function remixPlay(c: PostCard, driver: Winner["driver"]): string {
+  const type = c.contentType ? `${c.contentType} ` : "";
+  if (driver === "follows") {
+    return `Pulled ${c.follows} new follower${c.follows === 1 ? "" : "s"} — this ${type}angle makes people want IN. Remix it: keep the structure, swap in a fresh transformation story so it lands brand-new.`;
+  }
+  if (driver === "link taps") {
+    return `Drove ${c.linkTaps} link tap${c.linkTaps === 1 ? "" : "s"} — strongest intent you've got. Remix it: keep the close, rewrite the hook around a different pain point (cravings, Sunday dinner, the scale).`;
+  }
+  return `Sent ${c.profileVisits} to your profile — strong curiosity, thin next step. Remix it: same opener, then add a clear "link in bio" close so the visits turn into taps.`;
 }
 
 function derivePattern(cards: PostCard[]): string | null {

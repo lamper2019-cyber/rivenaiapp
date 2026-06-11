@@ -92,6 +92,7 @@ export async function syncInstagram(): Promise<SyncResult> {
           plays: ins.plays ?? null,
           avgWatchTimeMs: ins.avgWatchTimeMs ?? null,
           totalWatchTimeMs: ins.totalWatchTimeMs ?? null,
+          follows: ins.follows ?? null,
           profileVisits: ins.profileVisits ?? null,
           // Prefer IG's own link-tap count; PostHog taps are the funnel-side
           // truth, so we store PostHog's when present.

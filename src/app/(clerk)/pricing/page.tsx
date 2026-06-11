@@ -167,11 +167,15 @@ export default async function PricingPage({
             </Link>
           ) : isNativeApp ? (
             <div className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest px-6 py-5 text-center">
+              {/* Apple 3.1.1: inside the app we must NOT steer users to an
+                  external purchase mechanism — so no website name, no "start
+                  your plan there" CTA. Just state that billing lives outside
+                  the app and let them sign in once active. */}
               <p className="font-body text-body-md text-charcoal">
-                Your RIVEN membership is managed on the web.
+                Your RIVEN membership is managed outside the app.
               </p>
               <p className="font-body text-label-md text-on-surface-variant mt-1">
-                Visit rivenmethod.com to start or manage your plan.
+                Once your plan is active, sign in to start using RIVEN.
               </p>
             </div>
           ) : signedIn ? (
