@@ -104,6 +104,7 @@ model User {
   dayPicks           DayPick[]
   mealDislikes       MealDislike[]
   coachFlags         CoachFlag[]
+  dailyAnswers       DailyAnswer[]
   contentSubmissions ContentSubmission[]
   chatMessages       ChatMessage[]          @relation("ChatRecipient")
   sentChatMessages   ChatMessage[]          @relation("ChatSender")
@@ -146,6 +147,12 @@ model Profile {
   // this column existed don't get marched through the tutorial; new
   // profile rows from onboarding/actions.ts explicitly set tutorialStep: 0.
   tutorialStep Int @default(5)
+
+  // "Share my wins to the Circle" — when on, milestone moments (weigh-in
+  // streaks, comebacks, plan eats) auto-post to the community AS BEHAVIOR,
+  // never numbers (her weight never leaves her screen). Default ON; the
+  // toggle lives on /profile.
+  shareToCircle Boolean @default(true)
 
   // Duolingo-style streak protection. Each client starts with one freeze;
   // when she misses a day mid-streak the engine can spend a freeze to keep
@@ -348,6 +355,10 @@ model CommunityPost {
   authorColor String
   kind        String // walk | meal | win | heavy | note
   text        String    @db.Text
+  /// Null = she typed/tapped it herself. Set = the app posted it for her
+  /// (auto-share): e.g. "weigh_streak_7:2026-06-12". Doubles as the dedup
+  /// key so a milestone never posts twice.
+  source      String?
   createdAt   DateTime  @default(now())
   hiddenAt    DateTime? // set when auto-hidden by reports (or by coach)
   reportCount Int       @default(0)
@@ -357,6 +368,26 @@ model CommunityPost {
 
   @@index([createdAt])
   @@index([hiddenAt])
+  @@index([authorId, source])
+}
+
+/// One member's answer to the daily Circle question (the question content
+/// itself lives in code — src/lib/daily-question-bank.ts — keyed by date,
+/// same pattern as the meal bank). One row per member per day.
+model DailyAnswer {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day         DateTime @db.Date
+  questionKey String
+  /// Option key when she tapped a chip; null when she wrote her own.
+  choice      String?
+  /// Her own words when she tapped "Mine…"; null for chip answers.
+  body        String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, day])
+  @@index([day])
 }
 
 model CommunityHeart {

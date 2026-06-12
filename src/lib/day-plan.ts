@@ -636,4 +636,9 @@ export async function eatDaySlot(
     update: { mealId, locked: true, eatenAt: now },
     create: { userId, day: today, slot, mealId, locked: true, eatenAt: now },
   });
+
+  // Auto-share to The Circle (venue eats always; home eats dinner only;
+  // one plan-eat post per day). Best-effort — never breaks the log.
+  const { maybeSharePlanEat } = await import("@/lib/circle-auto-share");
+  await maybeSharePlanEat(userId, meal, slot).catch(() => {});
 }

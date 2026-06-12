@@ -8,6 +8,7 @@ import { Sparkline } from "@/components/sparkline";
 import { startOfCentralMonth } from "@/lib/dates";
 import { DeleteAccountButton } from "./delete-account-button";
 import { CalorieBankingToggle } from "./calorie-banking-toggle";
+import { CircleShareToggle } from "./circle-share-toggle";
 import { getMyMoodHistory, type MoodHistoryEntry } from "@/lib/daily-mood";
 import { MoodHistory } from "@/components/mood-history";
 
@@ -153,6 +154,17 @@ export default async function ProfilePage() {
             initialEnabled={profile.calorieBankingEnabled}
             dailyTarget={profile.cutCalories}
           />
+        </section>
+      )}
+
+      {/* Circle auto-share lever — milestone moments post as behavior,
+          never numbers. Default ON; this is the opt-out. */}
+      {profile && (
+        <section className="space-y-3">
+          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+            The Circle
+          </h2>
+          <CircleShareToggle initialEnabled={profile.shareToCircle} />
         </section>
       )}
 

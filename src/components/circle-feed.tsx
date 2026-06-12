@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { FeedPost, PostKind } from "@/lib/community";
+import type { DailyQuestionSnapshot } from "@/lib/daily-question";
+import { DailyQuestionCard } from "@/components/daily-question-card";
 import {
   createCirclePost,
   toggleCircleHeart,
@@ -32,9 +34,11 @@ function timeAgo(iso: string): string {
 export function CircleFeed({
   initialFeed,
   movedToday,
+  dailyQuestion,
 }: {
   initialFeed: FeedPost[];
   movedToday: number;
+  dailyQuestion: DailyQuestionSnapshot | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -65,14 +69,23 @@ export function CircleFeed({
         )}
       </header>
 
-      {/* RIVEN morning card */}
-      <div className="rounded-2xl bg-charcoal text-cream px-gutter py-4 mb-5">
-        <p className="font-body text-[10px] tracking-widest uppercase text-gold mb-1">
-          RIVEN
-        </p>
-        <p className="font-body text-body-md">
-          A tap is enough. But if today needs more words, the room is open. No rush.
-        </p>
+      {/* The room's heartbeat — today's question, pinned, with everyone's
+          answers. Replaced the static RIVEN morning card: same charcoal
+          treatment, but alive. Falls back to the old line if the question
+          fails to load. */}
+      <div className="mb-5">
+        {dailyQuestion ? (
+          <DailyQuestionCard snapshot={dailyQuestion} variant="circle" />
+        ) : (
+          <div className="rounded-2xl bg-charcoal text-cream px-gutter py-4">
+            <p className="font-body text-[10px] tracking-widest uppercase text-gold mb-1">
+              RIVEN
+            </p>
+            <p className="font-body text-body-md">
+              A tap is enough. But if today needs more words, the room is open. No rush.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Feed */}

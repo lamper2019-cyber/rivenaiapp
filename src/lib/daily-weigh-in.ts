@@ -84,6 +84,11 @@ export async function submitDailyWeight(args: {
     where: { userId: args.userId },
     data: { currentWeight: args.weight },
   });
+  // Auto-share milestone moments (streaks, comebacks, first weigh-in) to
+  // The Circle — behavior only, never her number. Best-effort: a share
+  // failure must never break the weigh-in itself.
+  const { maybeShareWeighMilestone } = await import("@/lib/circle-auto-share");
+  await maybeShareWeighMilestone(args.userId).catch(() => {});
 }
 
 export type WeeklyAverage = {

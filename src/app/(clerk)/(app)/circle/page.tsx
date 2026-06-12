@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCircleFeed, getCircleMovedToday } from "@/lib/community";
+import { getDailyQuestionSnapshot } from "@/lib/daily-question";
 import { CircleFeed } from "@/components/circle-feed";
 
 // Always fresh — it's a live room.
@@ -22,10 +23,17 @@ export default async function CirclePage() {
     .catch(() => null);
   if (!user) redirect("/onboarding");
 
-  const [feed, movedToday] = await Promise.all([
+  const [feed, movedToday, dailyQuestion] = await Promise.all([
     getCircleFeed(user.id).catch(() => []),
     getCircleMovedToday().catch(() => 0),
+    getDailyQuestionSnapshot(user.id).catch(() => null),
   ]);
 
-  return <CircleFeed initialFeed={feed} movedToday={movedToday} />;
+  return (
+    <CircleFeed
+      initialFeed={feed}
+      movedToday={movedToday}
+      dailyQuestion={dailyQuestion}
+    />
+  );
 }
