@@ -54,6 +54,49 @@ them straight into Railway's Variables tab.
 
 ---
 
+### 0. Day plan — "RIVEN already picked your day" (shipped end of 2026-06-11)
+
+The Level-3 leap: she opens /dashboard and the day's meals are already
+decided. One engine, three jobs — DECIDE (pick a dish per slot that fits
+what's left of her day), PLAN (whole day mapped breakfast→snack), ADJUST
+(flat 7-day scale trend → plan quietly runs 100 cal lighter, one sage line,
+never a "you stalled" screen).
+
+- **`src/lib/meal-bank.ts`** — 100 dishes in CODE (not DB; edit by PR):
+  22 breakfast / 26 lunch / 32 dinner / 20 snack. Culturally real (soul
+  food, Southern, Caribbean, air-fryer, restaurant smart-orders). Tags
+  drive the picker. Never recycle an id.
+- **`DayPick`** table (migration `20260611150000_add_day_pick`) — one row
+  per user/day/slot, `day @db.Date` (calendar-string compare, NOT getTime).
+  `locked=true` = she tapped Lock it in; rebalance never touches it.
+- **`src/lib/day-plan.ts`** — the brain. Lazy-builds on first dashboard
+  open (NO cron needed), rebalances unlocked slots as she logs, stable
+  across reloads, deterministic per-day variety. Trim needs 10 of last 14
+  days weighed (thin data never punishes).
+- **`src/components/day-plan-card.tsx`** — between weigh-in card and
+  Today. Collapsed = ONE hero decision (time-aware: tonight/lunch/etc.) +
+  RIVEN voice line + Lock it in / Swap. "See your full day" expands the
+  full mapped day.
+- **`riven-coach.ts`** midday/evening nudges now name the planned meal
+  ("Tonight's already picked — air-fryer wings…"), fall back to old copy
+  when no plan exists.
+- **Next moves, in order:** (1) eat-it = log-it (locked pick → one-tap
+  MealLog — the biggest gap), (2) taste memory (learn from swaps; data's
+  already captured), (3) deeper adjustment ladder, (4) grocery list,
+  (5) photo→logged, (6) optional 5am "your day's ready" build cron.
+
+**⚠️ Deploy gotchas learned shipping this:**
+- Local `.env` `DATABASE_URL` points at the DEAD old Railway Postgres —
+  prod is Neon, whose URL lives only in Railway Variables. Any prod DB
+  command must be `railway run npx prisma …`. A plain `npx prisma migrate
+  deploy` "succeeds" against the dead DB and does nothing.
+- Neon free-tier scale-to-zero can kill `prisma migrate deploy` mid-run on
+  deploy ("terminating connection due to administrator command") → deploy
+  fails, old code keeps serving. Re-trigger the deploy (empty commit) once
+  Neon is warm.
+- The build lints: `tsc --noEmit` passing is NOT enough — run
+  `npx next lint` before pushing (unused imports fail the build).
+
 ### 1. RIVEN rebrand (Sean → RIVEN in the app voice)
 
 The app no longer speaks as "Sean." The coaching persona is "RIVEN."
