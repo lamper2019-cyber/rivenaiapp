@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { startOfCentralDay } from "@/lib/dates";
 import { sendPushToUser } from "@/lib/push";
+import { getMeal } from "@/lib/meal-bank";
 
 /**
  * The RIVEN coach brain — the running implementation of the decision tree
@@ -66,17 +67,35 @@ function afternoonWeighCopy(daysSince: number | null): string | null {
   return "We still don't have today's weight. You need to weigh in today — do it before the day gets away.";
 }
 
-/** MIDDAY breakfast/food nudge — first food touch of the day. */
-function middayFoodCopy(daysSince: number | null): string | null {
+/**
+ * MIDDAY breakfast/food nudge — first food touch of the day. When the day
+ * plan exists, the nudge points at the actual planned breakfast so it reads
+ * like a coach who knows her day, not a generic reminder.
+ */
+function middayFoodCopy(
+  daysSince: number | null,
+  plannedBreakfast: string | null,
+): string | null {
   if (daysSince === 0) return null; // already logged today → silent
+  if (plannedBreakfast)
+    return `I planned ${plannedBreakfast} for you this morning. Had it — or something else? Log it.`;
   return "You need to log your breakfast. Not sure what counts? Ask me — that's what I'm here for.";
 }
 
-/** EVENING food nudge copy, by days since her last meal log (null = never). */
-function eveningFoodCopy(daysSince: number | null): string | null {
+/**
+ * EVENING food nudge copy, by days since her last meal log (null = never).
+ * The 1-day line points at tonight's planned dinner when there is one — the
+ * decision's already made, she just has to say yes.
+ */
+function eveningFoodCopy(
+  daysSince: number | null,
+  plannedDinner: string | null,
+): string | null {
   if (daysSince === 0) return null; // logged today → silent
   if (daysSince === null || daysSince === 1)
-    return "It's evening and your log's still empty. You need to log what you ate today — voice it, takes 5 seconds.";
+    return plannedDinner
+      ? `Tonight's already picked — ${plannedDinner}. Make it, log it. Done deciding.`
+      : "It's evening and your log's still empty. You need to log what you ate today — voice it, takes 5 seconds.";
   if (daysSince === 2)
     return "You haven't logged in a couple days. You need to log your food — every meal. Start with the next one.";
   if (daysSince === 3)
@@ -98,6 +117,12 @@ export async function runRivenCoach(slot: RivenSlot): Promise<RivenCoachResult> 
       id: true,
       dailyWeighIns: { orderBy: { day: "desc" }, take: 1, select: { day: true } },
       mealLogs: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+      // Today's day-plan picks (if she opened the app and the lazy build
+      // ran) — lets the food nudges reference the actual planned meal.
+      dayPicks: {
+        where: { day: today, slot: { in: ["breakfast", "dinner"] } },
+        select: { slot: true, mealId: true },
+      },
       // Today's RIVEN coaching pushes — used for the per-TRACK daily cap.
       chatMessages: {
         where: { kind: "COACH", category: { startsWith: "riven_" }, createdAt: { gte: today } },
@@ -119,14 +144,19 @@ export async function runRivenCoach(slot: RivenSlot): Promise<RivenCoachResult> 
       ? Math.round((today.getTime() - startOfCentralDay(lastMeal).getTime()) / DAY_MS)
       : null;
 
+    const plannedName = (s: "breakfast" | "dinner"): string | null => {
+      const pick = c.dayPicks.find((p) => p.slot === s);
+      return pick ? (getMeal(pick.mealId)?.name ?? null) : null;
+    };
+
     const copy =
       slot === "morning"
         ? morningWeighCopy(daysSinceWeigh)
         : slot === "afternoon"
           ? afternoonWeighCopy(daysSinceWeigh)
           : slot === "midday"
-            ? middayFoodCopy(daysSinceFood)
-            : eveningFoodCopy(daysSinceFood);
+            ? middayFoodCopy(daysSinceFood, plannedName("breakfast"))
+            : eveningFoodCopy(daysSinceFood, plannedName("dinner"));
 
     if (!copy) {
       skippedDone++;

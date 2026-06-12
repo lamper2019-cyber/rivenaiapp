@@ -101,6 +101,7 @@ model User {
   dailyTotals        DailyTotals[]
   weeklyCheckIns     WeeklyCheckIn[]
   dailyWeighIns      DailyWeighIn[]
+  dayPicks           DayPick[]
   contentSubmissions ContentSubmission[]
   chatMessages       ChatMessage[]          @relation("ChatRecipient")
   sentChatMessages   ChatMessage[]          @relation("ChatSender")
@@ -278,6 +279,26 @@ model DailyWeighIn {
   createdAt DateTime @default(now())
 
   @@unique([userId, day])
+  @@index([userId, day])
+}
+
+/// One slot of today's meal plan — "RIVEN already picked your day." mealId
+/// points into the static bank in src/lib/meal-bank.ts (no FK; the bank lives
+/// in code so Sean can edit dishes in a PR). One row per user/day/slot,
+/// lazily built the first time she opens /dashboard that day. locked=true
+/// means she tapped "Lock it in" — rebalancing never touches a locked slot.
+model DayPick {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day       DateTime @db.Date
+  slot      String // "breakfast" | "lunch" | "dinner" | "snack"
+  mealId    String
+  locked    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, day, slot])
   @@index([userId, day])
 }
 

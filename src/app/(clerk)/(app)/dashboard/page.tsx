@@ -29,6 +29,8 @@ import { CheerCeremony } from "@/components/cheer-ceremony";
 import { SundayRitual } from "@/components/sunday-ritual";
 import { DailyWeightCheckinCard, DailyWeighDone } from "@/components/daily-weight-checkin-card";
 import { getDailyWeighSnapshot, getSundayWrap } from "@/lib/daily-weigh-in";
+import { getOrBuildDayPlan } from "@/lib/day-plan";
+import { DayPlanCard } from "@/components/day-plan-card";
 import { SundayWeightWrap } from "@/components/sunday-weight-wrap";
 import { getMonthlyRecap, getYearlyRecap } from "@/lib/weight-recaps";
 import { MonthlyRecapOverlay } from "@/components/monthly-recap-overlay";
@@ -146,6 +148,17 @@ export default async function DashboardPage() {
   const proteinRemaining = profile.proteinFloor - todayTotals.protein;
   const stepRemaining = STEP_GOAL - todayTotals.steps;
 
+  // "RIVEN already picked your day" — lazy-builds today's meal plan the
+  // first time she opens the dashboard, rebalances unlocked slots against
+  // what she's actually eaten. Best-effort: a failure hides the card, never
+  // the page.
+  const dayPlan = await getOrBuildDayPlan(clientUserId, {
+    calorieTarget,
+    caloriesEaten: todayTotals.calories,
+    proteinFloor: profile.proteinFloor,
+    proteinEaten: todayTotals.protein,
+  }).catch(() => null);
+
   // pickGreeting() and the day-quote line both retired — the time-aware
   // ritual card carries the greeting + intent based on hour, and the
   // generic motivational quote didn't earn the screen space.
@@ -232,6 +245,10 @@ export default async function DashboardPage() {
 
       {/* Monthly waist/photo check-in removed per RIVEN — the daily weigh-in
           + the weekly/monthly average wraps are the whole weight story now. */}
+
+      {/* "RIVEN already picked your day" — the done-with-you surface. One
+          decision up top (tonight), the full mapped day one tap below. */}
+      {dayPlan && <DayPlanCard plan={dayPlan} />}
 
       {/* Self-hides if already installed as PWA or dismissed. */}
       <PwaInstallBanner />
