@@ -102,6 +102,8 @@ model User {
   weeklyCheckIns     WeeklyCheckIn[]
   dailyWeighIns      DailyWeighIn[]
   dayPicks           DayPick[]
+  mealDislikes       MealDislike[]
+  coachFlags         CoachFlag[]
   contentSubmissions ContentSubmission[]
   chatMessages       ChatMessage[]          @relation("ChatRecipient")
   sentChatMessages   ChatMessage[]          @relation("ChatSender")
@@ -288,18 +290,50 @@ model DailyWeighIn {
 /// lazily built the first time she opens /dashboard that day. locked=true
 /// means she tapped "Lock it in" — rebalancing never touches a locked slot.
 model DayPick {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day       DateTime  @db.Date
+  slot      String // "breakfast" | "lunch" | "dinner" | "snack"
+  mealId    String
+  locked    Boolean   @default(false)
+  /// Stamped when she taps "I ate it" — the pick was converted into a real
+  /// MealLog with the bank's macros (eat-it-logs-it). Null = not eaten via
+  /// the plan (she may still have voice-logged something separately).
+  eatenAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, day, slot])
+  @@index([userId, day])
+}
+
+/// Taste memory. Every time she swaps AWAY from a meal the counter bumps;
+/// at 3+ the picker stops offering that dish to her entirely. The cheapest
+/// 80% of taste-learning — no ML, just "she keeps saying no to fish."
+model MealDislike {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealId    String
+  count     Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, mealId])
+  @@index([userId])
+}
+
+/// One-per-day dedup for automatic coach alerts (e.g. "2 flat weeks → tell
+/// Sean once, not on every dashboard open"). kind examples: "flat2".
+model CoachFlag {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   day       DateTime @db.Date
-  slot      String // "breakfast" | "lunch" | "dinner" | "snack"
-  mealId    String
-  locked    Boolean  @default(false)
+  kind      String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@unique([userId, day, slot])
-  @@index([userId, day])
+  @@unique([userId, day, kind])
 }
 
 /// ── Community ("The Circle") — one room everyone is in. Author names/colors

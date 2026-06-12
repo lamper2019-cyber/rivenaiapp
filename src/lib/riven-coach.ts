@@ -84,18 +84,22 @@ function middayFoodCopy(
 
 /**
  * EVENING food nudge copy, by days since her last meal log (null = never).
- * The 1-day line points at tonight's planned dinner when there is one — the
- * decision's already made, she just has to say yes.
+ * Ladder of specificity: she LOCKED dinner → one-tap close ("did you eat
+ * it?"); a plan exists → point at it; otherwise the generic log nudge.
  */
 function eveningFoodCopy(
   daysSince: number | null,
   plannedDinner: string | null,
+  dinnerLockedNotEaten: boolean,
 ): string | null {
   if (daysSince === 0) return null; // logged today → silent
-  if (daysSince === null || daysSince === 1)
+  if (daysSince === null || daysSince === 1) {
+    if (dinnerLockedNotEaten && plannedDinner)
+      return `You locked in ${plannedDinner}. Did you eat it? One tap on Home and it's logged.`;
     return plannedDinner
       ? `Tonight's already picked — ${plannedDinner}. Make it, log it. Done deciding.`
       : "It's evening and your log's still empty. You need to log what you ate today — voice it, takes 5 seconds.";
+  }
   if (daysSince === 2)
     return "You haven't logged in a couple days. You need to log your food — every meal. Start with the next one.";
   if (daysSince === 3)
@@ -121,7 +125,7 @@ export async function runRivenCoach(slot: RivenSlot): Promise<RivenCoachResult> 
       // ran) — lets the food nudges reference the actual planned meal.
       dayPicks: {
         where: { day: today, slot: { in: ["breakfast", "dinner"] } },
-        select: { slot: true, mealId: true },
+        select: { slot: true, mealId: true, locked: true, eatenAt: true },
       },
       // Today's RIVEN coaching pushes — used for the per-TRACK daily cap.
       chatMessages: {
@@ -156,7 +160,13 @@ export async function runRivenCoach(slot: RivenSlot): Promise<RivenCoachResult> 
           ? afternoonWeighCopy(daysSinceWeigh)
           : slot === "midday"
             ? middayFoodCopy(daysSinceFood, plannedName("breakfast"))
-            : eveningFoodCopy(daysSinceFood, plannedName("dinner"));
+            : eveningFoodCopy(
+                daysSinceFood,
+                plannedName("dinner"),
+                c.dayPicks.some(
+                  (p) => p.slot === "dinner" && p.locked && p.eatenAt == null,
+                ),
+              );
 
     if (!copy) {
       skippedDone++;

@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { startOfCentralDay } from "@/lib/dates";
+import { sendPushToUser } from "@/lib/push";
+import { persistMealLog, type MealAnalysis } from "@/lib/meal-pipeline";
 import {
   getMeal,
   mealsForSlot,
@@ -11,12 +13,22 @@ import {
  * The day-plan brain — "RIVEN already picked your day."
  *
  * This is the Level-3 leap: she opens the app and the deciding is done.
- * Three jobs, one engine:
+ * Four jobs, one engine:
  *   DECIDE  — pick a dish per slot that fits what's left of her day
  *   PLAN    — the whole day mapped up front (breakfast → snack)
- *   ADJUST  — when her 7-day scale trend goes flat, quietly trim the plan's
- *             budget by 100 cal. Never a "you stalled" screen — the day just
- *             gets a little tighter, with one calm sage line saying why.
+ *   ADJUST  — a ladder, not a single clamp (see computeAdjustment):
+ *               1 flat week  → plan runs 100 lighter
+ *               2 flat weeks → 150 lighter + Sean gets a coach flag (push)
+ *               dropping ≥2 lb/wk → plan runs 100 HEAVIER (we lose steady,
+ *               not starving)
+ *             Never a "you stalled" screen — the day just shifts, with one
+ *             calm line saying why.
+ *   LEARN   — taste memory. Swapping away from a dish bumps MealDislike;
+ *             at 3+ the picker stops offering it to her, period.
+ *
+ * Plus the loop-closer: eatDaySlot() converts a pick into a real MealLog
+ * through the SAME pipeline as voice logging (persistMealLog), with the
+ *bank's macros as gospel. Decide → eat → logged, zero typing.
  *
  * Lazy-build: the plan is created the first time she opens /dashboard each
  * day. No cron needed — the existing riven-coach crons just reference it.
@@ -24,7 +36,8 @@ import {
  * Stability over cleverness: picks persist in DayPick and DON'T churn on
  * every reload. A slot only re-picks when (a) it has no row yet, or (b) it's
  * unlocked AND the day's eating has drifted so far that the pick no longer
- * fits (>150 cal over its share). Locked slots are hers — never touched.
+ * fits (>150 cal over its share). Locked or eaten slots are hers — never
+ * touched.
  */
 
 export type SlotState = "passed" | "hero" | "upcoming";
@@ -35,18 +48,26 @@ export type PlanSlotView = {
   /** Did she log food during this slot's Central-time window today? */
   logged: boolean;
   locked: boolean;
+  /** True once "I ate it" converted this pick into a MealLog. */
+  eaten: boolean;
   meal: Pick<MealIdea, "id" | "name" | "detail" | "calories" | "protein">;
 };
+
+export type AdjustMode = "none" | "flat1" | "flat2" | "fast";
 
 export type DayPlanView = {
   slots: PlanSlotView[];
   /** The slot whose decision is live right now (time-aware). */
   heroSlot: MealSlot;
-  /** Plan's calorie budget — her real target, minus the trim when flat. */
+  /** Plan's calorie budget — her real target, shifted by the adjust ladder. */
   planCalories: number;
   planProtein: number;
-  /** True when the flat-scale -100 trim is on today. */
-  trimmed: boolean;
+  /** Which rung of the adjustment ladder is active today. */
+  adjust: AdjustMode;
+  /** Calories still unspent against the plan budget (≥0, for display). */
+  caloriesLeft: number;
+  /** Protein still to floor (≥0). */
+  proteinLeft: number;
   /** RIVEN's one-liner on the card — why today looks the way it does. */
   voiceLine: string;
 };
@@ -69,7 +90,13 @@ const SLOT_END_HOUR: Record<MealSlot, number> = {
   snack: 24,
 };
 
-const FLAT_TRIM_CAL = 100;
+/** Adjustment ladder sizes. */
+const FLAT1_TRIM = 100;
+const FLAT2_TRIM = 150;
+const FAST_EASE = 100;
+
+/** Swapped away this many times → the picker never offers the dish again. */
+const DISLIKE_THRESHOLD = 3;
 
 function centralHour(d: Date = new Date()): number {
   return (
@@ -139,23 +166,86 @@ function rankCandidates(
 }
 
 /**
- * The ADJUST layer: is her 7-day average flat vs the week before?
- * Mirrors the Sunday-wrap math (±0.3 lb band). Only calls "flat" with at
- * least 10 of the last 14 days weighed — thin data never triggers a trim.
+ * The ADJUST ladder. Weekly averages over her last ~3 weeks of weigh-ins
+ * (same ±0.3 lb "flat" band as the Sunday wrap):
+ *   fast  — this week's avg is ≥2 lb BELOW last week's → ease up. Losing
+ *           that fast on a cut usually means under-eating; we add back.
+ *   flat2 — two consecutive flat weeks → bigger trim + coach flag.
+ *   flat1 — one flat week → the standard 100 trim.
+ * Thin data never triggers anything (≥10 weigh-ins for flat1/fast, ≥16
+ * for flat2) — we never punish a woman for not weighing.
  */
-async function isScaleFlat(userId: string): Promise<boolean> {
+async function computeAdjustment(
+  userId: string,
+): Promise<{ mode: AdjustMode; delta: number }> {
   const rows = await prisma.dailyWeighIn.findMany({
     where: { userId },
     orderBy: { day: "desc" },
-    take: 14,
+    take: 21,
     select: { weightLb: true },
   });
-  if (rows.length < 10) return false;
+  if (rows.length < 10) return { mode: "none", delta: 0 };
+
   const weights = rows.map((r) => r.weightLb);
-  const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
-  const thisAvg = avg(weights.slice(0, 7));
-  const lastAvg = avg(weights.slice(7));
-  return Math.abs(thisAvg - lastAvg) < 0.3;
+  const avg = (a: number[]) =>
+    a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+  const w0 = avg(weights.slice(0, 7))!;
+  const w1 = avg(weights.slice(7, 14));
+  const w2 = avg(weights.slice(14, 21));
+
+  if (w1 == null) return { mode: "none", delta: 0 };
+
+  if (w0 - w1 <= -2) return { mode: "fast", delta: +FAST_EASE };
+
+  const flatNow = Math.abs(w0 - w1) < 0.3;
+  const flatBefore = w2 != null && Math.abs(w1 - w2) < 0.3;
+  if (flatNow && flatBefore && rows.length >= 16)
+    return { mode: "flat2", delta: -FLAT2_TRIM };
+  if (flatNow) return { mode: "flat1", delta: -FLAT1_TRIM };
+  return { mode: "none", delta: 0 };
+}
+
+/**
+ * Two flat weeks → Sean hears about it, ONCE a week max (CoachFlag dedup),
+ * so the auto-trim never silently replaces the human. Best-effort: a flag
+ * failure never blocks the plan.
+ */
+async function flagCoachFlat2(userId: string): Promise<void> {
+  const today = startOfCentralDay();
+  const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const recent = await prisma.coachFlag.findFirst({
+    where: { userId, kind: "flat2", day: { gte: weekAgo } },
+    select: { id: true },
+  });
+  if (recent) return;
+
+  try {
+    await prisma.coachFlag.create({
+      data: { userId, day: today, kind: "flat2" },
+    });
+  } catch {
+    return; // unique race — someone else flagged in parallel, fine
+  }
+
+  const [profile, coaches] = await Promise.all([
+    prisma.profile.findUnique({
+      where: { userId },
+      select: { name: true },
+    }),
+    prisma.user.findMany({ where: { role: "COACH" }, select: { id: true } }),
+  ]);
+  const name = profile?.name?.split(/\s+/)[0] ?? "A member";
+  await Promise.all(
+    coaches.map((coach) =>
+      sendPushToUser(coach.id, {
+        title: "RIVEN coach flag",
+        body: `${name}'s scale has been flat for 2 weeks. Plan auto-trimmed 150 — worth a personal check-in.`,
+        url: "/coach/messages",
+        tag: `coach-flag-flat2-${userId}`,
+      }).catch(() => {}),
+    ),
+  );
 }
 
 /** Yesterday's protein vs her floor — drives the "protein fix" voice line. */
@@ -179,12 +269,16 @@ async function proteinLowYesterday(
 
 /** RIVEN's one-liner — explicit, calm, no cheerleading. Priority order. */
 function pickVoiceLine(args: {
-  trimmed: boolean;
+  adjust: AdjustMode;
   proteinLow: boolean;
   heroSlot: MealSlot;
   caloriesLeft: number;
 }): string {
-  if (args.trimmed)
+  if (args.adjust === "fast")
+    return "You're dropping fast. I added a little back today — we lose steady, not starving.";
+  if (args.adjust === "flat2")
+    return "Two flat weeks, so I clamped down a little harder today. That's data, not a problem — Sean's been looped in.";
+  if (args.adjust === "flat1")
     return "Scale's been flat this week, so I trimmed today by 100. Small clamp — nothing drastic.";
   if (args.proteinLow)
     return "Protein came in low yesterday. Today's picks fix that — just follow the plan.";
@@ -215,21 +309,30 @@ export async function getOrBuildDayPlan(
   const hour = centralHour();
   const heroSlot = slotForHour(hour);
 
-  // ADJUST: flat scale → the plan budget (not her global target) trims 100.
-  const [trimmed, proteinLow, existing, todaysMeals] = await Promise.all([
-    isScaleFlat(userId),
-    proteinLowYesterday(userId, args.proteinFloor),
-    prisma.dayPick.findMany({
-      where: { userId, day: today },
-      select: { slot: true, mealId: true, locked: true },
-    }),
-    prisma.mealLog.findMany({
-      where: { userId, createdAt: { gte: today } },
-      select: { createdAt: true },
-    }),
-  ]);
+  const [adjustment, proteinLow, existing, todaysMeals, dislikes] =
+    await Promise.all([
+      computeAdjustment(userId),
+      proteinLowYesterday(userId, args.proteinFloor),
+      prisma.dayPick.findMany({
+        where: { userId, day: today },
+        select: { slot: true, mealId: true, locked: true, eatenAt: true },
+      }),
+      prisma.mealLog.findMany({
+        where: { userId, createdAt: { gte: today } },
+        select: { createdAt: true },
+      }),
+      prisma.mealDislike.findMany({
+        where: { userId, count: { gte: DISLIKE_THRESHOLD } },
+        select: { mealId: true },
+      }),
+    ]);
 
-  const planCalories = args.calorieTarget - (trimmed ? FLAT_TRIM_CAL : 0);
+  // Two flat weeks → make sure Sean knows (deduped to 1x/week inside).
+  if (adjustment.mode === "flat2") {
+    flagCoachFlat2(userId).catch(() => {});
+  }
+
+  const planCalories = args.calorieTarget + adjustment.delta;
 
   // Which slot windows has she actually logged food in today?
   const loggedSlots = new Set<MealSlot>(
@@ -238,33 +341,42 @@ export async function getOrBuildDayPlan(
 
   const bySlot = new Map(existing.map((p) => [p.slot as MealSlot, p]));
   const usedIds = new Set(existing.map((p) => p.mealId));
+  // Taste memory — dishes she's swapped away 3+ times never come back.
+  const neverOffer = new Set(dislikes.map((d) => d.mealId));
+  // (Array.from, not spread — Set spread trips downlevelIteration.)
+  const excluded = () =>
+    new Set([...Array.from(usedIds), ...Array.from(neverOffer)]);
 
   // Slots still in play (their window hasn't closed). Passed slots keep
   // whatever pick they had — they're history now, not decisions.
   const upcoming = SLOTS.filter((s) => SLOT_END_HOUR[s] > hour || s === heroSlot);
 
+  // A slot is settled (untouchable) once locked OR eaten.
+  const isSettled = (p: { locked: boolean; eatenAt: Date | null } | undefined) =>
+    !!p && (p.locked || p.eatenAt != null);
+
   // What's genuinely left to allocate: the plan budget minus what she's
-  // eaten minus calories already committed to LOCKED upcoming picks.
-  const lockedUpcoming = upcoming
+  // eaten minus calories already committed to SETTLED upcoming picks.
+  const settledUpcoming = upcoming
     .map((s) => bySlot.get(s))
-    .filter((p): p is NonNullable<typeof p> => !!p && p.locked);
-  const lockedCal = lockedUpcoming.reduce(
+    .filter((p): p is NonNullable<typeof p> => isSettled(p));
+  const settledCal = settledUpcoming.reduce(
     (sum, p) => sum + (getMeal(p.mealId)?.calories ?? 0),
     0,
   );
-  const lockedProtein = lockedUpcoming.reduce(
+  const settledProtein = settledUpcoming.reduce(
     (sum, p) => sum + (getMeal(p.mealId)?.protein ?? 0),
     0,
   );
 
-  const openSlots = upcoming.filter((s) => !bySlot.get(s)?.locked);
+  const openSlots = upcoming.filter((s) => !isSettled(bySlot.get(s)));
   const openWeight = openSlots.reduce((sum, s) => sum + SLOT_WEIGHT[s], 0);
   const budgetLeft = Math.max(
-    planCalories - args.caloriesEaten - lockedCal,
+    planCalories - args.caloriesEaten - settledCal,
     250 * openSlots.length, // floor: never plan a slot below something real
   );
   const proteinGap = Math.max(
-    args.proteinFloor - args.proteinEaten - lockedProtein,
+    args.proteinFloor - args.proteinEaten - settledProtein,
     0,
   );
 
@@ -276,10 +388,13 @@ export async function getOrBuildDayPlan(
     const current = bySlot.get(slot);
     const currentMeal = current ? getMeal(current.mealId) : null;
 
-    // Keep a standing pick unless it's drifted out of fit. Stability —
-    // the card shouldn't reshuffle every time she opens the app.
+    // Keep a standing pick unless it's drifted out of fit or she's since
+    // 3-strike-disliked it. Stability — the card shouldn't reshuffle every
+    // time she opens the app.
     const stillFits =
-      currentMeal !== null && currentMeal.calories <= slotBudget + 150;
+      currentMeal !== null &&
+      currentMeal.calories <= slotBudget + 150 &&
+      !neverOffer.has(currentMeal.id);
     if (current && stillFits) continue;
 
     if (currentMeal) usedIds.delete(currentMeal.id);
@@ -289,13 +404,13 @@ export async function getOrBuildDayPlan(
       slotBudget,
       proteinGap / Math.max(openSlots.length, 1),
       seed,
-      usedIds,
+      excluded(),
     );
     const pick = ranked[0];
     if (!pick) continue;
     usedIds.add(pick.id);
     writes.push({ slot, mealId: pick.id });
-    bySlot.set(slot, { slot, mealId: pick.id, locked: false });
+    bySlot.set(slot, { slot, mealId: pick.id, locked: false, eatenAt: null });
   }
 
   // Slots with no row at all that already PASSED today (she opened the app
@@ -309,13 +424,13 @@ export async function getOrBuildDayPlan(
       planCalories * SLOT_WEIGHT[slot],
       0,
       seed,
-      usedIds,
+      excluded(),
     );
     const pick = ranked[0];
     if (!pick) continue;
     usedIds.add(pick.id);
     writes.push({ slot, mealId: pick.id });
-    bySlot.set(slot, { slot, mealId: pick.id, locked: false });
+    bySlot.set(slot, { slot, mealId: pick.id, locked: false, eatenAt: null });
   }
 
   if (writes.length > 0) {
@@ -336,6 +451,7 @@ export async function getOrBuildDayPlan(
     const pick = bySlot.get(slot);
     const meal = pick ? getMeal(pick.mealId) : null;
     if (!pick || !meal) return null; // bank/row mismatch — card self-hides
+    const eaten = pick.eatenAt != null;
     slots.push({
       slot,
       state:
@@ -344,8 +460,9 @@ export async function getOrBuildDayPlan(
           : SLOT_END_HOUR[slot] <= hour
             ? "passed"
             : "upcoming",
-      logged: loggedSlots.has(slot),
+      logged: eaten || loggedSlots.has(slot),
       locked: pick.locked,
+      eaten,
       meal: {
         id: meal.id,
         name: meal.name,
@@ -356,17 +473,22 @@ export async function getOrBuildDayPlan(
     });
   }
 
+  const caloriesLeft = Math.max(planCalories - args.caloriesEaten, 0);
+  const proteinLeft = Math.max(args.proteinFloor - args.proteinEaten, 0);
+
   return {
     slots,
     heroSlot,
     planCalories,
     planProtein: args.proteinFloor,
-    trimmed,
+    adjust: adjustment.mode,
+    caloriesLeft,
+    proteinLeft,
     voiceLine: pickVoiceLine({
-      trimmed,
+      adjust: adjustment.mode,
       proteinLow,
       heroSlot,
-      caloriesLeft: planCalories - args.caloriesEaten,
+      caloriesLeft,
     }),
   };
 }
@@ -385,8 +507,13 @@ export async function lockDaySlot(
 
 /**
  * Swap a slot to the next-best candidate (cycles through the ranked list,
- * skipping meals already used elsewhere today). Swapping unlocks — she's
- * re-deciding, so the new pick waits for her "Lock it in" again.
+ * skipping meals already used elsewhere today AND her 3-strike dislikes).
+ * Swapping unlocks — she's re-deciding, so the new pick waits for her
+ * "Lock it in" again.
+ *
+ * LEARN: every swap-away bumps MealDislike for the dish she rejected. At
+ * 3+ the picker stops offering it entirely. The cheapest taste-learning
+ * there is — she teaches RIVEN by using the app normally.
  */
 export async function swapDaySlot(
   userId: string,
@@ -395,18 +522,27 @@ export async function swapDaySlot(
   const today = startOfCentralDay();
   const todayKey = today.toISOString().slice(0, 10);
 
-  const picks = await prisma.dayPick.findMany({
-    where: { userId, day: today },
-    select: { slot: true, mealId: true },
-  });
+  const [picks, dislikes] = await Promise.all([
+    prisma.dayPick.findMany({
+      where: { userId, day: today },
+      select: { slot: true, mealId: true },
+    }),
+    prisma.mealDislike.findMany({
+      where: { userId, count: { gte: DISLIKE_THRESHOLD } },
+      select: { mealId: true },
+    }),
+  ]);
   const current = picks.find((p) => p.slot === slot);
   if (!current) return;
 
-  const usedElsewhere = new Set(
-    picks.filter((p) => p.slot !== slot).map((p) => p.mealId),
-  );
+  const skip = new Set([
+    ...picks.filter((p) => p.slot !== slot).map((p) => p.mealId),
+    ...dislikes.map((d) => d.mealId),
+  ]);
   const seed = daySeed(userId, todayKey, slot);
-  const pool = mealsForSlot(slot).filter((m) => !usedElsewhere.has(m.id));
+  const pool = mealsForSlot(slot).filter(
+    (m) => !skip.has(m.id) || m.id === current.mealId,
+  );
   if (pool.length < 2) return;
 
   // Same deterministic rotation the picker uses, so "next" is stable: find
@@ -416,8 +552,88 @@ export async function swapDaySlot(
   const idx = rotated.findIndex((m) => m.id === current.mealId);
   const next = rotated[(idx + 1) % rotated.length];
 
-  await prisma.dayPick.update({
+  await Promise.all([
+    prisma.dayPick.update({
+      where: { userId_day_slot: { userId, day: today, slot } },
+      data: { mealId: next.id, locked: false },
+    }),
+    // Taste memory write — she just said "not this" to the current dish.
+    prisma.mealDislike.upsert({
+      where: { userId_mealId: { userId, mealId: current.mealId } },
+      update: { count: { increment: 1 } },
+      create: { userId, mealId: current.mealId },
+    }),
+  ]);
+}
+
+/**
+ * EAT-IT-LOGS-IT — the loop closer. Converts a pick into a real MealLog
+ * through the same pipeline as voice logging (persistMealLog → DailyTotals
+ * recompute), with the bank's macros as gospel. No Claude call, no typing.
+ *
+ * `overrideMealId` is the eating-out path: "That's what I got" at Wingstop
+ * repoints the slot to the venue order and logs it in one move.
+ *
+ * Idempotent: a slot already eaten today is a no-op (double-tap safe).
+ */
+export async function eatDaySlot(
+  userId: string,
+  slot: MealSlot,
+  overrideMealId?: string,
+): Promise<void> {
+  const today = startOfCentralDay();
+
+  const existing = await prisma.dayPick.findUnique({
     where: { userId_day_slot: { userId, day: today, slot } },
-    data: { mealId: next.id, locked: false },
+    select: { mealId: true, eatenAt: true },
+  });
+  if (existing?.eatenAt) return;
+
+  const mealId = overrideMealId ?? existing?.mealId;
+  if (!mealId) throw new Error("No pick to log for this slot.");
+  const meal = getMeal(mealId);
+  if (!meal) throw new Error("Unknown meal.");
+
+  // Bank macros are gospel: protein is known; fat/carbs estimated from the
+  // remaining calories (45/55 split — typical for these dishes). Honest
+  // bookkeeping, not precision theater.
+  const proteinCal = meal.protein * 4;
+  const remainder = Math.max(meal.calories - proteinCal, 0);
+  const fat = Math.round((remainder * 0.45) / 9);
+  const carbs = Math.round((remainder * 0.55) / 4);
+
+  const analysis: MealAnalysis = {
+    calories: meal.calories,
+    protein: meal.protein,
+    fat,
+    carbs,
+    shortName: meal.name.slice(0, 80),
+    items: [
+      {
+        name: meal.name.slice(0, 60),
+        calories: meal.calories,
+        protein: meal.protein,
+        fat,
+        carbs,
+      },
+    ],
+    processedFlag: false,
+    flagReason: "",
+    coaching: meal.venue
+      ? "Smart order. You ate out and stayed on plan — that's the skill."
+      : "Plan executed. That's how steady wins.",
+  };
+
+  await persistMealLog({
+    userId,
+    description: `${meal.name} — ${meal.detail} (from today's plan)`,
+    analysis,
+  });
+
+  const now = new Date();
+  await prisma.dayPick.upsert({
+    where: { userId_day_slot: { userId, day: today, slot } },
+    update: { mealId, locked: true, eatenAt: now },
+    create: { userId, day: today, slot, mealId, locked: true, eatenAt: now },
   });
 }

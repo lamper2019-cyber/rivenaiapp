@@ -1,23 +1,28 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   lockDaySlotAction,
   swapDaySlotAction,
+  ateDaySlotAction,
+  ateVenueMealAction,
 } from "@/app/(clerk)/(app)/dashboard/day-plan-actions";
 import type { DayPlanView, PlanSlotView } from "@/lib/day-plan";
-import type { MealSlot } from "@/lib/meal-bank";
+import { VENUES, venueMeals, type MealIdea, type MealSlot } from "@/lib/meal-bank";
 
 /**
  * The day-plan card — "RIVEN already picked your day." Sits on /dashboard
  * between the daily weigh-in and the Today targets.
  *
- * Two depths, one component:
+ * Three faces, one component:
  *   collapsed — ONE decision: the hero slot (tonight, usually) with RIVEN's
- *               one-liner, Lock it in, and Swap. Peaceful discipline.
- *   expanded  — the full mapped day (B): passed slots muted, hero held in
- *               gold, upcoming slots swappable. Her call which depth she sees.
+ *               one-liner, Lock it in / I ate it, and Swap.
+ *   expanded  — the full mapped day: passed slots muted, hero held in gold,
+ *               upcoming slots swappable.
+ *   eating out — the same card flips to venue chips + the smart order that
+ *               fits what's left of her day. "That's what I got" logs it.
  */
 
 const SLOT_LABEL: Record<MealSlot, string> = {
@@ -35,38 +40,161 @@ const HERO_EYEBROW: Record<MealSlot, string> = {
   snack: "Tonight's snack",
 };
 
+const OUT_LINK_LABEL: Record<MealSlot, string> = {
+  breakfast: "Grabbing breakfast out?",
+  lunch: "Eating out for lunch?",
+  dinner: "Eating out tonight?",
+  snack: "Out somewhere?",
+};
+
 export function DayPlanCard({ plan }: { plan: DayPlanView }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [mode, setMode] = useState<"plan" | "out">("plan");
+  const [venue, setVenue] = useState<string | null>(null);
+  const [orderIdx, setOrderIdx] = useState(0);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const hero = plan.slots.find((s) => s.state === "hero") ?? plan.slots[0];
 
-  function lock(slot: MealSlot) {
+  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
     setError(null);
     startTransition(async () => {
-      const r = await lockDaySlotAction({ slot });
+      const r = await action();
       if (!r.ok) {
-        setError(r.error);
+        setError(r.error ?? "Something went sideways. Try again.");
         return;
       }
       router.refresh();
     });
   }
 
-  function swap(slot: MealSlot) {
-    setError(null);
-    startTransition(async () => {
-      const r = await swapDaySlotAction({ slot });
-      if (!r.ok) {
-        setError(r.error);
-        return;
-      }
-      router.refresh();
+  const lock = (slot: MealSlot) => run(() => lockDaySlotAction({ slot }));
+  const swap = (slot: MealSlot) => run(() => swapDaySlotAction({ slot }));
+  const ate = (slot: MealSlot) => run(() => ateDaySlotAction({ slot }));
+  const ateOut = (slot: MealSlot, mealId: string) =>
+    run(() => ateVenueMealAction({ slot, mealId }));
+
+  // Venue orders ranked against what's actually left of her day: the best
+  // order is the biggest one that still FITS (small overshoot tolerated);
+  // orders that blow the budget rank by how far over they go.
+  const venueOrders = useMemo<MealIdea[]>(() => {
+    if (!venue) return [];
+    const left = plan.caloriesLeft;
+    return [...venueMeals(venue)].sort((a, b) => {
+      const over = (m: MealIdea) => Math.max(m.calories - (left + 80), 0);
+      const score = (m: MealIdea) =>
+        over(m) > 0 ? 100_000 + over(m) * 2 : (left + 80 - m.calories) - m.protein * 3;
+      return score(a) - score(b);
     });
+  }, [venue, plan.caloriesLeft]);
+
+  const order = venueOrders.length
+    ? venueOrders[orderIdx % venueOrders.length]
+    : null;
+
+  /* ── Eating-out face ─────────────────────────────────────────────── */
+  if (mode === "out") {
+    return (
+      <section
+        aria-label="Eating out — the smart order"
+        className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-5 shadow-elevation-1 space-y-4"
+      >
+        <div className="flex items-baseline justify-between">
+          <p className="font-body text-label-md tracking-widest uppercase text-gold">
+            Eating out
+          </p>
+          <p className="font-body text-label-sm text-on-surface-variant">
+            {plan.caloriesLeft.toLocaleString()} cal left today
+          </p>
+        </div>
+
+        <div>
+          <p className="font-body text-label-sm text-on-surface-variant mb-2">
+            Where are you?
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {VENUES.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => {
+                  setVenue(v.id);
+                  setOrderIdx(0);
+                }}
+                className={`rounded-full px-4 py-2 font-body text-label-sm transition-all active:scale-95 ${
+                  venue === v.id
+                    ? "bg-charcoal text-cream"
+                    : "bg-transparent text-charcoal border border-outline-variant"
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {order && (
+          <div className="rounded-md bg-surface-container-lowest border border-gold/60 px-gutter py-4 space-y-3">
+            <p className="font-body text-label-md tracking-widest uppercase text-gold">
+              Get this — it fits
+            </p>
+            <div>
+              <p className="font-display text-headline-sm text-charcoal leading-snug">
+                {order.name}
+              </p>
+              <p className="font-body text-label-sm text-on-surface-variant mt-1">
+                {order.detail}
+              </p>
+              <p className="font-body text-label-sm text-charcoal mt-1">
+                ~{order.calories} cal · {order.protein}g protein
+                {order.calories <= plan.caloriesLeft + 80
+                  ? " · fits what's left"
+                  : " · runs over — eat light the rest of the day"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => ateOut(hero.slot, order.id)}
+              disabled={pending}
+              className="block w-full bg-charcoal text-cream py-3.5 rounded-full font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-95 disabled:opacity-50 transition-all"
+            >
+              {pending ? "Logging…" : "That's what I got — log it"}
+            </button>
+            {venueOrders.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setOrderIdx((i) => i + 1)}
+                disabled={pending}
+                className="block w-full bg-transparent text-charcoal border border-charcoal/70 py-3 rounded-full font-body text-label-md tracking-widest uppercase active:scale-95 disabled:opacity-50 transition-all"
+              >
+                Show me another order
+              </button>
+            )}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => {
+            setMode("plan");
+            setVenue(null);
+          }}
+          className="flex w-full items-center justify-center gap-1.5 border-t border-outline-variant/50 pt-3 font-body text-label-md text-on-surface-variant"
+        >
+          <span aria-hidden className="material-symbols-outlined text-[18px]">
+            arrow_back
+          </span>
+          Back to the plan
+        </button>
+
+        {error && <p className="font-body text-label-sm text-soft-red">{error}</p>}
+      </section>
+    );
   }
 
+  /* ── Plan face (collapsed A / expanded B) ────────────────────────── */
   return (
     <section
       aria-label="Your day, already planned"
@@ -103,13 +231,30 @@ export function DayPlanCard({ plan }: { plan: DayPlanView }) {
           </p>
         </div>
 
-        {hero.locked ? (
+        {hero.eaten ? (
           <p className="flex items-center gap-2 font-body text-body-md text-sage">
             <span aria-hidden className="material-symbols-outlined text-sage">
               check_circle
             </span>
-            Locked in. Make it, log it.
+            Eaten and logged. Steady wins.
           </p>
+        ) : hero.locked ? (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => ate(hero.slot)}
+              disabled={pending}
+              className="block w-full bg-charcoal text-cream py-3.5 rounded-full font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-95 disabled:opacity-50 transition-all"
+            >
+              {pending ? "Logging…" : "I ate it — log it"}
+            </button>
+            <Link
+              href="/log"
+              className="block w-full text-center bg-transparent text-charcoal border border-charcoal/70 py-3 rounded-full font-body text-label-md tracking-widest uppercase active:scale-95 transition-all"
+            >
+              Ate something else? Log it
+            </Link>
+          </div>
         ) : (
           <div className="space-y-2">
             <button
@@ -130,12 +275,33 @@ export function DayPlanCard({ plan }: { plan: DayPlanView }) {
             </button>
           </div>
         )}
+
+        {/* The quiet third door — different intent entirely: not cooking. */}
+        {!hero.eaten && (
+          <button
+            type="button"
+            onClick={() => setMode("out")}
+            className="flex w-full items-center justify-center gap-1.5 pt-1 font-body text-label-sm text-charcoal"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[18px] text-gold">
+              restaurant
+            </span>
+            {OUT_LINK_LABEL[hero.slot]}
+            <span aria-hidden className="material-symbols-outlined text-[16px] text-gold">
+              arrow_forward
+            </span>
+          </button>
+        )}
       </div>
 
-      {/* Quiet adjustment note — only when the flat-week trim is on. */}
-      {plan.trimmed && (
+      {/* Quiet adjustment note — only when the ladder moved today's budget. */}
+      {plan.adjust !== "none" && (
         <p className="rounded-md bg-sage/15 border border-sage/40 px-4 py-2.5 font-body text-label-sm text-charcoal/80">
-          Today&apos;s plan runs 100 lighter. That&apos;s data, not a problem.
+          {plan.adjust === "fast"
+            ? "Today's plan runs a little heavier — you're losing fast and we keep it steady."
+            : plan.adjust === "flat2"
+              ? "Today's plan runs 150 lighter. That's data, not a problem."
+              : "Today's plan runs 100 lighter. That's data, not a problem."}
         </p>
       )}
 
@@ -146,7 +312,7 @@ export function DayPlanCard({ plan }: { plan: DayPlanView }) {
         aria-expanded={expanded}
         className="flex w-full items-center justify-between border-t border-outline-variant/50 pt-3 font-body text-label-md text-charcoal"
       >
-        <span>{expanded ? "Just tonight" : "See your full day"}</span>
+        <span>{expanded ? "Just the next meal" : "See your full day"}</span>
         <span className="flex items-center gap-2 text-on-surface-variant">
           <span className="text-label-sm">
             {plan.planCalories.toLocaleString()} cal · {plan.planProtein}g
@@ -168,6 +334,7 @@ export function DayPlanCard({ plan }: { plan: DayPlanView }) {
               pending={pending}
               onLock={() => lock(s.slot)}
               onSwap={() => swap(s.slot)}
+              onAte={() => ate(s.slot)}
             />
           ))}
         </ul>
@@ -184,12 +351,14 @@ function DaySlotRow({
   pending,
   onLock,
   onSwap,
+  onAte,
 }: {
   row: PlanSlotView;
   isHero: boolean;
   pending: boolean;
   onLock: () => void;
   onSwap: () => void;
+  onAte: () => void;
 }) {
   const passed = row.state === "passed";
 
@@ -229,37 +398,62 @@ function DaySlotRow({
         </p>
         <p className="font-body text-label-sm text-on-surface-variant/70">
           {row.meal.calories} cal · {row.meal.protein}g
-          {row.logged ? " · logged" : row.locked ? " · locked in" : ""}
+          {row.eaten
+            ? " · eaten + logged"
+            : row.logged
+              ? " · logged"
+              : row.locked
+                ? " · locked in"
+                : ""}
         </p>
       </div>
 
-      {/* Upcoming, unlocked slots stay swappable; hero locks from up top. */}
-      {!passed && !row.logged && !row.locked && (
+      {/* Locked-not-eaten gets the one-tap log; open upcoming slots stay
+          lockable + swappable; hero handles its own buttons up top. */}
+      {!passed && !row.eaten && !row.logged && (
         <div className="flex shrink-0 items-center gap-1">
-          {!isHero && (
-            <button
-              type="button"
-              onClick={onLock}
-              disabled={pending}
-              aria-label={`Lock in ${row.meal.name}`}
-              className="rounded-full p-1.5 text-charcoal/70 active:scale-90 disabled:opacity-40 transition-all"
-            >
-              <span aria-hidden className="material-symbols-outlined text-[20px]">
-                check
-              </span>
-            </button>
+          {row.locked ? (
+            !isHero && (
+              <button
+                type="button"
+                onClick={onAte}
+                disabled={pending}
+                aria-label={`Log ${row.meal.name} as eaten`}
+                className="rounded-full p-1.5 text-sage active:scale-90 disabled:opacity-40 transition-all"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[20px]">
+                  done_all
+                </span>
+              </button>
+            )
+          ) : (
+            <>
+              {!isHero && (
+                <button
+                  type="button"
+                  onClick={onLock}
+                  disabled={pending}
+                  aria-label={`Lock in ${row.meal.name}`}
+                  className="rounded-full p-1.5 text-charcoal/70 active:scale-90 disabled:opacity-40 transition-all"
+                >
+                  <span aria-hidden className="material-symbols-outlined text-[20px]">
+                    check
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onSwap}
+                disabled={pending}
+                aria-label={`Swap ${row.meal.name}`}
+                className="rounded-full p-1.5 text-gold active:scale-90 disabled:opacity-40 transition-all"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[20px]">
+                  sync
+                </span>
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            onClick={onSwap}
-            disabled={pending}
-            aria-label={`Swap ${row.meal.name}`}
-            className="rounded-full p-1.5 text-gold active:scale-90 disabled:opacity-40 transition-all"
-          >
-            <span aria-hidden className="material-symbols-outlined text-[20px]">
-              sync
-            </span>
-          </button>
         </div>
       )}
     </li>

@@ -29,7 +29,32 @@ export type MealIdea = {
   calories: number;
   protein: number;
   tags: string[];
+  /**
+   * Set = this is a RESTAURANT smart order for the eating-out flow, tied to
+   * a venue in VENUES. Venue meals are EXCLUDED from the home day-plan
+   * rotation — they only surface when she taps "Eating out?". Calories on
+   * chain orders come from published nutrition data; the generic spots
+   * (soul-food / seafood / mexican) carry the house +20% cushion.
+   */
+  venue?: string;
 };
+
+/** The eating-out venue chips, in display order — the spots members
+ *  actually go. Add a venue here + its orders below and it's live. */
+export const VENUES: { id: string; label: string }[] = [
+  { id: "wingstop", label: "Wingstop" },
+  { id: "chick-fil-a", label: "Chick-fil-A" },
+  { id: "chipotle", label: "Chipotle" },
+  { id: "popeyes", label: "Popeyes" },
+  { id: "panda", label: "Panda Express" },
+  { id: "texas-roadhouse", label: "Texas Roadhouse" },
+  { id: "olive-garden", label: "Olive Garden" },
+  { id: "red-lobster", label: "Red Lobster" },
+  { id: "cracker-barrel", label: "Cracker Barrel" },
+  { id: "soul-food", label: "Soul food spot" },
+  { id: "seafood", label: "Seafood spot" },
+  { id: "mexican", label: "Mexican spot" },
+];
 
 export const MEAL_BANK: MealIdea[] = [
   // ── Breakfast ──────────────────────────────────────────────────────────
@@ -67,7 +92,7 @@ export const MEAL_BANK: MealIdea[] = [
   { id: "ln-red-beans-rice-cup", slot: "lunch", name: "Red beans + rice, lunch portion", detail: "One bowl with turkey sausage", calories: 480, protein: 24, tags: ["soul-food", "southern", "leftover-friendly", "one-pot"] },
   { id: "ln-chicken-noodle-soup", slot: "lunch", name: "Chicken noodle soup + roll", detail: "Big bowl, 1 roll", calories: 400, protein: 24, tags: ["one-pot", "15-min"] },
   { id: "ln-blackened-fish-sandwich", slot: "lunch", name: "Blackened fish sandwich", detail: "Grilled not fried, hold heavy sauce", calories: 470, protein: 32, tags: ["restaurant", "high-protein"] },
-  { id: "ln-chipotle-bowl", slot: "lunch", name: "Burrito bowl, double chicken", detail: "Rice, beans, double chicken, salsa — skip the queso", calories: 620, protein: 50, tags: ["restaurant", "high-protein"] },
+  { id: "ln-chipotle-bowl", slot: "lunch", name: "Burrito bowl, double chicken", detail: "Rice, beans, double chicken, salsa — skip the queso", calories: 620, protein: 50, tags: ["restaurant", "high-protein"], venue: "chipotle" },
   { id: "ln-leftover-baked-chicken", slot: "lunch", name: "Leftover baked chicken plate", detail: "Thigh + whatever sides made it to today", calories: 480, protein: 36, tags: ["leftover-friendly", "soul-food", "15-min", "high-protein"] },
   { id: "ln-egg-salad-toast", slot: "lunch", name: "Egg salad on toast", detail: "3 eggs, light mayo, 2 slices", calories: 420, protein: 22, tags: ["no-cook", "15-min"] },
   { id: "ln-chicken-quesadilla", slot: "lunch", name: "Chicken quesadilla, half order", detail: "Half quesadilla + side salad", calories: 540, protein: 32, tags: ["restaurant", "high-protein"] },
@@ -116,7 +141,7 @@ export const MEAL_BANK: MealIdea[] = [
   { id: "din-chicken-alfredo-half", slot: "dinner", name: "Chicken alfredo, half portion", detail: "Restaurant half-plate or box half for tomorrow", calories: 650, protein: 38, tags: ["restaurant", "leftover-friendly", "high-protein"] },
   { id: "din-neckbones-rice", slot: "dinner", name: "Neckbones + rice + green beans", detail: "Sunday-style, one plate", calories: 640, protein: 38, tags: ["soul-food", "southern", "high-protein"] },
   { id: "din-chicken-veggie-sheetpan", slot: "dinner", name: "Sheet-pan chicken + vegetables", detail: "Everything on one pan, oven does it", calories: 520, protein: 42, tags: ["one-pot", "leftover-friendly", "high-protein"] },
-  { id: "din-wingstop-smart-order", slot: "dinner", name: "Wing spot, the smart order", detail: "8 plain or lemon pepper, skip fries, get veggie sticks", calories: 640, protein: 50, tags: ["restaurant", "high-protein"] },
+  { id: "din-wingstop-smart-order", slot: "dinner", name: "Wing spot, the smart order", detail: "8 plain or lemon pepper, skip fries, get veggie sticks", calories: 640, protein: 50, tags: ["restaurant", "high-protein"], venue: "wingstop" },
 
   // ── Snack ──────────────────────────────────────────────────────────────
   { id: "sn-popcorn", slot: "snack", name: "Popcorn", detail: "Air-popped bag, light butter", calories: 160, protein: 4, tags: ["no-cook", "15-min"] },
@@ -139,6 +164,63 @@ export const MEAL_BANK: MealIdea[] = [
   { id: "sn-protein-bar", slot: "snack", name: "Protein bar", detail: "One from the stash", calories: 210, protein: 20, tags: ["no-cook", "15-min", "high-protein"] },
   { id: "sn-edamame-cup", slot: "snack", name: "Edamame", detail: "1 cup, sea salt, microwave bag", calories: 150, protein: 14, tags: ["15-min", "high-protein"] },
   { id: "sn-pickle-cheese-plate", slot: "snack", name: "Pickles + cheese cubes", detail: "The fridge-door plate", calories: 140, protein: 8, tags: ["no-cook", "15-min"] },
+
+  // ── Eating out — venue smart orders ────────────────────────────────────
+  // Chain numbers from published nutrition data (2026). Generic spots
+  // (soul-food / seafood / mexican) carry the +20% house cushion since
+  // there's no label to trust. Slot is "dinner" for all — the eating-out
+  // flow filters by venue, not slot, so these work at lunch too.
+
+  // Wingstop — plain classic ≈90 cal / 10g protein per wing; lemon pepper ≈120.
+  { id: "out-wingstop-6-plain", slot: "dinner", name: "6 plain classic wings + veggie sticks", detail: "Hot sauce on the side, skip the fries and the ranch", calories: 580, protein: 62, tags: ["restaurant", "high-protein"], venue: "wingstop" },
+  { id: "out-wingstop-6-lemon", slot: "dinner", name: "6 lemon pepper classic wings + veggie sticks", detail: "The flavor you want — skip the fries, that's the whole trade", calories: 760, protein: 62, tags: ["restaurant", "high-protein"], venue: "wingstop" },
+  { id: "out-wingstop-8-plain", slot: "dinner", name: "8 plain classic wings", detail: "All classic, no sides, hot sauce — protein night", calories: 720, protein: 82, tags: ["restaurant", "high-protein"], venue: "wingstop" },
+
+  // Chick-fil-A — 12-ct grilled nuggets = 200 cal / 38g (published).
+  { id: "out-cfa-grilled-nuggets", slot: "dinner", name: "12-count grilled nuggets + fruit cup", detail: "Zesty buffalo or honey mustard packet — not the ranch", calories: 290, protein: 39, tags: ["restaurant", "high-protein", "15-min"], venue: "chick-fil-a" },
+  { id: "out-cfa-grilled-sandwich", slot: "dinner", name: "Grilled chicken sandwich + side salad", detail: "Light Italian on the salad, skip the fries", calories: 560, protein: 33, tags: ["restaurant", "high-protein"], venue: "chick-fil-a" },
+  { id: "out-cfa-market-salad", slot: "dinner", name: "Market salad with grilled chicken", detail: "Half the granola, dressing on the side", calories: 430, protein: 28, tags: ["restaurant"], venue: "chick-fil-a" },
+
+  // Chipotle — chicken bowl ≈640 / 52g (published calculator).
+  { id: "out-chipotle-chicken-bowl", slot: "dinner", name: "Chicken bowl — rice, black beans, fajita veggies, salsa", detail: "Skip the queso and the chips. Lettuce free, pile it on", calories: 640, protein: 52, tags: ["restaurant", "high-protein"], venue: "chipotle" },
+  { id: "out-chipotle-double-norice", slot: "dinner", name: "Double chicken bowl, no rice", detail: "Beans, fajita veggies, salsa, little cheese — protein play", calories: 560, protein: 72, tags: ["restaurant", "high-protein"], venue: "chipotle" },
+
+  // Popeyes — blackened tenders 5pc ≈283 / 43g (published).
+  { id: "out-popeyes-blackened-5", slot: "dinner", name: "5 blackened tenders + regular red beans & rice", detail: "Blackened, not fried — that one word saves you 400", calories: 520, protein: 49, tags: ["restaurant", "high-protein"], venue: "popeyes" },
+  { id: "out-popeyes-blackened-3", slot: "dinner", name: "3 blackened tenders + red beans & rice", detail: "The lighter run — still Popeyes, still counts", calories: 410, protein: 32, tags: ["restaurant", "high-protein"], venue: "popeyes" },
+
+  // Panda Express — grilled teriyaki 275 / 33g; string bean chicken 210 (published).
+  { id: "out-panda-teriyaki-greens", slot: "dinner", name: "Grilled teriyaki chicken + super greens", detail: "Skip the rice and the orange chicken — you know why", calories: 370, protein: 39, tags: ["restaurant", "high-protein"], venue: "panda" },
+  { id: "out-panda-stringbean", slot: "dinner", name: "String bean chicken + super greens", detail: "Both sides green. Light, real, done", calories: 310, protein: 25, tags: ["restaurant"], venue: "panda" },
+
+  // Texas Roadhouse — 6oz sirloin 250 / 46g (published).
+  { id: "out-troadhouse-sirloin", slot: "dinner", name: "6 oz sirloin + green beans + house salad", detail: "Dressing on the side. Two rolls max — count them if you eat them", calories: 540, protein: 54, tags: ["restaurant", "high-protein"], venue: "texas-roadhouse" },
+  { id: "out-troadhouse-bbq-chicken", slot: "dinner", name: "Grilled BBQ chicken + sweet potato, plain", detail: "No marshmallow on the potato — butter's plenty", calories: 700, protein: 55, tags: ["restaurant", "high-protein"], venue: "texas-roadhouse" },
+
+  // Olive Garden — grilled chicken margherita ≈650 / 63g (published).
+  { id: "out-og-chicken-margherita", slot: "dinner", name: "Grilled chicken margherita", detail: "One breadstick. One. The entree's already carrying you", calories: 650, protein: 63, tags: ["restaurant", "high-protein"], venue: "olive-garden" },
+  { id: "out-og-herb-salmon", slot: "dinner", name: "Herb-grilled salmon + broccoli", detail: "Salad with dressing on the side instead of soup", calories: 580, protein: 47, tags: ["restaurant", "high-protein"], venue: "olive-garden" },
+
+  // Red Lobster — wood-grilled shrimp skewers plate ≈450 / 36g (published).
+  { id: "out-rlobster-shrimp-skewers", slot: "dinner", name: "Wood-grilled shrimp skewers + broccoli + rice", detail: "Skip the biscuit basket… okay, ONE Cheddar Bay. Count it: +160", calories: 450, protein: 36, tags: ["restaurant", "high-protein"], venue: "red-lobster" },
+  { id: "out-rlobster-grilled-salmon", slot: "dinner", name: "Grilled salmon + broccoli", detail: "Ask for it blackened if you want heat — same numbers", calories: 570, protein: 50, tags: ["restaurant", "high-protein"], venue: "red-lobster" },
+
+  // Cracker Barrel — grilled tenders plate ≈320 / 57g (published).
+  { id: "out-cbarrel-grilled-tenders", slot: "dinner", name: "Grilled chicken tenders + turnip greens + carrots", detail: "Cornbread over biscuit if you're choosing — it's smaller", calories: 560, protein: 61, tags: ["restaurant", "southern", "high-protein"], venue: "cracker-barrel" },
+  { id: "out-cbarrel-trout", slot: "dinner", name: "Lemon pepper rainbow trout + greens + green beans", detail: "Two veggie sides, no hashbrown casserole tonight", calories: 500, protein: 42, tags: ["restaurant", "southern", "high-protein"], venue: "cracker-barrel" },
+
+  // Soul food spot — no label, house cushion applied. Real plates, honest counts.
+  { id: "out-soul-baked-chicken", slot: "dinner", name: "Baked chicken plate — greens + yams", detail: "Skip the mac this round. Two pieces, dark meat's fine", calories: 700, protein: 48, tags: ["restaurant", "soul-food", "southern", "high-protein"], venue: "soul-food" },
+  { id: "out-soul-turkey-wing", slot: "dinner", name: "Smothered turkey wing — green beans + rice", detail: "Light on the gravy ladle, heavy on the green beans", calories: 680, protein: 46, tags: ["restaurant", "soul-food", "southern", "high-protein"], venue: "soul-food" },
+  { id: "out-soul-fish-plate", slot: "dinner", name: "Fried fish plate — 2 pieces + slaw", detail: "Two pieces, not three. Slaw instead of fries. That's the move", calories: 650, protein: 42, tags: ["restaurant", "soul-food", "southern"], venue: "soul-food" },
+
+  // Seafood spot — no label, house cushion applied.
+  { id: "out-seafood-boil", slot: "dinner", name: "Shrimp boil — corn + potatoes, light butter", detail: "Sauce on the side and dip — don't let them drown it", calories: 620, protein: 42, tags: ["restaurant", "high-protein"], venue: "seafood" },
+  { id: "out-seafood-grilled-plate", slot: "dinner", name: "Grilled fish plate + vegetables", detail: "Whatever's fresh, grilled not fried, double veggies", calories: 500, protein: 42, tags: ["restaurant", "high-protein"], venue: "seafood" },
+
+  // Mexican spot — no label, house cushion applied.
+  { id: "out-mex-fajitas", slot: "dinner", name: "Chicken fajitas — 2 tortillas", detail: "Two tortillas, then fork the rest. Easy on the sour cream", calories: 650, protein: 46, tags: ["restaurant", "high-protein"], venue: "mexican" },
+  { id: "out-mex-street-tacos", slot: "dinner", name: "3 chicken street tacos", detail: "Corn tortillas, onion + cilantro — skip the chips basket", calories: 520, protein: 34, tags: ["restaurant", "high-protein"], venue: "mexican" },
 ];
 
 /** Look up one meal by id. Returns null for retired/unknown ids so a stale
@@ -147,7 +229,14 @@ export function getMeal(id: string): MealIdea | null {
   return MEAL_BANK.find((m) => m.id === id) ?? null;
 }
 
-/** All meals for a slot — the picker's candidate pool. */
+/** Home-cooked candidate pool for a slot. Venue orders are excluded — they
+ *  only surface through the eating-out flow, never the home rotation. */
 export function mealsForSlot(slot: MealSlot): MealIdea[] {
-  return MEAL_BANK.filter((m) => m.slot === slot);
+  return MEAL_BANK.filter((m) => m.slot === slot && !m.venue);
+}
+
+/** All smart orders for one venue — the eating-out pool. Slot-agnostic on
+ *  purpose: a Wingstop order works at lunch as well as dinner. */
+export function venueMeals(venue: string): MealIdea[] {
+  return MEAL_BANK.filter((m) => m.venue === venue);
 }
