@@ -119,6 +119,36 @@ never a "you stalled" screen).
 - The build lints: `tsc --noEmit` passing is NOT enough — run
   `npx next lint` before pushing (unused imports fail the build).
 
+### 0.5 Circle engagement — auto-share + daily question (2026-06-12)
+
+The Circle was a separate chore for an empty room. Two fixes shipped
+(migration `20260612120000_add_circle_engagement`):
+
+**B — the app posts her wins (Strava model: the activity IS the post).**
+`src/lib/circle-auto-share.ts`, hooked into `submitDailyWeight` +
+`eatDaySlot` (best-effort, never blocks the action). Posts: weigh streak
+milestones (7/14/30, then every 30), comeback after 3+ days off,
+first-ever weigh-in, plan eats (venue always, home dinner only, max 1
+plan-eat post/day). **Iron rules: BEHAVIOR never numbers (her weight
+never posts), moments not every action.** `CommunityPost.source` is the
+dedup key. Gated by `Profile.shareToCircle` (default ON; toggle on
+/profile under "The Circle") + role CLIENT.
+
+**A — the daily question (hook on home, room as payoff).**
+28-question bank in code (`src/lib/daily-question-bank.ts`), rotates by
+Central date (4-week cycle, deterministic — no cron posts it). Answers in
+`DailyAnswer` (one row/member/day, upsert — retap to change).
+- Home: `DailyQuestionCard variant="home"` under the day-plan card —
+  one-tap chips + "Mine…" free text; once answered, "See what the room
+  said →" links to /circle. **The pull-through is the whole point.**
+- Circle: same card `variant="circle"` pinned at top with everyone's
+  answers listed by name (replaced the static RIVEN morning card).
+- **Sean must add ONE Railway cron**: route
+  `/api/cron/daily-question`, schedule `0 14 * * *` (= 9:00a CDT),
+  standard Bearer CRON_SECRET start command. It pushes ONLY members who
+  haven't answered yet — an invitation, never a nag. Suggested name:
+  "Today's Circle question".
+
 ### 1. RIVEN rebrand (Sean → RIVEN in the app voice)
 
 The app no longer speaks as "Sean." The coaching persona is "RIVEN."
