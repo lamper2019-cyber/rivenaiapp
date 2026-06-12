@@ -80,10 +80,32 @@ never a "you stalled" screen).
 - **`riven-coach.ts`** midday/evening nudges now name the planned meal
   ("Tonight's already picked — air-fryer wings…"), fall back to old copy
   when no plan exists.
-- **Next moves, in order:** (1) eat-it = log-it (locked pick → one-tap
-  MealLog — the biggest gap), (2) taste memory (learn from swaps; data's
-  already captured), (3) deeper adjustment ladder, (4) grocery list,
-  (5) photo→logged, (6) optional 5am "your day's ready" build cron.
+- **2026-06-12 level-up — all four shipped** (migration
+  `20260612090000_add_meal_feedback`):
+  - **Eat-it-logs-it:** locked pick → "I ate it — log it" → real MealLog
+    via `persistMealLog` (same pipeline as voice logging), bank macros as
+    gospel, fat/carbs estimated 45/55 from the non-protein remainder.
+    `DayPick.eatenAt` stamps it; idempotent on double-tap.
+  - **Restaurant mode:** 29 venue smart orders in the bank (`venue:` field;
+    `VENUES` list = Wingstop, Chick-fil-A, Chipotle, Popeyes, Panda,
+    Texas Roadhouse, Olive Garden, Red Lobster, Cracker Barrel + generic
+    soul-food/seafood/Mexican). Chain calories from published nutrition
+    data; generic spots +20% cushion. Venue meals are EXCLUDED from home
+    rotation (`mealsForSlot` filters them). "Eating out?" link on the card
+    → venue chips → best-fit order vs caloriesLeft → "That's what I got"
+    = repoint slot + log in one move (`ateVenueMealAction`).
+  - **Taste memory:** `MealDislike` table — every swap-away increments;
+    count ≥3 = picker never offers that dish again.
+  - **Adjustment ladder** (replaces the single flat trim): 1 flat wk →
+    −100; 2 flat wks → −150 + push to all COACH users ("worth a personal
+    check-in"), deduped to 1x/week via `CoachFlag` (userId+day+kind
+    unique); dropping ≥2 lb/wk → +100 ease ("we lose steady, not
+    starving"). Thin data (<10 weigh-ins of last 21) never triggers.
+  - Evening cron now says "You locked in X. Did you eat it? One tap" when
+    dinner is locked-not-eaten.
+- **Next moves, in order:** (1) grocery list (needs ingredient tags on the
+  bank — skipped for now per Sean), (2) optional 5am "your day's ready"
+  build cron, (3) photo→logged (Sean said NO — too costly, don't build).
 
 **⚠️ Deploy gotchas learned shipping this:**
 - Local `.env` `DATABASE_URL` points at the DEAD old Railway Postgres —
