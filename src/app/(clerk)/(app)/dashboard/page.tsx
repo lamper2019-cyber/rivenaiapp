@@ -33,6 +33,7 @@ import { getOrBuildDayPlan } from "@/lib/day-plan";
 import { DayPlanCard } from "@/components/day-plan-card";
 import { getDailyQuestionSnapshot } from "@/lib/daily-question";
 import { DailyQuestionCard } from "@/components/daily-question-card";
+import { ManualStepsCard } from "@/components/manual-steps-card";
 import { SundayWeightWrap } from "@/components/sunday-weight-wrap";
 import { getMonthlyRecap, getYearlyRecap } from "@/lib/weight-recaps";
 import { MonthlyRecapOverlay } from "@/components/monthly-recap-overlay";
@@ -150,7 +151,6 @@ export default async function DashboardPage() {
   const calorieTarget = banked.target;
   const calorieRemaining = calorieTarget - todayTotals.calories;
   const proteinRemaining = profile.proteinFloor - todayTotals.protein;
-  const stepRemaining = STEP_GOAL - todayTotals.steps;
 
   // "RIVEN already picked your day" — lazy-builds today's meal plan the
   // first time she opens the dashboard, rebalances unlocked slots against
@@ -366,17 +366,9 @@ export default async function DashboardPage() {
             }
             requireToHit
           />
-          <ProgressCard
-            label="Steps"
-            value={todayTotals.steps}
-            target={STEP_GOAL}
-            unit=""
-            remainingLabel={
-              stepRemaining > 0
-                ? `${stepRemaining.toLocaleString()} to go`
-                : `goal hit`
-            }
-          />
+          {/* Steps is now manually loggable — tap "Log" to enter today's
+              count by hand (no tracker integration). */}
+          <ManualStepsCard value={todayTotals.steps} target={STEP_GOAL} />
         </div>
       </section>
 

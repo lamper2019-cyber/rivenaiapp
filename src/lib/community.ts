@@ -19,7 +19,7 @@ export function colorForName(name: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
-export type FeedReply = { authorName: string; text: string; you: boolean };
+export type FeedReply = { id: string; authorName: string; text: string; you: boolean };
 export type FeedPost = {
   id: string;
   authorId: string;
@@ -59,7 +59,7 @@ export async function getCircleFeed(
       hearts: { select: { userId: true } },
       replies: {
         orderBy: { createdAt: "asc" },
-        select: { authorId: true, authorName: true, text: true },
+        select: { id: true, authorId: true, authorName: true, text: true },
       },
     },
   });
@@ -81,6 +81,7 @@ export async function getCircleFeed(
       youHearted: p.hearts.some((h) => h.userId === viewerUserId),
       isYou: p.authorId === viewerUserId,
       replies: p.replies.map((r) => ({
+        id: r.id,
         authorName: r.authorName,
         text: r.text,
         you: r.authorId === viewerUserId,

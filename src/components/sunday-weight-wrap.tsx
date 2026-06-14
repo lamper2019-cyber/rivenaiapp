@@ -1,7 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SundayWrap } from "@/lib/daily-weigh-in";
+
+/**
+ * Count a number up to `target` over `durationMs` once `active` is true.
+ * Ease-out so it decelerates into the final figure — the number "lands."
+ * Honors prefers-reduced-motion: those users see the final value instantly.
+ */
+function useCountUp(target: number, active: boolean, durationMs = 1100): number {
+  const [value, setValue] = useState(0);
+  const raf = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setValue(target);
+      return;
+    }
+
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min((now - start) / durationMs, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setValue(target * eased);
+      if (t < 1) raf.current = requestAnimationFrame(tick);
+      else setValue(target);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => {
+      if (raf.current) cancelAnimationFrame(raf.current);
+    };
+  }, [target, active, durationMs]);
+
+  return value;
+}
 
 /**
  * Sunday weekly wrap — full-screen, once a week. Shows her 7-day average + the
@@ -38,6 +75,9 @@ export function SundayWeightWrap({ wrap }: { wrap: SundayWrap }) {
     };
   }, [visible]);
 
+  // Drive the count-up only once the overlay is actually on screen.
+  const animatedAvg = useCountUp(wrap.thisAvg, visible);
+
   if (!visible) return null;
 
   function dismiss() {
@@ -57,9 +97,10 @@ export function SundayWeightWrap({ wrap }: { wrap: SundayWrap }) {
         Your week
       </p>
 
-      {/* The average + the trend arrow */}
-      <p className="font-display text-display-lg text-charcoal leading-none">
-        {wrap.thisAvg.toFixed(1)}
+      {/* The average + the trend arrow. The number counts up on reveal —
+          tabular-nums so the digits don't jitter while it climbs. */}
+      <p className="font-display text-display-lg text-charcoal leading-none tabular-nums">
+        {animatedAvg.toFixed(1)}
         <span className="font-body text-headline-sm text-on-surface-variant/70 ml-2">
           lb avg
         </span>

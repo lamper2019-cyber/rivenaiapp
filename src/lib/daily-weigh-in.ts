@@ -91,6 +91,90 @@ export async function submitDailyWeight(args: {
   await maybeShareWeighMilestone(args.userId).catch(() => {});
 }
 
+export type WeighHistoryRow = {
+  /** YYYY-MM-DD (Central calendar day) — the stable key edits/deletes use. */
+  day: string;
+  weightLb: number;
+  /** True for today's row — UI labels it "Today". */
+  isToday: boolean;
+};
+
+/**
+ * Her full weigh-in history, newest first, for the account editor. Default
+ * 90 days is plenty to scroll; she can correct any of them.
+ */
+export async function getWeighHistory(
+  userId: string,
+  take = 90,
+): Promise<WeighHistoryRow[]> {
+  const rows = await prisma.dailyWeighIn.findMany({
+    where: { userId },
+    orderBy: { day: "desc" },
+    take,
+    select: { day: true, weightLb: true },
+  });
+  const todayKey = centralDateKey();
+  return rows.map((r) => {
+    const day = r.day.toISOString().slice(0, 10);
+    return { day, weightLb: r.weightLb, isToday: day === todayKey };
+  });
+}
+
+/** UTC instant that stores as the given YYYY-MM-DD in a @db.Date column.
+ *  Noon UTC keeps the date portion stable in every timezone. */
+function dateColFromKey(dayKey: string): Date {
+  return new Date(`${dayKey}T12:00:00Z`);
+}
+
+/** Re-sync Profile.currentWeight to her most recent remaining weigh-in.
+ *  Called after any edit/delete so downstream surfaces never read a stale
+ *  number (e.g. after deleting today's row). */
+async function resyncCurrentWeight(userId: string): Promise<void> {
+  const latest = await prisma.dailyWeighIn.findFirst({
+    where: { userId },
+    orderBy: { day: "desc" },
+    select: { weightLb: true },
+  });
+  if (latest) {
+    await prisma.profile.update({
+      where: { userId },
+      data: { currentWeight: latest.weightLb },
+    });
+  }
+}
+
+/**
+ * Add or correct one day's weight (the account editor — re-log a typo, or
+ * backfill a day she missed). Upsert by (user, day). Deliberately does NOT
+ * fire the Circle auto-share: corrections and backfills aren't live "I just
+ * weighed in" moments. Re-syncs currentWeight after.
+ */
+export async function setWeighForDay(args: {
+  userId: string;
+  dayKey: string;
+  weight: number;
+}): Promise<void> {
+  const day = dateColFromKey(args.dayKey);
+  await prisma.dailyWeighIn.upsert({
+    where: { userId_day: { userId: args.userId, day } },
+    update: { weightLb: args.weight },
+    create: { userId: args.userId, day, weightLb: args.weight },
+  });
+  await resyncCurrentWeight(args.userId);
+}
+
+/** Delete one day's weigh-in (logged it by mistake). Re-syncs currentWeight. */
+export async function deleteWeighForDay(args: {
+  userId: string;
+  dayKey: string;
+}): Promise<void> {
+  const day = dateColFromKey(args.dayKey);
+  await prisma.dailyWeighIn
+    .delete({ where: { userId_day: { userId: args.userId, day } } })
+    .catch(() => {}); // already gone → fine
+  await resyncCurrentWeight(args.userId);
+}
+
 export type WeeklyAverage = {
   /** Rounded 7-day average weight. */
   avg: number;

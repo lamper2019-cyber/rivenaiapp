@@ -9,6 +9,8 @@ import { startOfCentralMonth } from "@/lib/dates";
 import { DeleteAccountButton } from "./delete-account-button";
 import { CalorieBankingToggle } from "./calorie-banking-toggle";
 import { CircleShareToggle } from "./circle-share-toggle";
+import { getWeighHistory, type WeighHistoryRow } from "@/lib/daily-weigh-in";
+import { WeightLogEditor } from "./weight-log-editor";
 import { getMyMoodHistory, type MoodHistoryEntry } from "@/lib/daily-mood";
 import { MoodHistory } from "@/components/mood-history";
 
@@ -35,6 +37,7 @@ export default async function ProfilePage() {
     waist: number;
   } | null = null;
   let moodHistory: MoodHistoryEntry[] = [];
+  let weighHistory: WeighHistoryRow[] = [];
 
   const monthStart = startOfCentralMonth();
 
@@ -49,7 +52,7 @@ export default async function ProfilePage() {
       subscriptionStatus = user?.subscriptionStatus ?? null;
 
       if (user) {
-        [checkIns, monthCheckIn, moodHistory] = await Promise.all([
+        [checkIns, monthCheckIn, moodHistory, weighHistory] = await Promise.all([
           prisma.weeklyCheckIn.findMany({
             where: { userId: user.id },
             orderBy: { weekStart: "asc" },
@@ -62,6 +65,7 @@ export default async function ProfilePage() {
             select: { id: true, weight: true, waist: true },
           }),
           getMyMoodHistory(user.id, 30),
+          getWeighHistory(user.id, 90),
         ]);
       }
 
@@ -154,6 +158,17 @@ export default async function ProfilePage() {
             initialEnabled={profile.calorieBankingEnabled}
             dailyTarget={profile.cutCalories}
           />
+        </section>
+      )}
+
+      {/* Weight log — full editable history. Re-log a typo, backfill a
+          missed day, delete a stray. Corrections never auto-share. */}
+      {profile && (
+        <section className="space-y-3">
+          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
+            Weight log
+          </h2>
+          <WeightLogEditor history={weighHistory} />
         </section>
       )}
 

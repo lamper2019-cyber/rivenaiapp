@@ -11,6 +11,8 @@ import {
   addCircleReply,
   reportCirclePost,
   blockCircleAuthor,
+  deleteCirclePost,
+  deleteCircleReply,
 } from "@/app/(clerk)/(app)/circle/actions";
 
 const KIND_ICON: Record<PostKind, string> = {
@@ -22,6 +24,40 @@ const KIND_ICON: Record<PostKind, string> = {
 };
 const QUICK = ["I see you.", "That's steady.", "Proud of you."];
 const QUICK_HEAVY = ["I'm here.", "Holding this with you.", "Rest. We've got you."];
+
+// Varied check-in lines per tap so five "Ate well" posts in a row don't read
+// like bots. One is picked at random when she taps — same one tap, fresh words.
+const QUICK_POSTS: Record<"meal" | "walk" | "win" | "heavy", string[]> = {
+  meal: [
+    "Ate well today.",
+    "Hit my protein.",
+    "Clean plate, no drama.",
+    "Stayed on plan today.",
+  ],
+  walk: [
+    "Got my walk in.",
+    "Moved my body today.",
+    "Steps are done.",
+    "Walked it out.",
+  ],
+  win: [
+    "Small win today.",
+    "Showed up anyway.",
+    "Proud of myself today.",
+    "One better choice today.",
+  ],
+  heavy: [
+    "Heavy day. Just need to be seen.",
+    "Rough one today. Still here.",
+    "Carrying a lot today.",
+    "Not my day — but I showed up.",
+  ],
+};
+
+function pickLine(kind: keyof typeof QUICK_POSTS): string {
+  const arr = QUICK_POSTS[kind];
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
 function timeAgo(iso: string): string {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -128,10 +164,10 @@ export function CircleFeed({
                 Something on your mind? Say more…
               </button>
               <div className="grid grid-cols-4 gap-2 mt-1">
-                <QuickBtn icon="restaurant" label="Ate well" onClick={() => quickPost("meal", "Ate well today.")} disabled={pending} />
-                <QuickBtn icon="directions_walk" label="Walked" onClick={() => quickPost("walk", "Got my walk in.")} disabled={pending} />
-                <QuickBtn icon="auto_awesome" label="A win" onClick={() => quickPost("win", "Small win today.")} disabled={pending} />
-                <QuickBtn icon="rainy" label="Heavy day" heavy onClick={() => quickPost("heavy", "Heavy day. Just need to be seen.")} disabled={pending} />
+                <QuickBtn icon="restaurant" label="Ate well" onClick={() => quickPost("meal", pickLine("meal"))} disabled={pending} />
+                <QuickBtn icon="directions_walk" label="Walked" onClick={() => quickPost("walk", pickLine("walk"))} disabled={pending} />
+                <QuickBtn icon="auto_awesome" label="A win" onClick={() => quickPost("win", pickLine("win"))} disabled={pending} />
+                <QuickBtn icon="rainy" label="Heavy day" heavy onClick={() => quickPost("heavy", pickLine("heavy"))} disabled={pending} />
               </div>
             </>
           )}
@@ -166,7 +202,7 @@ function PostCard({
 
   return (
     <div
-      className={`rounded-2xl border px-gutter py-4 ${
+      className={`riven-rise-in rounded-2xl border px-gutter py-4 ${
         heavy ? "bg-soft-red/[0.06] border-soft-red/30" : "bg-white/55 border-outline-variant/50"
       }`}
     >
@@ -185,36 +221,47 @@ function PostCard({
         <span className={`material-symbols-outlined text-[18px] ${heavy ? "text-soft-red" : "text-sage"}`}>
           {KIND_ICON[post.kind]}
         </span>
-        {!post.isYou && (
-          <div className="relative">
-            <button
-              type="button"
-              aria-label="Post options"
-              onClick={() => setMenuOpen((o) => !o)}
-              className="material-symbols-outlined text-[18px] text-on-surface-variant/60"
-            >
-              more_horiz
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-6 z-10 rounded-xl bg-cream border border-outline-variant/60 shadow-elevation-2 overflow-hidden w-32">
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="Post options"
+            onClick={() => setMenuOpen((o) => !o)}
+            className="material-symbols-outlined text-[18px] text-on-surface-variant/60"
+          >
+            more_horiz
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-6 z-10 rounded-xl bg-cream border border-outline-variant/60 shadow-elevation-2 overflow-hidden w-32">
+              {post.isYou ? (
+                // Your own post — delete it (logged twice, or thought better).
                 <button
                   type="button"
-                  onClick={() => { setMenuOpen(false); act(() => reportCirclePost(post.id)); }}
-                  className="block w-full text-left px-3 py-2 font-body text-label-md text-charcoal hover:bg-charcoal/5"
-                >
-                  Report
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setMenuOpen(false); act(() => blockCircleAuthor(post.authorId)); }}
+                  onClick={() => { setMenuOpen(false); act(() => deleteCirclePost(post.id)); }}
                   className="block w-full text-left px-3 py-2 font-body text-label-md text-soft-red hover:bg-charcoal/5"
                 >
-                  Block
+                  Delete
                 </button>
-              </div>
-            )}
-          </div>
-        )}
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { setMenuOpen(false); act(() => reportCirclePost(post.id)); }}
+                    className="block w-full text-left px-3 py-2 font-body text-label-md text-charcoal hover:bg-charcoal/5"
+                  >
+                    Report
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setMenuOpen(false); act(() => blockCircleAuthor(post.authorId)); }}
+                    className="block w-full text-left px-3 py-2 font-body text-label-md text-soft-red hover:bg-charcoal/5"
+                  >
+                    Block
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <p className="font-body text-body-md text-charcoal mt-2.5 leading-relaxed">{post.text}</p>
@@ -270,11 +317,24 @@ function PostCard({
 
       {post.replies.length > 0 && (
         <div className="mt-3 pt-3 border-t border-outline-variant/40 space-y-1.5">
-          {post.replies.map((r, i) => (
-            <p key={i} className="font-body text-label-md">
-              <span className={`font-semibold ${r.you ? "text-gold" : "text-charcoal"}`}>{r.authorName} </span>
-              <span className="text-on-surface-variant">{r.text}</span>
-            </p>
+          {post.replies.map((r) => (
+            <div key={r.id} className="group flex items-start justify-between gap-2">
+              <p className="font-body text-label-md">
+                <span className={`font-semibold ${r.you ? "text-gold" : "text-charcoal"}`}>{r.authorName} </span>
+                <span className="text-on-surface-variant">{r.text}</span>
+              </p>
+              {/* Delete your own reply — posted twice, or thought better of it. */}
+              {r.you && (
+                <button
+                  type="button"
+                  aria-label="Delete your reply"
+                  onClick={() => act(() => deleteCircleReply(r.id))}
+                  className="shrink-0 material-symbols-outlined text-[16px] text-on-surface-variant/50 active:scale-90 transition-transform"
+                >
+                  close
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

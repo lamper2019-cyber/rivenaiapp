@@ -107,6 +107,31 @@ export async function reportCirclePost(postId: string, reason = "reported"): Pro
   return { ok: true };
 }
 
+/** Delete your OWN post. Scoped to authorId so a leaked id can't delete
+ *  anyone else's. Cascades to its hearts + replies (schema onDelete). */
+export async function deleteCirclePost(postId: string): Promise<CircleResult> {
+  const v = await viewer();
+  if (!v) return { ok: false, error: "Not signed in." };
+  const res = await prisma.communityPost.deleteMany({
+    where: { id: postId, authorId: v.id },
+  });
+  if (res.count === 0) return { ok: false, error: "That's not yours to delete." };
+  revalidatePath("/circle");
+  return { ok: true };
+}
+
+/** Delete your OWN reply (posted twice, or thought better of it). */
+export async function deleteCircleReply(replyId: string): Promise<CircleResult> {
+  const v = await viewer();
+  if (!v) return { ok: false, error: "Not signed in." };
+  const res = await prisma.communityReply.deleteMany({
+    where: { id: replyId, authorId: v.id },
+  });
+  if (res.count === 0) return { ok: false, error: "That's not yours to delete." };
+  revalidatePath("/circle");
+  return { ok: true };
+}
+
 /** Block an author — their posts vanish from this viewer's feed. */
 export async function blockCircleAuthor(authorId: string): Promise<CircleResult> {
   const v = await viewer();
