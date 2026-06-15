@@ -8,6 +8,7 @@ import {
   swapDaySlotAction,
   ateDaySlotAction,
   ateVenueMealAction,
+  rateYesterdayDinnerAction,
 } from "@/app/(clerk)/(app)/dashboard/day-plan-actions";
 import type { DayPlanView, PlanSlotView } from "@/lib/day-plan";
 import { VENUES, venueMeals, type MealIdea, type MealSlot } from "@/lib/meal-bank";
@@ -53,6 +54,7 @@ export function DayPlanCard({ plan }: { plan: DayPlanView }) {
   const [mode, setMode] = useState<"plan" | "out">("plan");
   const [venue, setVenue] = useState<string | null>(null);
   const [orderIdx, setOrderIdx] = useState(0);
+  const [whyOpen, setWhyOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -200,18 +202,23 @@ export function DayPlanCard({ plan }: { plan: DayPlanView }) {
       aria-label="Your day, already planned"
       className="rounded-md bg-secondary-container/40 border border-gold/40 px-gutter py-5 shadow-elevation-1 space-y-4"
     >
-      {/* RIVEN's line — the "a coach looked at your data" moment. */}
-      <div className="flex items-start gap-3">
-        <span
-          aria-hidden
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-charcoal font-display text-body-md text-cream"
-        >
-          R
-        </span>
-        <p className="font-body text-body-md text-charcoal/90 leading-snug pt-0.5">
-          {plan.voiceLine}
-        </p>
-      </div>
+      {/* The RIVEN moment — the living top of the card. Breathing avatar +
+          what RIVEN says + (when there's a real reason) one-tap chips. */}
+      <RivenMomentRow
+        moment={plan.moment}
+        pending={pending}
+        whyOpen={whyOpen}
+        onWhy={() => setWhyOpen((v) => !v)}
+        onRate={(verdict) => {
+          if (verdict === "told") {
+            // Record it so the moment doesn't re-ask, then open the chat.
+            run(() => rateYesterdayDinnerAction({ verdict }));
+            router.push("/chat");
+            return;
+          }
+          run(() => rateYesterdayDinnerAction({ verdict }));
+        }}
+      />
 
       {/* The hero decision. */}
       <div className="rounded-md bg-surface-container-lowest border border-outline-variant/60 px-gutter py-4 space-y-3">
@@ -342,6 +349,78 @@ export function DayPlanCard({ plan }: { plan: DayPlanView }) {
 
       {error && <p className="font-body text-label-sm text-soft-red">{error}</p>}
     </section>
+  );
+}
+
+/**
+ * The RIVEN moment — the breathing top of the card. The avatar carries the
+ * gold breath halo (riven-coach-breath); `line` is what RIVEN says; chips are
+ * her one-tap answers (only when there's a real reason). "Why?" reveals the
+ * explainer inline; the rest route to real actions via onRate.
+ */
+function RivenMomentRow({
+  moment,
+  pending,
+  whyOpen,
+  onWhy,
+  onRate,
+}: {
+  moment: DayPlanView["moment"];
+  pending: boolean;
+  whyOpen: boolean;
+  onWhy: () => void;
+  onRate: (verdict: "good" | "heavy" | "told") => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden
+          className="riven-coach-breath flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-charcoal font-display text-body-md text-cream"
+        >
+          R
+        </span>
+        <p className="font-body text-body-md text-charcoal/90 leading-snug pt-0.5">
+          {moment.line}
+        </p>
+      </div>
+
+      {moment.chips.length > 0 && (
+        <div className="flex flex-wrap gap-2 pl-10">
+          {moment.chips.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                c.key === "why"
+                  ? onWhy()
+                  : onRate(
+                      c.key === "felt_good"
+                        ? "good"
+                        : c.key === "too_heavy"
+                          ? "heavy"
+                          : "told",
+                    )
+              }
+              className={`rounded-full px-4 py-2 font-body text-label-sm tracking-wide transition-transform active:scale-95 disabled:opacity-50 ${
+                c.primary
+                  ? "bg-charcoal text-cream"
+                  : "bg-transparent text-charcoal border border-charcoal/70"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {whyOpen && moment.why && (
+        <p className="pl-10 font-body text-label-sm text-on-surface-variant leading-relaxed">
+          {moment.why}
+        </p>
+      )}
+    </div>
   );
 }
 

@@ -64,8 +64,8 @@ export async function getCircleFeed(
     },
   });
 
-  // Newest-first from the DB → reverse so the freshest post is at the bottom,
-  // next to the composer (chat-style).
+  // Newest-first — the freshest post sits at the TOP of the feed, right under
+  // the composer (social-feed style, not chat-style).
   return posts
     .map((p): FeedPost => ({
       id: p.id,
@@ -86,8 +86,7 @@ export async function getCircleFeed(
         text: r.text,
         you: r.authorId === viewerUserId,
       })),
-    }))
-    .reverse();
+    }));
 }
 
 /** Count of members who've moved/posted today — the header "X today" pulse. */

@@ -33,7 +33,7 @@ export function DailyQuestionCard({
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const { question, myChoice, myBody, answers, answeredCount } = snapshot;
+  const { question, myChoice, myBody } = snapshot;
   const answered = myChoice != null || myBody != null;
   const myLabel =
     myBody ??
@@ -68,14 +68,9 @@ export function DailyQuestionCard({
             R
           </span>
           <p className="font-body text-label-sm tracking-widest uppercase text-gold">
-            The Circle · today
+            RIVEN asked
           </p>
         </div>
-        {answeredCount > 0 && (
-          <p className="font-body text-label-sm text-cream/60">
-            {answeredCount} answered
-          </p>
-        )}
       </div>
 
       <p className="font-display text-headline-sm text-cream leading-snug">
@@ -143,27 +138,29 @@ export function DailyQuestionCard({
         </p>
       )}
 
-      {/* HOME: the pull-through into the room. CIRCLE: the room itself. */}
+      {/* HOME: answering pulls her into the Circle. CIRCLE: RIVEN answers
+          her back — a quiet one-on-one, not a public vote. */}
       {variant === "home" ? (
         answered && (
           <Link
             href="/circle"
             className="block w-full rounded-full bg-gold py-3 text-center font-body text-label-md tracking-widest uppercase text-charcoal active:scale-95 transition-transform"
           >
-            See what the room said →
+            Take it to the Circle →
           </Link>
         )
       ) : (
-        answers.length > 0 && (
-          <div className="space-y-1.5 border-t border-cream/15 pt-3">
-            {answers.map((a, i) => (
-              <p key={i} className="font-body text-label-md">
-                <span className={`font-semibold ${a.isMine ? "text-gold" : "text-cream"}`}>
-                  {a.isMine ? "You" : a.firstName}{" "}
-                </span>
-                <span className="text-cream/70">· {a.text}</span>
-              </p>
-            ))}
+        answered && (
+          <div className="flex items-start gap-2.5 border-t border-cream/15 pt-3">
+            <span
+              aria-hidden
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gold font-display text-label-md text-charcoal"
+            >
+              R
+            </span>
+            <p className="font-body text-body-md text-cream/90 leading-snug pt-0.5">
+              Noted — that&apos;s you staying the course. Steady wins.
+            </p>
           </div>
         )
       )}

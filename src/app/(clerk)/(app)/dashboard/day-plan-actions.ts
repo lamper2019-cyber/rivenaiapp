@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { lockDaySlot, swapDaySlot, eatDaySlot } from "@/lib/day-plan";
+import {
+  lockDaySlot,
+  swapDaySlot,
+  eatDaySlot,
+  rateYesterdayDinner,
+} from "@/lib/day-plan";
 import { getMeal } from "@/lib/meal-bank";
 
 /**
@@ -101,6 +106,33 @@ export async function ateDaySlotAction(
 
   revalidatePath("/dashboard");
   revalidatePath("/log");
+  return { ok: true };
+}
+
+const RateSchema = z.object({
+  verdict: z.enum(["good", "heavy", "told"]),
+});
+
+/**
+ * The "How'd it sit?" answer on the RIVEN moment. Records the rating (which
+ * tunes her future picks) and dedups the moment for the day.
+ */
+export async function rateYesterdayDinnerAction(
+  input: z.infer<typeof RateSchema>,
+): Promise<DayPlanActionResult> {
+  const parsed = RateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid answer." };
+
+  const who = await resolveDbUserId();
+  if (!who.ok) return who;
+
+  try {
+    await rateYesterdayDinner(who.userId, parsed.data.verdict);
+  } catch {
+    return { ok: false, error: "Couldn't save that. Try again." };
+  }
+
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 

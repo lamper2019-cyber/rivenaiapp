@@ -55,6 +55,24 @@ export type PlanSlotView = {
 
 export type AdjustMode = "none" | "flat1" | "flat2" | "fast";
 
+/** One tappable answer on the RIVEN moment. The key routes the action. */
+export type MomentChip = { key: string; label: string; primary?: boolean };
+
+/**
+ * The RIVEN "moment" — the living top of the day-plan card. The avatar
+ * breathes; `line` is what RIVEN says; `chips` are her one-tap answers (empty
+ * on a calm day = just a warm hello). This merges the old passive voiceLine
+ * with the proactive A+B presence: same spot, now interactive when there's a
+ * real reason to be. No live AI — every chip routes to a built action.
+ */
+export type RivenMoment = {
+  kind: "calm" | "flat" | "feedback";
+  line: string;
+  chips: MomentChip[];
+  /** Explainer revealed inline by the "Why?" chip (flat moment only). */
+  why: string | null;
+};
+
 export type DayPlanView = {
   slots: PlanSlotView[];
   /** The slot whose decision is live right now (time-aware). */
@@ -70,6 +88,8 @@ export type DayPlanView = {
   proteinLeft: number;
   /** RIVEN's one-liner on the card — why today looks the way it does. */
   voiceLine: string;
+  /** The interactive RIVEN moment that sits at the top of the card. */
+  moment: RivenMoment;
 };
 
 const SLOTS: MealSlot[] = ["breakfast", "lunch", "dinner", "snack"];
@@ -309,23 +329,44 @@ export async function getOrBuildDayPlan(
   const hour = centralHour();
   const heroSlot = slotForHour(hour);
 
-  const [adjustment, proteinLow, existing, todaysMeals, dislikes] =
-    await Promise.all([
-      computeAdjustment(userId),
-      proteinLowYesterday(userId, args.proteinFloor),
-      prisma.dayPick.findMany({
-        where: { userId, day: today },
-        select: { slot: true, mealId: true, locked: true, eatenAt: true },
-      }),
-      prisma.mealLog.findMany({
-        where: { userId, createdAt: { gte: today } },
-        select: { createdAt: true },
-      }),
-      prisma.mealDislike.findMany({
-        where: { userId, count: { gte: DISLIKE_THRESHOLD } },
-        select: { mealId: true },
-      }),
-    ]);
+  // Yesterday (Central) — for the "how'd it sit?" feedback moment.
+  const yday = startOfCentralDay(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const ydayKey = yday.toISOString().slice(0, 10);
+
+  const [
+    adjustment,
+    proteinLow,
+    existing,
+    todaysMeals,
+    dislikes,
+    ydayDinner,
+    ydayRated,
+  ] = await Promise.all([
+    computeAdjustment(userId),
+    proteinLowYesterday(userId, args.proteinFloor),
+    prisma.dayPick.findMany({
+      where: { userId, day: today },
+      select: { slot: true, mealId: true, locked: true, eatenAt: true },
+    }),
+    prisma.mealLog.findMany({
+      where: { userId, createdAt: { gte: today } },
+      select: { createdAt: true },
+    }),
+    prisma.mealDislike.findMany({
+      where: { userId, count: { gte: DISLIKE_THRESHOLD } },
+      select: { mealId: true },
+    }),
+    // Did she actually eat last night's planned dinner? (drives the rating ask)
+    prisma.dayPick.findFirst({
+      where: { userId, day: yday, slot: "dinner", eatenAt: { not: null } },
+      select: { mealId: true },
+    }),
+    // Already rated it? (dedup — the rating writes this category)
+    prisma.chatMessage.findFirst({
+      where: { userId, category: `riven_mealfeedback_${ydayKey}` },
+      select: { id: true },
+    }),
+  ]);
 
   // Two flat weeks → make sure Sean knows (deduped to 1x/week inside).
   if (adjustment.mode === "flat2") {
@@ -476,6 +517,45 @@ export async function getOrBuildDayPlan(
   const caloriesLeft = Math.max(planCalories - args.caloriesEaten, 0);
   const proteinLeft = Math.max(args.proteinFloor - args.proteinEaten, 0);
 
+  const voiceLine = pickVoiceLine({
+    adjust: adjustment.mode,
+    proteinLow,
+    heroSlot,
+    caloriesLeft,
+  });
+
+  // The RIVEN moment — the living top of the card. Priority:
+  //   1. "How'd it sit?" — she ate last night's dinner and hasn't rated it.
+  //      The genuine question; her answer TUNES her future picks.
+  //   2. Flat-scale — RIVEN already trimmed today; offer the "why."
+  //   3. Calm — just the warm line, no chips. Presence, not a quiz.
+  const ydayMeal = ydayDinner ? getMeal(ydayDinner.mealId) : null;
+  let moment: RivenMoment;
+  if (ydayDinner && ydayMeal && !ydayRated) {
+    moment = {
+      kind: "feedback",
+      line: `You ate the ${ydayMeal.name.toLowerCase()} last night. How'd it sit?`,
+      chips: [
+        { key: "felt_good", label: "Felt good", primary: true },
+        { key: "too_heavy", label: "Too heavy" },
+        { key: "tell_riven", label: "Tell RIVEN" },
+      ],
+      why: null,
+    };
+  } else if (adjustment.mode === "flat1" || adjustment.mode === "flat2") {
+    moment = {
+      kind: "flat",
+      line: voiceLine,
+      chips: [
+        { key: "why", label: "Why?" },
+        { key: "tell_riven", label: "Tell RIVEN" },
+      ],
+      why: "When the scale holds two weeks straight, your body's adjusted to the calories. A small trim restarts the drop — no crash, no starving. That's data, not a problem.",
+    };
+  } else {
+    moment = { kind: "calm", line: voiceLine, chips: [], why: null };
+  }
+
   return {
     slots,
     heroSlot,
@@ -484,13 +564,55 @@ export async function getOrBuildDayPlan(
     adjust: adjustment.mode,
     caloriesLeft,
     proteinLeft,
-    voiceLine: pickVoiceLine({
-      adjust: adjustment.mode,
-      proteinLow,
-      heroSlot,
-      caloriesLeft,
-    }),
+    voiceLine,
+    moment,
   };
+}
+
+/**
+ * "How'd it sit?" rating on last night's dinner — the answer that teaches
+ * the meal engine. "good" keeps it in rotation (default); "heavy" bumps the
+ * dislike counter so the picker leans away from it; "told" just records that
+ * she opened the chat. Either way a dedup ChatMessage is written so the
+ * moment never re-asks for that day. No live AI.
+ */
+export async function rateYesterdayDinner(
+  userId: string,
+  verdict: "good" | "heavy" | "told",
+): Promise<void> {
+  const yday = startOfCentralDay(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const ydayKey = yday.toISOString().slice(0, 10);
+
+  const pick = await prisma.dayPick.findFirst({
+    where: { userId, day: yday, slot: "dinner", eatenAt: { not: null } },
+    select: { mealId: true },
+  });
+
+  const content =
+    verdict === "good"
+      ? "She said last night's dinner felt good — keeping it in rotation."
+      : verdict === "heavy"
+        ? "She said last night's dinner was too heavy — leaning lighter for her."
+        : "She opened the chat about last night's dinner.";
+
+  // Dedup marker (and a record Sean can see) — category keys the day.
+  await prisma.chatMessage.create({
+    data: {
+      userId,
+      role: "ASSISTANT",
+      kind: "COACH",
+      content,
+      category: `riven_mealfeedback_${ydayKey}`,
+    },
+  });
+
+  if (verdict === "heavy" && pick) {
+    await prisma.mealDislike.upsert({
+      where: { userId_mealId: { userId, mealId: pick.mealId } },
+      update: { count: { increment: 1 } },
+      create: { userId, mealId: pick.mealId },
+    });
+  }
 }
 
 /** Lock a slot — she said yes to the pick. Rebalance never touches it now. */
