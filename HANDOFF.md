@@ -119,6 +119,36 @@ never a "you stalled" screen).
 - The build lints: `tsc --noEmit` passing is NOT enough — run
   `npx next lint` before pushing (unused imports fail the build).
 
+### 0.05 RIVEN as Jarvis — orb + brief + Ask RIVEN + voice (2026-06-15)
+
+The "coach in her pocket" layer. Goal: RIVEN feels like a *presence*, not a
+screen. Text brain is always on (pennies); voice is gated to the moments
+that matter (the ~2¢ spend).
+
+- **`src/components/riven-orb.tsx`** — the living gold presence orb. States:
+  rest (breathes), alert (glows), listening (ripples), speaking (waveform).
+  Keyframes in `globals.css` (`riven-orb-*`), reduced-motion safe.
+- **`src/lib/riven-brief.ts`** — `getMorningBrief()` composes the "here's
+  your day, handled" line from her data (weekly trend + the one move). **No
+  LLM — free.** Shown in the presence header on `/dashboard`.
+- **Ask RIVEN (text brain, always on):** `src/lib/riven-ask.ts`
+  `answerForMember()` + `dashboard/ask-riven-actions.ts` `askRivenAction()`.
+  Answers her typed/spoken question from HER real numbers via Claude
+  **Sonnet** (`MEAL_LOGGING_MODEL`), system prompt cached → ~$0.003/reply.
+  Scope-guarded in the prompt: food/plan/weight only, no medical advice.
+- **`src/components/riven-presence.tsx`** — the Jarvis header on home: orb +
+  brief + "Talk to RIVEN" → a sheet with text input + mic (reuses the
+  existing `/api/chat/transcribe` Whisper pipe).
+- **Voice (gated):** `src/app/api/voice/speak/route.ts` — ElevenLabs Flash
+  TTS, rate-limited 40/min/user. Speaks the brief + RIVEN's replies. **It is
+  DORMANT until two Railway env vars are set:** `ELEVENLABS_API_KEY` and
+  `ELEVENLABS_VOICE_ID` (pick a warm, steady voice in the ElevenLabs
+  dashboard, copy its ID). Without them the route returns 503 and the UI
+  hides the speak button — text is unaffected. The `GET /api/voice/speak`
+  returns `{enabled}` so the client knows whether to show voice.
+- Cost shape: text ≈ a fraction of a cent/reply; voice ≈ 1–2¢ per spoken
+  line. Voice deliberately NOT on every reply — only the brief + the mic.
+
 ### 0.1 Home reimagined to ONE focus + Circle is now a real room (2026-06-15)
 
 Big UX shift — Sean's call: the home screen was "too much" (6+ stacked
