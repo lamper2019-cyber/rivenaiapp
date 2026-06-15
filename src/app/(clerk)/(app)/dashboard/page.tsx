@@ -12,6 +12,8 @@ import { CoachMessageBadge } from "@/components/coach-message-badge";
 import { getDailyWeighSnapshot, getSundayWrap } from "@/lib/daily-weigh-in";
 import { getOrBuildDayPlan } from "@/lib/day-plan";
 import { HomeFocus, type HomeHero } from "@/components/home-focus";
+import { getMorningBrief } from "@/lib/riven-brief";
+import { RivenPresence } from "@/components/riven-presence";
 import { SundayWeightWrap } from "@/components/sunday-weight-wrap";
 import { getMonthlyRecap, getYearlyRecap } from "@/lib/weight-recaps";
 import { MonthlyRecapOverlay } from "@/components/monthly-recap-overlay";
@@ -94,6 +96,17 @@ export default async function DashboardPage() {
       }
     : null;
 
+  // RIVEN's morning brief — the "here's your day, handled" line for the
+  // presence header. Composed from data; free. Best-effort.
+  const brief = await getMorningBrief(clientUserId, {
+    firstName,
+    weighedToday: weigh?.weighedToday ?? false,
+    proteinFloor: profile.proteinFloor,
+    proteinToday: todayTotals.protein,
+    heroMealName: hero?.name ?? null,
+    heroEaten: hero?.eaten ?? false,
+  }).catch(() => `Morning, ${firstName}. Your day's already mapped — just follow it.`);
+
   return (
     <main className="relative px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-10 space-y-6">
       <RefreshOnDayChange />
@@ -114,11 +127,9 @@ export default async function DashboardPage() {
       {/* Top-right "Message from RIVEN" pill. Self-hides with no history. */}
       <CoachMessageBadge messages={recentCoachMessages} />
 
-      <header>
-        <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal">
-          {pickGreeting(firstName)}
-        </h1>
-      </header>
+      {/* RIVEN presence — the Jarvis header: living orb + morning brief +
+          Talk-to-RIVEN (text always, voice when configured). */}
+      <RivenPresence brief={brief} firstName={firstName} />
 
       {/* THE one focus + her quiet numbers. Everything else moved off home. */}
       <HomeFocus
@@ -152,21 +163,6 @@ export default async function DashboardPage() {
 }
 
 /* ──────────────────────────────────────────────────────────── */
-
-function pickGreeting(name: string): string {
-  const hour = parseInt(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Chicago",
-      hour: "numeric",
-      hour12: false,
-    }).format(new Date()),
-    10,
-  );
-  if (hour < 5) return `Up early, ${name}.`;
-  if (hour < 12) return `Good morning, ${name}.`;
-  if (hour < 18) return `Afternoon, ${name}.`;
-  return `Evening, ${name}.`;
-}
 
 function UnauthedPlaceholder({ children }: { children: React.ReactNode }) {
   return (
