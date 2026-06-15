@@ -355,6 +355,9 @@ model CommunityPost {
   authorColor String
   kind        String // walk | meal | win | heavy | note
   text        String    @db.Text
+  /// Optional photo on the post (R2 public URL) — the plate she cooked, etc.
+  /// This is what turns the room into the plate-and-recipe share.
+  imageUrl    String?
   /// Null = she typed/tapped it herself. Set = the app posted it for her
   /// (auto-share): e.g. "weigh_streak_7:2026-06-12". Doubles as the dedup
   /// key so a milestone never posts twice.

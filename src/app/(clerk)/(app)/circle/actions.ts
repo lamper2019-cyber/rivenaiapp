@@ -24,16 +24,31 @@ async function viewer(): Promise<Viewer | null> {
 
 export type CircleResult = { ok: true } | { ok: false; error: string };
 
-const PostSchema = z.object({
-  kind: z.enum(POST_KINDS),
-  text: z.string().trim().min(1).max(600),
-});
+const PostSchema = z
+  .object({
+    kind: z.enum(POST_KINDS),
+    // Text is optional WHEN there's a photo — a plate can speak for itself.
+    text: z.string().trim().max(600).optional().default(""),
+    // Only accept our own R2 public URLs (no arbitrary off-site links).
+    imageUrl: z.string().url().max(500).optional(),
+  })
+  .refine((v) => (v.text && v.text.length > 0) || v.imageUrl, {
+    message: "Say something or add a photo.",
+  });
 
 export async function createCirclePost(input: z.infer<typeof PostSchema>): Promise<CircleResult> {
   const parsed = PostSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Say a little something first." };
+  if (!parsed.success) return { ok: false, error: "Say something or add a photo." };
   const v = await viewer();
   if (!v) return { ok: false, error: "Finish onboarding to join the circle." };
+
+  // Guard the image URL host — must be our R2 public bucket, never an
+  // arbitrary link someone crafts.
+  const publicBase = process.env.R2_PUBLIC_URL ?? "";
+  const imageUrl =
+    parsed.data.imageUrl && publicBase && parsed.data.imageUrl.startsWith(publicBase)
+      ? parsed.data.imageUrl
+      : null;
 
   await prisma.communityPost.create({
     data: {
@@ -41,7 +56,8 @@ export async function createCirclePost(input: z.infer<typeof PostSchema>): Promi
       authorName: v.firstName,
       authorColor: colorForName(v.firstName),
       kind: parsed.data.kind,
-      text: parsed.data.text,
+      text: parsed.data.text ?? "",
+      imageUrl,
     },
   });
   revalidatePath("/circle");

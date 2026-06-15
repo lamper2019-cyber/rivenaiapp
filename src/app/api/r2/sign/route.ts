@@ -54,7 +54,7 @@ const BodySchema = z.object({
   fileName: z.string().min(1).max(200),
   contentType: z.string().min(1).max(100),
   contentLength: z.number().int().min(1),
-  scope: z.enum(["checkin-front", "checkin-side", "content", "chat", "voice"]),
+  scope: z.enum(["checkin-front", "checkin-side", "content", "chat", "voice", "circle"]),
 });
 
 export async function POST(req: Request) {
@@ -147,7 +147,10 @@ export async function POST(req: Request) {
   // content scope can be either image/video, chat is image-only, voice
   // is audio-only.
   if (
-    (scope === "checkin-front" || scope === "checkin-side" || scope === "chat") &&
+    (scope === "checkin-front" ||
+      scope === "checkin-side" ||
+      scope === "chat" ||
+      scope === "circle") &&
     !isImage
   ) {
     return NextResponse.json(

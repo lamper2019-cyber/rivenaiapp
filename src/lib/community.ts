@@ -27,6 +27,7 @@ export type FeedPost = {
   authorColor: string;
   kind: PostKind;
   text: string;
+  imageUrl: string | null;
   createdAt: string;
   hearts: number;
   youHearted: boolean;
@@ -76,6 +77,7 @@ export async function getCircleFeed(
         ? (p.kind as PostKind)
         : "note",
       text: p.text,
+      imageUrl: p.imageUrl,
       createdAt: p.createdAt.toISOString(),
       hearts: p.hearts.length,
       youHearted: p.hearts.some((h) => h.userId === viewerUserId),

@@ -42,9 +42,9 @@ export function CircleFeed({
   const [composeOpen, setComposeOpen] = useState(false);
   const refresh = () => startTransition(() => router.refresh());
 
-  function post(text: string) {
+  function post(text: string, imageUrl?: string) {
     startTransition(async () => {
-      await createCirclePost({ kind: "note", text });
+      await createCirclePost({ kind: "note", text, imageUrl });
       setComposeOpen(false);
       router.refresh();
     });
@@ -70,8 +70,9 @@ export function CircleFeed({
       <div className="mb-5">
         {composeOpen ? (
           <Composer
-            placeholder="Say what's on your mind…"
+            placeholder="Say what's on your mind, or show your plate…"
             disabled={pending}
+            allowPhoto
             onCancel={() => setComposeOpen(false)}
             onSend={post}
           />
@@ -81,8 +82,8 @@ export function CircleFeed({
             onClick={() => setComposeOpen(true)}
             className="w-full flex items-center gap-2 rounded-2xl border border-outline-variant/60 bg-white/55 px-4 py-3 text-left font-body text-body-md text-on-surface-variant active:scale-[0.99] transition-transform"
           >
-            <span className="material-symbols-outlined text-[20px] text-gold">edit</span>
-            Share something with the Circle…
+            <span className="material-symbols-outlined text-[20px] text-gold">photo_camera</span>
+            Share a plate or a thought…
           </button>
         )}
       </div>
@@ -91,7 +92,7 @@ export function CircleFeed({
       <div className="space-y-4">
         {initialFeed.length === 0 ? (
           <p className="font-body text-body-md text-on-surface-variant text-center py-10">
-            Quiet so far. Be the first to say something.
+            The room&apos;s open. Be the first — share a plate or what&apos;s on your mind.
           </p>
         ) : (
           initialFeed.map((p) => (
@@ -180,17 +181,31 @@ function PostCard({
         </div>
       </div>
 
-      <p className="font-body text-body-md text-charcoal mt-2.5 leading-relaxed whitespace-pre-wrap">{post.text}</p>
+      {post.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={post.imageUrl}
+          alt={`Shared by ${post.authorName}`}
+          loading="lazy"
+          className="mt-3 w-full rounded-xl border border-outline-variant/40 object-cover max-h-96"
+        />
+      )}
+
+      {post.text && (
+        <p className="font-body text-body-md text-charcoal mt-2.5 leading-relaxed whitespace-pre-wrap">{post.text}</p>
+      )}
 
       <div className="flex items-center gap-4 mt-3">
+        {/* The Circle's cheer is a rose — RIVEN's "I've got you" language. */}
         <button
           type="button"
           disabled={post.isYou || pending}
           onClick={() => act(() => toggleCircleHeart(post.id))}
+          aria-label={post.youHearted ? "Take back your rose" : "Send a rose"}
           className="flex items-center gap-1 active:scale-90 transition-transform disabled:opacity-60"
         >
-          <span className={`material-symbols-outlined text-[18px] ${post.youHearted ? "text-soft-red filled" : "text-on-surface-variant/60"}`}>
-            favorite
+          <span className={`material-symbols-outlined text-[18px] ${post.youHearted ? "text-gold filled" : "text-on-surface-variant/60"}`}>
+            local_florist
           </span>
           <span className="font-body text-label-sm text-on-surface-variant">{post.hearts}</span>
         </button>
@@ -244,11 +259,58 @@ function PostCard({
 }
 
 function Composer({
-  placeholder, onSend, onCancel, disabled,
+  placeholder, onSend, onCancel, disabled, allowPhoto,
 }: {
-  placeholder: string; onSend: (t: string) => void; onCancel: () => void; disabled?: boolean;
+  placeholder: string;
+  onSend: (t: string, imageUrl?: string) => void;
+  onCancel: () => void;
+  disabled?: boolean;
+  allowPhoto?: boolean;
 }) {
   const [text, setText] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploading, startUpload] = useTransition();
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Presigned PUT to R2 — same flow as the check-in photo upload.
+  function handleFile(file: File) {
+    setUploadError(null);
+    startUpload(async () => {
+      try {
+        const contentType = file.type || "image/jpeg";
+        const signResp = await fetch("/api/r2/sign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: file.name,
+            contentType,
+            contentLength: file.size,
+            scope: "circle",
+          }),
+        });
+        if (!signResp.ok) {
+          const d = await signResp.json().catch(() => ({}));
+          throw new Error(d.error ?? "Couldn't add that photo. Try a smaller one.");
+        }
+        const { uploadUrl, publicUrl } = (await signResp.json()) as {
+          uploadUrl: string;
+          publicUrl: string;
+        };
+        const put = await fetch(uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": contentType },
+        });
+        if (!put.ok) throw new Error("Upload failed. Check your connection and try again.");
+        setImageUrl(publicUrl);
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : "Upload failed.");
+      }
+    });
+  }
+
+  const canSend = (text.trim().length > 0 || !!imageUrl) && !disabled && !uploading;
+
   return (
     <div>
       <textarea
@@ -259,14 +321,53 @@ function Composer({
         placeholder={placeholder}
         className="w-full resize-none rounded-2xl border border-outline-variant/60 bg-surface-container-lowest px-4 py-3 font-body text-body-md text-charcoal focus:border-charcoal focus:outline-none"
       />
+
+      {imageUrl && (
+        <div className="relative mt-2 w-full">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageUrl} alt="Your photo" className="w-full rounded-xl border border-outline-variant/40 object-cover max-h-72" />
+          <button
+            type="button"
+            onClick={() => setImageUrl(null)}
+            aria-label="Remove photo"
+            className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-charcoal/80 text-cream material-symbols-outlined text-[18px]"
+          >
+            close
+          </button>
+        </div>
+      )}
+
+      {uploadError && (
+        <p className="mt-2 font-body text-label-sm text-soft-red">{uploadError}</p>
+      )}
+
       <div className="flex items-center justify-between mt-2">
-        <button type="button" onClick={onCancel} className="font-body text-label-sm text-on-surface-variant">
-          Cancel
-        </button>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={onCancel} className="font-body text-label-sm text-on-surface-variant">
+            Cancel
+          </button>
+          {allowPhoto && !imageUrl && (
+            <label className="flex items-center gap-1 font-body text-label-sm text-charcoal cursor-pointer active:opacity-70">
+              <span className="material-symbols-outlined text-[18px] text-gold">photo_camera</span>
+              {uploading ? "Adding…" : "Photo"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
+        </div>
         <button
           type="button"
-          disabled={!text.trim() || disabled}
-          onClick={() => text.trim() && onSend(text.trim())}
+          disabled={!canSend}
+          onClick={() => canSend && onSend(text.trim(), imageUrl ?? undefined)}
           className="rounded-full bg-charcoal text-cream px-6 py-2.5 font-body text-label-sm tracking-widest uppercase disabled:opacity-40 active:scale-95 transition-transform"
         >
           Share
