@@ -119,6 +119,36 @@ never a "you stalled" screen).
 - The build lints: `tsc --noEmit` passing is NOT enough — run
   `npx next lint` before pushing (unused imports fail the build).
 
+### 0.1 Home reimagined to ONE focus + Circle is now a real room (2026-06-15)
+
+Big UX shift — Sean's call: the home screen was "too much" (6+ stacked
+cards). Reworked to a **single focus** model, and the Circle stripped to a
+real conversation room.
+
+**Home (`/dashboard`) — one thing at a time.** New `src/components/home-focus.tsx`:
+ONE breathing dark card that rotates through her day via priority —
+`weigh` (slider; the day "opens" after she weighs) → `plan` (tonight's
+pick, Lock it in inline; Swap/Eating out/full day → `/plan`) → `eat`
+("Did you eat it?" one-tap log) → `done` (calm). Her cal/protein/steps sit
+in a quiet strip that taps to expand to bars + log. The dashboard was
+stripped: removed the weigh card, day-plan card, daily-question card,
+progress-card grid, manual-steps card, and the cheer/peer-wins/sunday-
+ritual stack from the home FACE (components/data still exist, just not
+rendered on home). Weight wraps + the Message-from-RIVEN pill stay.
+- **New `/plan` page** (`app/(clerk)/(app)/plan/page.tsx`) holds the full
+  `DayPlanCard` (swap, eating out, whole mapped day, the "how'd it sit?"
+  moment). Home links to it. So home stays simple, nothing's lost.
+
+**The Circle is now conversation + plates.** Stripped the category quick-
+buttons and canned cheers (stale). Newest-first. Free-text posts + replies,
+delete-your-own. **Photos** on posts (`CommunityPost.imageUrl`, migration
+`20260615090000`; `circle` R2 scope, image-only; host-checked vs
+`R2_PUBLIC_URL`). The reaction is a **gold rose** (`local_florist`) — the
+re-homed "rose" cheer language (heart retired in the Circle). Daily
+question is RIVEN one-on-one now (no public tally). Note: the old
+CheerReaction/falling-petal ceremony system is dormant (not deleted) — the
+rose reaction replaces it in spirit.
+
 ### 0.5 Circle engagement — auto-share + daily question (2026-06-12)
 
 The Circle was a separate chore for an empty room. Two fixes shipped
