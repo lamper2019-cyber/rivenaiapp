@@ -1,66 +1,8 @@
 # RIVEN — Session Handoff Context
 
-Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated **2026-06-15** — Sean set the **north star** (see the section immediately below): RIVEN becomes a conversational gold-orb assistant you *talk to*, Jarvis-style. Read the NORTH STAR section first; the dated sections under it are history.
+Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated **2026-06-11**, end of the "RIVEN rebrand + App Store prep + daily weigh-in + The Circle + coach decision tree" sprint. The newest section is directly below this line — **read the 2026-06-11 section first**; everything under it is older and may describe behavior that has since changed (notably: the coach voice is now "RIVEN," not "Sean"; weight tracking is daily, not monthly; there's a real community tab).
 
 Also read `CLAUDE.md` at the repo root — it captures the design system and Sean-voice rules in a form that auto-loads into every Claude Code session.
-
----
-
-## ★ NORTH STAR (2026-06-15) — read this first, this is the direction
-
-Sean's words: *"I want it to be like Jarvis — this back-and-forth. The brain
-needs to be built within what this is. This HTML file is how it should feel,
-exactly — the brain and all that stuff, the backend of it. Build the brain of
-everything this way, end to end. This is how it should feel from top to
-bottom."*
-
-**The spec is two HTML mockups in the repo — treat them as the source of truth
-for the feel:**
-- `docs/design/riven-orb-mockup.html` — the home screen: a big breathing
-  **gold orb** centered, ONE small assisting widget up top (protein ring +
-  calories left), a single line of RIVEN's reply under the orb, quick-tap
-  **chips** ("Baked chicken & greens", "How's my protein?"), and a
-  **"Talk to RIVEN…" bar with a mic.** Tap a chip or talk → orb goes
-  "thinking" → the macro ring animates up → RIVEN replies in one line. No
-  card stack. The orb IS the app.
-- `docs/design/riven-orb-conversations.html` — the same brain as a **chat
-  thread** across real scenarios: **Everyday** ("Morning, what'd you have for
-  breakfast?" → she answers → "that's 32g protein before 9am…"), **Weigh-in**
-  (RIVEN asks for the number → she says "216.1" → a weigh widget + the
-  reframe: "that's water, not fat; your Sunday-to-Sunday is down 1.4"),
-  **Milestone** (badge + celebration), **Out to eat** ("I'm at a restaurant,
-  help" → orders for her), **Check-in** (proactive nudge). RIVEN drives the
-  back-and-forth; she mostly just answers.
-
-**What this means concretely (the build target):**
-1. **Everything is conversation.** The home screen opens and RIVEN *asks* —
-   first thing, it asks her weight. Answer by **one tap, the slider, OR
-   typing/saying the number** — same weigh data we have now, but framed as
-   RIVEN asking, not a form. Then it asks about food, checks in, reacts. The
-   `riven-ask` brain (already built — `src/lib/riven-ask.ts`, answers from her
-   real numbers via Claude Sonnet) is the seed; **grow it into the whole home
-   experience**, not just a sheet behind a button.
-2. **The orb is the surface.** Use the existing `RivenOrb` + `riven-presence`
-   work and the mockup's orb treatment (gold, breathing, thinking state). The
-   day-plan/eat-it/adjustment brain we built stays the *engine* underneath —
-   it just gets *spoken* through the conversation instead of shown as cards.
-3. **Voice is the same back-and-forth** (already wired, gated on
-   `ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID` — see §0.05). The mockup's mic
-   = tap-to-talk; RIVEN talks back on the brief + replies.
-4. **Fonts in the mockup:** Fraunces (serif, RIVEN's voice) + Inter. Our
-   tokens are DM Serif + Plus Jakarta — keep ours unless Sean says switch;
-   the *feel* (serif speaks, sans for UI) is the point.
-
-**Scope / nav decision (Sean, explicit):** strip the bottom nav to **Home ·
-Circle · Profile** — that's it. **The Circle is parked** ("some people use it,
-most don't; I'll reimagine it later"). Do NOT invest in Circle now; keep it
-working but spend the energy on the orb/conversation brain. Profile stays.
-
-**Build order from here:** (1) make the home screen the orb + opening
-weigh-in-as-conversation, (2) route the day-plan/macros/adjustment engine
-through RIVEN's replies, (3) collapse nav to Home/Circle/Profile, (4) voice
-once the ElevenLabs keys are in. Everything below this section is the engine
-that already exists to power it.
 
 ---
 
@@ -176,66 +118,6 @@ never a "you stalled" screen).
   Neon is warm.
 - The build lints: `tsc --noEmit` passing is NOT enough — run
   `npx next lint` before pushing (unused imports fail the build).
-
-### 0.05 RIVEN as Jarvis — orb + brief + Ask RIVEN + voice (2026-06-15)
-
-The "coach in her pocket" layer. Goal: RIVEN feels like a *presence*, not a
-screen. Text brain is always on (pennies); voice is gated to the moments
-that matter (the ~2¢ spend).
-
-- **`src/components/riven-orb.tsx`** — the living gold presence orb. States:
-  rest (breathes), alert (glows), listening (ripples), speaking (waveform).
-  Keyframes in `globals.css` (`riven-orb-*`), reduced-motion safe.
-- **`src/lib/riven-brief.ts`** — `getMorningBrief()` composes the "here's
-  your day, handled" line from her data (weekly trend + the one move). **No
-  LLM — free.** Shown in the presence header on `/dashboard`.
-- **Ask RIVEN (text brain, always on):** `src/lib/riven-ask.ts`
-  `answerForMember()` + `dashboard/ask-riven-actions.ts` `askRivenAction()`.
-  Answers her typed/spoken question from HER real numbers via Claude
-  **Sonnet** (`MEAL_LOGGING_MODEL`), system prompt cached → ~$0.003/reply.
-  Scope-guarded in the prompt: food/plan/weight only, no medical advice.
-- **`src/components/riven-presence.tsx`** — the Jarvis header on home: orb +
-  brief + "Talk to RIVEN" → a sheet with text input + mic (reuses the
-  existing `/api/chat/transcribe` Whisper pipe).
-- **Voice (gated):** `src/app/api/voice/speak/route.ts` — ElevenLabs Flash
-  TTS, rate-limited 40/min/user. Speaks the brief + RIVEN's replies. **It is
-  DORMANT until two Railway env vars are set:** `ELEVENLABS_API_KEY` and
-  `ELEVENLABS_VOICE_ID` (pick a warm, steady voice in the ElevenLabs
-  dashboard, copy its ID). Without them the route returns 503 and the UI
-  hides the speak button — text is unaffected. The `GET /api/voice/speak`
-  returns `{enabled}` so the client knows whether to show voice.
-- Cost shape: text ≈ a fraction of a cent/reply; voice ≈ 1–2¢ per spoken
-  line. Voice deliberately NOT on every reply — only the brief + the mic.
-
-### 0.1 Home reimagined to ONE focus + Circle is now a real room (2026-06-15)
-
-Big UX shift — Sean's call: the home screen was "too much" (6+ stacked
-cards). Reworked to a **single focus** model, and the Circle stripped to a
-real conversation room.
-
-**Home (`/dashboard`) — one thing at a time.** New `src/components/home-focus.tsx`:
-ONE breathing dark card that rotates through her day via priority —
-`weigh` (slider; the day "opens" after she weighs) → `plan` (tonight's
-pick, Lock it in inline; Swap/Eating out/full day → `/plan`) → `eat`
-("Did you eat it?" one-tap log) → `done` (calm). Her cal/protein/steps sit
-in a quiet strip that taps to expand to bars + log. The dashboard was
-stripped: removed the weigh card, day-plan card, daily-question card,
-progress-card grid, manual-steps card, and the cheer/peer-wins/sunday-
-ritual stack from the home FACE (components/data still exist, just not
-rendered on home). Weight wraps + the Message-from-RIVEN pill stay.
-- **New `/plan` page** (`app/(clerk)/(app)/plan/page.tsx`) holds the full
-  `DayPlanCard` (swap, eating out, whole mapped day, the "how'd it sit?"
-  moment). Home links to it. So home stays simple, nothing's lost.
-
-**The Circle is now conversation + plates.** Stripped the category quick-
-buttons and canned cheers (stale). Newest-first. Free-text posts + replies,
-delete-your-own. **Photos** on posts (`CommunityPost.imageUrl`, migration
-`20260615090000`; `circle` R2 scope, image-only; host-checked vs
-`R2_PUBLIC_URL`). The reaction is a **gold rose** (`local_florist`) — the
-re-homed "rose" cheer language (heart retired in the Circle). Daily
-question is RIVEN one-on-one now (no public tally). Note: the old
-CheerReaction/falling-petal ceremony system is dormant (not deleted) — the
-rose reaction replaces it in spirit.
 
 ### 0.5 Circle engagement — auto-share + daily question (2026-06-12)
 

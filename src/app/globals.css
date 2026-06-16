@@ -140,40 +140,11 @@ body {
   animation: riven-coach-breath 2.8s ease-in-out infinite;
 }
 
-/* RIVEN presence orb — Jarvis-style living states. Warm gold, calm. */
-@keyframes riven-orb-breath {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(201,169,97,0); }
-  50% { transform: scale(1.06); box-shadow: 0 0 26px 7px rgba(201,169,97,0.42); }
-}
-.riven-orb-breath { animation: riven-orb-breath 3.4s ease-in-out infinite; }
-
-@keyframes riven-orb-alert {
-  0%, 100% { box-shadow: 0 0 16px 4px rgba(201,169,97,0.5); }
-  50% { box-shadow: 0 0 32px 11px rgba(201,169,97,0.85); }
-}
-.riven-orb-alert { animation: riven-orb-alert 1.8s ease-in-out infinite; }
-
-@keyframes riven-orb-ripple {
-  0% { transform: scale(0.7); opacity: 0.7; }
-  100% { transform: scale(2.1); opacity: 0; }
-}
-.riven-orb-ripple { animation: riven-orb-ripple 2s ease-out infinite; }
-
-@keyframes riven-orb-wave {
-  0%, 100% { transform: scaleY(0.35); }
-  50% { transform: scaleY(1); }
-}
-.riven-orb-wave { animation: riven-orb-wave 0.9s ease-in-out infinite; transform-origin: center; }
-
 @media (prefers-reduced-motion: reduce) {
   .riven-pulse-soft,
   .riven-pulse-strong,
   .riven-glow,
-  .riven-coach-breath,
-  .riven-orb-breath,
-  .riven-orb-alert,
-  .riven-orb-ripple,
-  .riven-orb-wave {
+  .riven-coach-breath {
     animation: none;
   }
 }
