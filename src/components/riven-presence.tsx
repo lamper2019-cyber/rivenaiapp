@@ -198,7 +198,7 @@ function AskSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-cream">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-cream">
       <header className="flex items-center justify-between px-container-mobile py-4 border-b border-outline-variant/40">
         <div className="flex items-center gap-2.5">
           <RivenOrb state={recording ? "listening" : pending ? "speaking" : "rest"} size="sm" />
