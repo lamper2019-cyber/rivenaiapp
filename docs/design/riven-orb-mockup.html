@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RIVEN — talk to it</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FAF7F2;
+    --charcoal:#161513;
+    --charcoal-2:#1E1C19;
+    --gold:#C9A961;
+    --gold-soft:#E3C988;
+    --line:rgba(250,247,242,0.10);
+    --muted:rgba(250,247,242,0.45);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{
+    min-height:100vh;
+    background:#0c0b0a;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Inter',system-ui,sans-serif;
+    padding:24px 12px;
+  }
+  /* phone frame */
+  .phone{
+    width:100%;max-width:380px;height:780px;max-height:90vh;
+    background:radial-gradient(120% 90% at 50% 8%, #211e1a 0%, var(--charcoal) 55%, #100f0d 100%);
+    border-radius:42px;
+    border:1px solid rgba(250,247,242,0.06);
+    box-shadow:0 40px 120px rgba(0,0,0,0.6), inset 0 0 0 8px #050505;
+    position:relative;overflow:hidden;
+    display:flex;flex-direction:column;
+    padding:54px 22px 26px;
+  }
+  .notch{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#050505;border-radius:0 0 16px 16px;}
+
+  /* header */
+  .head{display:flex;align-items:center;justify-content:space-between;}
+  .wordmark{font-family:'Fraunces',serif;font-weight:600;letter-spacing:.28em;color:var(--cream);font-size:14px;padding-left:.28em;}
+  .today{font-size:11px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;}
+
+  /* macro widget — the one assisting widget */
+  .widget{
+    margin-top:18px;
+    background:linear-gradient(180deg, rgba(250,247,242,0.05), rgba(250,247,242,0.02));
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:14px 16px;
+    display:flex;align-items:center;gap:16px;
+  }
+  .ring{position:relative;width:58px;height:58px;flex:0 0 auto;}
+  .ring svg{transform:rotate(-90deg);}
+  .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .ring .num{font-family:'Fraunces',serif;font-weight:600;color:var(--cream);font-size:15px;line-height:1;}
+  .ring .lbl{font-size:8px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;}
+  .macros{flex:1;display:flex;flex-direction:column;gap:6px;}
+  .macro-row{display:flex;align-items:baseline;justify-content:space-between;}
+  .macro-row .k{font-size:12px;color:var(--muted);}
+  .macro-row .v{font-family:'Fraunces',serif;color:var(--cream);font-size:14px;font-weight:500;}
+  .macro-row .v b{color:var(--gold-soft);font-weight:600;}
+
+  /* orb stage */
+  .stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;position:relative;}
+  .orb-wrap{position:relative;width:200px;height:200px;display:flex;align-items:center;justify-content:center;}
+  .halo{
+    position:absolute;width:200px;height:200px;border-radius:50%;
+    background:radial-gradient(circle, rgba(201,169,97,0.35) 0%, rgba(201,169,97,0.10) 45%, transparent 70%);
+    filter:blur(8px);animation:breathe 5.5s ease-in-out infinite;
+  }
+  .orb{
+    width:128px;height:128px;border-radius:50%;
+    background:
+      radial-gradient(circle at 36% 32%, #fff5df 0%, var(--gold-soft) 22%, var(--gold) 52%, #9c7e3f 78%, #6f5829 100%);
+    box-shadow:0 0 40px rgba(201,169,97,0.55), inset -8px -10px 28px rgba(80,60,20,0.65), inset 8px 8px 22px rgba(255,245,220,0.5);
+    position:relative;animation:breathe 5.5s ease-in-out infinite;
+    transition:transform .4s ease;
+  }
+  .orb::after{
+    content:"";position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(from 0deg, transparent, rgba(255,250,235,0.45), transparent 40%, rgba(201,169,97,0.3), transparent 70%);
+    mix-blend-mode:screen;animation:spin 9s linear infinite;
+  }
+  .orb::before{
+    content:"";position:absolute;top:18%;left:24%;width:34px;height:24px;border-radius:50%;
+    background:rgba(255,252,245,0.7);filter:blur(6px);
+  }
+  .phone.thinking .orb{transform:scale(1.06);animation-duration:1.6s;}
+  .phone.thinking .halo{animation-duration:1.6s;}
+
+  /* reply text */
+  .reply{
+    min-height:62px;max-width:300px;text-align:center;
+    font-family:'Fraunces',serif;font-weight:400;color:var(--cream);
+    font-size:19px;line-height:1.45;letter-spacing:.005em;
+    opacity:0;transform:translateY(6px);transition:opacity .5s ease, transform .5s ease;
+    padding:0 6px;
+  }
+  .reply.show{opacity:1;transform:none;}
+  .reply .accent{color:var(--gold-soft);}
+
+  /* chips */
+  .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;}
+  .chip{
+    font-family:'Inter',sans-serif;font-size:12px;color:var(--cream);
+    background:rgba(250,247,242,0.06);border:1px solid var(--line);
+    padding:8px 13px;border-radius:999px;cursor:pointer;transition:background .2s,border-color .2s;
+  }
+  .chip:hover,.chip:focus-visible{background:rgba(201,169,97,0.16);border-color:rgba(201,169,97,0.5);outline:none;}
+
+  /* input bar */
+  .bar{display:flex;align-items:center;gap:10px;background:rgba(250,247,242,0.06);border:1px solid var(--line);border-radius:999px;padding:8px 8px 8px 18px;}
+  .bar input{flex:1;background:transparent;border:none;outline:none;color:var(--cream);font-family:'Inter',sans-serif;font-size:14px;}
+  .bar input::placeholder{color:var(--muted);}
+  .mic{
+    width:42px;height:42px;flex:0 0 auto;border:none;cursor:pointer;border-radius:50%;
+    background:radial-gradient(circle at 38% 34%, var(--gold-soft), var(--gold) 70%);
+    display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(201,169,97,0.4);
+    transition:transform .15s;
+  }
+  .mic:active{transform:scale(0.92);}
+  .mic svg{width:18px;height:18px;}
+  .hint{text-align:center;font-size:10px;color:var(--muted);margin-top:12px;letter-spacing:.04em;}
+
+  @keyframes breathe{0%,100%{transform:scale(1);}50%{transform:scale(1.05);}}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion: reduce){
+    .halo,.orb,.orb::after{animation:none!important;}
+    .reply{transition:none;}
+  }
+</style>
+</head>
+<body>
+  <div class="phone" id="phone">
+    <div class="notch"></div>
+
+    <div class="head">
+      <div class="wordmark">RIVEN</div>
+      <div class="today">Today</div>
+    </div>
+
+    <!-- the one assisting widget -->
+    <div class="widget" aria-label="Today's protein and calories">
+      <div class="ring">
+        <svg width="58" height="58">
+          <circle cx="29" cy="29" r="25" fill="none" stroke="rgba(250,247,242,0.10)" stroke-width="5"/>
+          <circle id="ringFill" cx="29" cy="29" r="25" fill="none" stroke="#C9A961" stroke-width="5" stroke-linecap="round" stroke-dasharray="157" stroke-dashoffset="94"/>
+        </svg>
+        <div class="val"><span class="num" id="protNum">48</span><span class="lbl">g protein</span></div>
+      </div>
+      <div class="macros">
+        <div class="macro-row"><span class="k">Protein</span><span class="v"><b id="protG">48</b> / 120g</span></div>
+        <div class="macro-row"><span class="k">Calories left</span><span class="v" id="calLeft">960</span></div>
+      </div>
+    </div>
+
+    <!-- orb stage -->
+    <div class="stage">
+      <div class="orb-wrap">
+        <div class="halo"></div>
+        <div class="orb" id="orb"></div>
+      </div>
+      <div class="reply show" id="reply">Tap the mic, or just tell me what you ate.</div>
+    </div>
+
+    <!-- demo chips -->
+    <div class="chips">
+      <button class="chip" data-meal="chicken">Baked chicken &amp; greens</button>
+      <button class="chip" data-meal="oxtails">Oxtails &amp; rice</button>
+      <button class="chip" data-meal="status">How's my protein?</button>
+    </div>
+
+    <!-- input -->
+    <div class="bar">
+      <input id="input" type="text" placeholder="Talk to RIVEN…" aria-label="Talk to RIVEN" />
+      <button class="mic" id="send" aria-label="Send">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z" fill="#161513"/><path d="M6 11a6 6 0 0 0 12 0M12 17v3" stroke="#161513" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="hint">Steady wins.</div>
+  </div>
+
+<script>
+  const phone=document.getElementById('phone');
+  const orb=document.getElementById('orb');
+  const reply=document.getElementById('reply');
+  const input=document.getElementById('input');
+  const protNum=document.getElementById('protNum');
+  const protG=document.getElementById('protG');
+  const calLeft=document.getElementById('calLeft');
+  const ringFill=document.getElementById('ringFill');
+
+  const GOAL_P=120, GOAL_C=1600, CIRC=157;
+  let protein=48, used=640;
+
+  function render(){
+    protNum.textContent=protein;
+    protG.textContent=protein;
+    calLeft.textContent=(GOAL_C-used).toLocaleString();
+    const pct=Math.min(protein/GOAL_P,1);
+    ringFill.style.transition='stroke-dashoffset 1s ease';
+    ringFill.style.strokeDashoffset=CIRC-(CIRC*pct);
+  }
+  render();
+
+  function meals(key,text){
+    const t=text.toLowerCase();
+    if(key==='chicken'||/chicken|greens|turkey|eggs|salmon/.test(t))
+      return {p:42,c:380,say:'Logged — baked chicken and greens. That\'s <span class="accent">42g protein</span> in one plate. You\'re ahead today.'};
+    if(key==='oxtails'||/oxtail|rice|mac|cornbread|sunday/.test(t))
+      return {p:35,c:620,say:'Got it — oxtails and rice. <span class="accent">You\'re good.</span> Protein\'s on track, so just keep the rice to one scoop.'};
+    if(key==='status'||/protein|how am i|doing|left|track/.test(t))
+      return {p:0,c:0,say:null};
+    return {p:24,c:300,say:'Logged. I added it to your day — <span class="accent">you\'ve got room.</span> Keep going.'};
+  }
+
+  function statusLine(){
+    const left=GOAL_P-protein;
+    if(left<=0) return 'You hit your protein for the day. <span class="accent">Steady wins.</span>';
+    return `You\'re at <span class="accent">${protein}g protein</span> — ${left}g to go. Get one more solid plate in and you\'re there.`;
+  }
+
+  function respond(key,text){
+    const m=meals(key,text);
+    reply.classList.remove('show');
+    phone.classList.add('thinking');
+    setTimeout(()=>{
+      protein+=m.p; used+=m.c; render();
+      reply.innerHTML = m.say===null ? statusLine() : m.say;
+      reply.classList.add('show');
+      phone.classList.remove('thinking');
+    },850);
+  }
+
+  document.querySelectorAll('.chip').forEach(c=>{
+    c.addEventListener('click',()=>respond(c.dataset.meal,c.textContent));
+  });
+  function submit(){
+    const v=input.value.trim();
+    if(!v) return;
+    respond(null,v); input.value='';
+  }
+  document.getElementById('send').addEventListener('click',submit);
+  input.addEventListener('keydown',e=>{if(e.key==='Enter')submit();});
+</script>
+</body>
+</html>
