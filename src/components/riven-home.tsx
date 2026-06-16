@@ -2,6 +2,35 @@
 
 import { useEffect, useRef, useState } from "react";
 import { weighInAction } from "@/app/(clerk)/(app)/dashboard/weigh-in-actions";
+import {
+  lockDaySlotAction,
+  swapDaySlotAction,
+  ateDaySlotAction,
+} from "@/app/(clerk)/(app)/dashboard/day-plan-actions";
+
+type Hero = {
+  slot: "breakfast" | "lunch" | "dinner" | "snack";
+  name: string;
+  calories: number;
+  protein: number;
+  locked: boolean;
+  eaten: boolean;
+};
+
+const SLOT_WORD: Record<Hero["slot"], string> = {
+  breakfast: "this morning",
+  lunch: "for lunch",
+  dinner: "tonight",
+  snack: "for your snack",
+};
+
+/** "Tonight I set you air-fryer wings — 612 cal, 48g. Want it?" */
+function offerLine(h: Hero): string {
+  return `${cap(SLOT_WORD[h.slot])} I set you ${h.name.toLowerCase()} — ${h.calories} cal, ${h.protein}g protein. Want it?`;
+}
+function cap(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 /**
  * The orb home — RIVEN as a presence you talk to (Jarvis), per
@@ -27,6 +56,7 @@ type Today = {
   prefillWeight: number;
   goalWeight: number;
   firstName: string;
+  hero: Hero | null;
 };
 
 const CIRC = 157; // 2πr, r=25
@@ -38,6 +68,7 @@ export function RivenHome({ initialFirstName }: { initialFirstName: string }) {
   const [thinking, setThinking] = useState(false);
   const [streaming, setStreaming] = useState<string | null>(null);
   const [weighOpen, setWeighOpen] = useState(false);
+  const [planOffer, setPlanOffer] = useState(false);
   const [weight, setWeight] = useState(180);
   const [input, setInput] = useState("");
   const [recording, setRecording] = useState(false);
@@ -71,6 +102,9 @@ export function RivenHome({ initialFirstName }: { initialFirstName: string }) {
       if (!d.weighedToday) {
         setReply(`Morning, ${d.firstName}. Step on the scale — one number, same time, before you eat.`);
         setWeighOpen(true);
+      } else if (d.hero && !d.hero.eaten) {
+        setReply(offerLine(d.hero));
+        setPlanOffer(true);
       } else {
         setReply(`You're logged in for today, ${d.firstName}. What'd you eat? Just tell me.`);
       }
@@ -97,7 +131,50 @@ export function RivenHome({ initialFirstName }: { initialFirstName: string }) {
     }
     setTurns((t) => [...t, { role: "riven", text: r.reply }]);
     setReply(r.reply);
-    refreshToday();
+    const d = await refreshToday();
+    // The day opened — now offer tonight's pick, conversationally.
+    if (d?.hero && !d.hero.eaten) {
+      setPlanOffer(true);
+      setTurns((t) => [...t, { role: "riven", text: offerLine(d.hero!) }]);
+    }
+  }
+
+  // RIVEN's pick, accepted/changed by tapping or talking — the day-plan
+  // engine spoken through the conversation instead of shown as a card.
+  async function planAction(kind: "lock" | "swap" | "ate") {
+    const h = today?.hero;
+    if (!h || thinking) return;
+    const label = kind === "lock" ? "Lock it in" : kind === "swap" ? "Swap it" : "I ate it";
+    setTurns((t) => [...t, { role: "you", text: label }]);
+    setThinking(true);
+    try {
+      if (kind === "swap") {
+        await swapDaySlotAction({ slot: h.slot });
+        const d = await refreshToday();
+        const reply = d?.hero
+          ? `Swapped — try ${d.hero.name.toLowerCase()} instead. ${d.hero.calories} cal, ${d.hero.protein}g.`
+          : "Swapped.";
+        setTurns((t) => [...t, { role: "riven", text: reply }]);
+        setReply(reply);
+      } else if (kind === "lock") {
+        await lockDaySlotAction({ slot: h.slot });
+        await refreshToday();
+        const reply = "Locked in. Make it, log it — tap “I ate it” when you do.";
+        setTurns((t) => [...t, { role: "riven", text: reply }]);
+        setReply(reply);
+      } else {
+        await ateDaySlotAction({ slot: h.slot });
+        await refreshToday();
+        const reply = "Logged — that's tonight handled. Steady wins.";
+        setTurns((t) => [...t, { role: "riven", text: reply }]);
+        setReply(reply);
+        setPlanOffer(false);
+      }
+    } catch {
+      setError("Couldn't do that — try again.");
+    } finally {
+      setThinking(false);
+    }
   }
 
   // Send a message to RIVEN (logs meals / answers) via the streaming brain.
@@ -301,6 +378,37 @@ export function RivenHome({ initialFirstName }: { initialFirstName: string }) {
               {c}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* plan offer — accept/change tonight's pick by tapping (or just talk) */}
+      {planOffer && today?.hero && !today.hero.eaten && !thinking && (
+        <div className="flex flex-wrap gap-2 justify-center mb-3">
+          {!today.hero.locked && (
+            <button
+              type="button"
+              onClick={() => planAction("lock")}
+              className="font-body text-label-sm text-charcoal bg-gold px-4 py-2 rounded-full active:scale-95 transition-transform"
+            >
+              Lock it in
+            </button>
+          )}
+          {!today.hero.locked && (
+            <button
+              type="button"
+              onClick={() => planAction("swap")}
+              className="font-body text-label-sm text-cream border border-cream/25 px-4 py-2 rounded-full active:scale-95 transition-transform"
+            >
+              Swap
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => planAction("ate")}
+            className="font-body text-label-sm text-cream border border-gold/50 px-4 py-2 rounded-full active:scale-95 transition-transform"
+          >
+            I ate it
+          </button>
         </div>
       )}
 

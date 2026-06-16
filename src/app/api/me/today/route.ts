@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { sumTodayMealMacros } from "@/lib/meal-pipeline";
 import { resolveTodayCalorieTarget } from "@/lib/calorie-banking";
 import { getDailyWeighSnapshot } from "@/lib/daily-weigh-in";
+import { getOrBuildDayPlan } from "@/lib/day-plan";
 
 /**
  * The orb home's live "today" feed — the macro ring + weigh state. Read on
@@ -32,6 +33,17 @@ export async function GET() {
   ]);
 
   const calTarget = banked.target;
+
+  // Tonight's pick — so RIVEN can OFFER it in conversation ("tonight I set
+  // you wings — want it?") instead of showing a card. Lazy-builds the plan.
+  const plan = await getOrBuildDayPlan(user.id, {
+    calorieTarget: calTarget,
+    caloriesEaten: today.calories,
+    proteinFloor: profile.proteinFloor,
+    proteinEaten: today.protein,
+  }).catch(() => null);
+  const heroSlot = plan?.slots.find((s) => s.state === "hero") ?? null;
+
   return NextResponse.json({
     protein: today.protein,
     proteinFloor: profile.proteinFloor,
@@ -42,5 +54,15 @@ export async function GET() {
     prefillWeight: weigh?.prefillWeight ?? profile.currentWeight ?? profile.startWeight,
     goalWeight: weigh?.goalWeight ?? profile.goalWeight,
     firstName: profile.name.split(/\s+/)[0] || "there",
+    hero: heroSlot
+      ? {
+          slot: heroSlot.slot,
+          name: heroSlot.meal.name,
+          calories: heroSlot.meal.calories,
+          protein: heroSlot.meal.protein,
+          locked: heroSlot.locked,
+          eaten: heroSlot.eaten,
+        }
+      : null,
   });
 }
