@@ -1,6 +1,6 @@
 # RIVEN — Session Handoff Context
 
-Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated **2026-06-11**, end of the "RIVEN rebrand + App Store prep + daily weigh-in + The Circle + coach decision tree" sprint. The newest section is directly below this line — **read the 2026-06-11 section first**; everything under it is older and may describe behavior that has since changed (notably: the coach voice is now "RIVEN," not "Sean"; weight tracking is daily, not monthly; there's a real community tab).
+Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated **2026-06-15**, end of the "App Store submission + insights all-time-winners" sprint. The newest section is directly below this line — **read the 2026-06-15 section first**, then the 2026-06-11 section; everything under those is older and may describe behavior that has since changed (notably: the coach voice is now "RIVEN," not "Sean"; weight tracking is daily, not monthly; there's a real community tab; the iOS app is iPhone-only and submitted to the App Store).
 
 Also read `CLAUDE.md` at the repo root — it captures the design system and Sean-voice rules in a form that auto-loads into every Claude Code session.
 
@@ -16,7 +16,93 @@ This rule does NOT apply when he asks for a build directly (the visual is implie
 
 ---
 
-## Session updates (2026-06-11) — CURRENT — read this first
+## Session updates (2026-06-15) — CURRENT — read this first
+
+### 🍎 iOS app SUBMITTED to the App Store (Waiting for Review)
+
+RIVEN **1.0 (2)** was archived, uploaded, and **submitted for App Store review
+on 2026-06-15 ~8:37 PM CT** — status **"Waiting for Review."** Release is set to
+**Manual** (Sean presses "Release" after approval; it won't auto-publish).
+App Store Connect record: **"RIVEN Method"**, Apple ID `6779347086`, bundle
+`com.rivenmethod.app`, SKU `riven-app`, category Health & Fitness, price Free,
+age rating 9+.
+
+- **The app is now iPhone-only.** Build 1.0 (1) supported iPad, which forced a
+  required 13" iPad screenshot AND risked an iPad-layout rejection (the webview
+  is phone-shaped). Fix: `ios/App/App.xcodeproj/project.pbxproj` →
+  `TARGETED_DEVICE_FAMILY = "1"` (was `"1,2"`) in both Debug+Release, and
+  `CURRENT_PROJECT_VERSION` bumped 1→2. Re-archived → uploaded → that's the
+  submitted build. If you re-add iPad later you must provide iPad screenshots.
+- **Reviewer demo account:** `rivenappreview@gmail.com` (email+password login —
+  NOT "Continue with Google," which is hidden in-app). It's **comped** (Sean
+  flipped the `/coach/clients` comp toggle on the live Neon DB), so it bypasses
+  the paywall. Creds + the review-notes block are in
+  **`docs/APP-STORE-SUBMISSION.md`** (new this session — the full submission pack:
+  listing copy, App Privacy answers, review notes). Keep that account comped or
+  review fails.
+- **App Privacy label** published: collects Email, Name, Health, Photos/Videos,
+  Audio Data, Other User Content, User ID, Product Interaction — all "linked to
+  user," none "used for tracking" (manifest already says NSPrivacyTracking=false).
+- **Screenshots uploaded are REAL iPhone 17 Pro Max (6.9") shots of the live
+  cream app** — chosen for Guideline 2.3.3 compliance (must match the app).
+- **Orb-UI mockups exist but were NOT shipped/used.** Sean dropped two HTML
+  mockups (`~/Desktop/riven-orb-*.html`) of a dark gold-"orb" "talk to it"
+  interface he wants to build. This session generated polished 1320×2868 App
+  Store screenshots from them via `chrome-headless-shell` (generator +
+  PNGs in `~/Desktop/riven-screenshots/`), but they were set aside because the
+  **live app is still the cream UI** — shipping orb screenshots over a cream app
+  = mismatch-rejection risk. The orb interface is a real future direction.
+- **Export compliance:** answered "No" (HTTPS-only is exempt; Info.plist already
+  has `ITSAppUsesNonExemptEncryption=false`).
+- **`scripts/comp-user.mjs`** (new): `node --env-file=.env scripts/comp-user.mjs
+  <email>` comps a user. ⚠️ The local `.env` `DATABASE_URL` points at the **OLD
+  Railway DB (`rlwy.net`)**, not the live Neon DB — so this script (and any local
+  DB query) hits stale data. To comp on prod, use the coach UI toggle on the live
+  site, or point `.env` at the Neon URL first.
+
+### Coach insights: SWOT card → "All-time winners · remix these"
+
+`/coach/insights` `SwotView` was replaced by `WinnersView`. Ranks posts by a
+composite of the three signals Sean cares about — **follows + profile visits +
+link taps** (weights: follows ×10, link taps ×6, profile visits ×1) — and gives
+each winner a rule-based "remix" play.
+- `src/lib/insights.ts`: `buildSwot` → `buildWinners`; `Swot` type → `Winner`;
+  `CommandCenter.swot` → `.winners`. `PostCard` gained `follows` + `profileVisits`.
+- IG pipeline now fetches per-post **follows + profile_visits**: `instagram.ts`
+  `fetchMediaInsights` does a SEPARATE try/caught graph call for
+  `follows,profile_visits` (a rejected metric there can't nuke the core insights
+  call — that landmine is real). `instagram-sync.ts` stores `follows`.
+- Schema: `IgPostMetric.follows Int?` + migration
+  `20260611120000_add_post_follows`. Existing rows are null until a fresh Sync;
+  follows/profile_visits only populate if the IG token returns those media
+  metrics.
+- `actions.ts` `askInsights` context now lists winners instead of SWOT.
+
+### Apple 3.1.1 + onboarding copy (deployed to live site)
+
+- **`pricing/page.tsx`** (native branch): removed the "Visit rivenmethod.com to
+  start or manage your plan" line — Apple 3.1.1 forbids steering to an external
+  purchase from inside the app. Now just "managed outside the app."
+- **`tutorial/tutorial-slides.tsx`**: Step 3 monthly check-in → **daily weigh-in**;
+  Step 4 weekly content prompt (retired) → **The Circle**; slide body now scrolls
+  instead of clipping.
+- All the above (insights, pricing, tutorial, migration) were **committed +
+  pushed to `main`** (commit `f37dd5a`) → Railway auto-deployed. The `ios/`
+  folder is intentionally NOT committed (untracked, huge).
+
+### Next moves
+- **Wait for Apple review** (1–3 days). On approval → "Pending Developer Release"
+  → Sean presses Release. On rejection → read notes; likely-quick fix.
+- Still pending from 2026-06-11: rotate the exposed Neon DB password + Clerk
+  `sk_live` key; wire the 4 `riven-coach` Railway cron services; top-of-funnel
+  attention is the real bottleneck.
+- If Sean greenlights the **orb UI**, that's a real build (the mockups +
+  generated screenshots are the starting point) — and would let those orb App
+  Store screenshots actually match the app.
+
+---
+
+## Session updates (2026-06-11) — read this after the 2026-06-15 section
 
 > **Who this is for:** a coding agent (possibly not Claude Code) picking up
 > RIVEN cold. By the end of this section you should know what shipped this
@@ -195,9 +281,9 @@ The iOS app is a Capacitor webview loading live rivenmethod.com via
   `project.pbxproj`.
 - **App icon:** real RIVEN wordmark, 1024×1024 opaque cream, no alpha
   (`AppIcon-512@2x.png`), generated from the desktop RIVEN logo SVG.
-- **Still TODO (Phase 3/4):** App Store Connect screenshots + listing copy;
-  Archive → TestFlight → submit for review; **a reviewer demo account**
-  (the app is sign-in-only / Netflix model, so Apple needs creds to get in).
+- **[DONE 2026-06-15 — see the top section.]** Screenshots, listing copy,
+  demo account, archive → submit all completed; app is iPhone-only and
+  Waiting for Review.
 
 ### 4. Production hardening
 
