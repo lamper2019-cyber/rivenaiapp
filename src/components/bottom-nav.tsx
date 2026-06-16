@@ -13,8 +13,10 @@ const NAV_ITEMS: NavItem[] = [
   // Four tabs. ALL of RIVEN's AI now lives in the "Message from RIVEN" bubble
   // at the top of /dashboard (tap it → /chat thread) — so the old "RIVEN AI"
   // tab is replaced by "Circle", the community room everyone is in.
+  // Nav trimmed to three (2026-06-15, Sean): Home is the orb you talk to —
+  // logging happens in conversation, so the old "Log" tab is gone (the /log
+  // page still exists for deep links). Circle is parked but stays reachable.
   { href: "/dashboard", label: "Home", icon: "home" },
-  { href: "/log", label: "Log", icon: "edit_note" },
   { href: "/circle", label: "Circle", icon: "diversity_3" },
   { href: "/profile", label: "Profile", icon: "person" },
 ];

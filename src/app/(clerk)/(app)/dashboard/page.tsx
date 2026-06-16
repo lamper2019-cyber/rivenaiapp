@@ -1,47 +1,39 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
-import { resolveTodayCalorieTarget } from "@/lib/calorie-banking";
-import { PwaInstallBanner } from "@/components/pwa-install-banner";
-import { NotificationOptIn } from "@/components/notification-opt-in";
 import { TUTORIAL_DONE_STEP } from "@/lib/tutorial";
 import { RefreshOnDayChange } from "@/components/refresh-on-day-change";
-import { CoachMessageBadge } from "@/components/coach-message-badge";
-import { getDailyWeighSnapshot, getSundayWrap } from "@/lib/daily-weigh-in";
-import { getOrBuildDayPlan } from "@/lib/day-plan";
-import { HomeFocus, type HomeHero } from "@/components/home-focus";
-import { getMorningBrief } from "@/lib/riven-brief";
-import { RivenPresence } from "@/components/riven-presence";
-import { SundayWeightWrap } from "@/components/sunday-weight-wrap";
+import { getSundayWrap } from "@/lib/daily-weigh-in";
 import { getMonthlyRecap, getYearlyRecap } from "@/lib/weight-recaps";
+import { SundayWeightWrap } from "@/components/sunday-weight-wrap";
 import { MonthlyRecapOverlay } from "@/components/monthly-recap-overlay";
 import { YearlyRecapOverlay } from "@/components/yearly-recap-overlay";
 import { SubscribedTracker } from "@/components/subscribed-tracker";
+import { RivenHome } from "@/components/riven-home";
 
-// Force a fresh server render on every request. Pairs with <RefreshOnDayChange />
-// so the screen re-asks for its one focus the moment the Central day rolls over.
+// Force a fresh server render each request. Pairs with <RefreshOnDayChange />.
 export const dynamic = "force-dynamic";
 
-const STEP_GOAL = 10000;
-
 /**
- * Home — radically simple. RIVEN shows ONE focus at a time (weigh → plan →
- * eat → done), breathing, with her numbers quiet underneath. The full day
- * plan lives at /plan; the community + the daily question live in the Circle.
- * This screen is the coach in her pocket, not a dashboard.
+ * Home — RIVEN as a presence you talk to (the orb). She opens by asking your
+ * weight, you log food by telling her, the macro ring moves in real time, and
+ * the day's engine (plan/macros/adjustment) is spoken through her, not shown
+ * as cards. Spec: docs/design/riven-orb-mockup.html + ...conversations.html.
+ *
+ * The whole screen is dark — the orb is the light. Weight-wrap overlays
+ * (Sunday/monthly/yearly) still fire on top as celebratory full-screens.
  */
 export default async function DashboardPage() {
   const { userId } = auth();
-
   if (!userId) {
     return (
-      <UnauthedPlaceholder>
-        {isClerkConfigured
-          ? "Please sign in."
-          : "Add real Clerk keys to .env.local to view your dashboard."}
-      </UnauthedPlaceholder>
+      <main className="min-h-[100dvh] bg-charcoal px-container-mobile pt-16 text-cream">
+        <p className="font-display text-headline-lg">RIVEN</p>
+        <p className="font-body text-body-md text-cream/60 mt-3">
+          {isClerkConfigured ? "Please sign in." : "Add Clerk keys to .env.local."}
+        </p>
+      </main>
     );
   }
 
@@ -50,9 +42,9 @@ export default async function DashboardPage() {
     data = await loadDashboardData(userId);
   } catch {
     return (
-      <UnauthedPlaceholder>
-        Database not connected.
-      </UnauthedPlaceholder>
+      <main className="min-h-[100dvh] bg-charcoal px-container-mobile pt-16 text-cream">
+        <p className="font-body text-body-md">Database not connected.</p>
+      </main>
     );
   }
 
@@ -60,62 +52,30 @@ export default async function DashboardPage() {
   if (!data) redirect("/onboarding");
   if (data.profile.tutorialStep < TUTORIAL_DONE_STEP) redirect("/tutorial");
 
-  const { userId: clientUserId, profile, todayTotals, recentCoachMessages } = data;
-
-  const banked = await resolveTodayCalorieTarget(clientUserId, profile);
-  const calorieTarget = banked.target;
-
-  // The data the one focus card needs. Best-effort — a slow query never
-  // blocks the screen; the focus just falls back to the next state.
-  const [weigh, dayPlan, sundayWrap, monthlyRecap, yearlyRecap] =
-    await Promise.all([
-      getDailyWeighSnapshot(clientUserId).catch(() => null),
-      getOrBuildDayPlan(clientUserId, {
-        calorieTarget,
-        caloriesEaten: todayTotals.calories,
-        proteinFloor: profile.proteinFloor,
-        proteinEaten: todayTotals.protein,
-      }).catch(() => null),
-      getSundayWrap(clientUserId).catch(() => null),
-      getMonthlyRecap(clientUserId).catch(() => null),
-      getYearlyRecap(clientUserId).catch(() => null),
-    ]);
-
+  const { userId: clientUserId, profile } = data;
   const firstName = profile.name.split(/\s+/)[0] || "there";
 
-  // The hero slot from the plan → the one meal decision the focus shows.
-  const heroSlot = dayPlan?.slots.find((s) => s.state === "hero");
-  const hero: HomeHero | null = heroSlot
-    ? {
-        slot: heroSlot.slot,
-        name: heroSlot.meal.name,
-        calories: heroSlot.meal.calories,
-        protein: heroSlot.meal.protein,
-        locked: heroSlot.locked,
-        eaten: heroSlot.eaten,
-      }
-    : null;
-
-  // RIVEN's morning brief — the "here's your day, handled" line for the
-  // presence header. Composed from data; free. Best-effort.
-  const brief = await getMorningBrief(clientUserId, {
-    firstName,
-    weighedToday: weigh?.weighedToday ?? false,
-    proteinFloor: profile.proteinFloor,
-    proteinToday: todayTotals.protein,
-    heroMealName: hero?.name ?? null,
-    heroEaten: hero?.eaten ?? false,
-  }).catch(() => `Morning, ${firstName}. Your day's already mapped — just follow it.`);
+  const [sundayWrap, monthlyRecap, yearlyRecap] = await Promise.all([
+    getSundayWrap(clientUserId).catch(() => null),
+    getMonthlyRecap(clientUserId).catch(() => null),
+    getYearlyRecap(clientUserId).catch(() => null),
+  ]);
 
   return (
-    <main className="relative px-container-mobile md:px-container-desktop max-w-2xl mx-auto py-10 space-y-6">
+    <main
+      className="relative px-container-mobile pt-12 pb-28"
+      style={{
+        minHeight: "100dvh",
+        background:
+          "radial-gradient(120% 90% at 50% 0%, #211e1a 0%, #161513 55%, #100f0d 100%)",
+      }}
+    >
       <RefreshOnDayChange />
-
       <Suspense fallback={null}>
         <SubscribedTracker />
       </Suspense>
 
-      {/* Full-screen weight wraps, longest horizon wins so they never stack. */}
+      {/* Celebratory full-screen wraps — longest horizon wins. */}
       {yearlyRecap ? (
         <YearlyRecapOverlay recap={yearlyRecap} />
       ) : monthlyRecap ? (
@@ -124,66 +84,7 @@ export default async function DashboardPage() {
         <SundayWeightWrap wrap={sundayWrap} />
       ) : null}
 
-      {/* Top-right "Message from RIVEN" pill. Self-hides with no history. */}
-      <CoachMessageBadge messages={recentCoachMessages} />
-
-      {/* RIVEN presence — the Jarvis header: living orb + morning brief +
-          Talk-to-RIVEN (text always, voice when configured). */}
-      <RivenPresence brief={brief} firstName={firstName} />
-
-      {/* THE one focus + her quiet numbers. Everything else moved off home. */}
-      <HomeFocus
-        firstName={firstName}
-        weighedToday={weigh?.weighedToday ?? false}
-        prefillWeight={weigh?.prefillWeight ?? profile.currentWeight ?? profile.startWeight}
-        goalWeight={weigh?.goalWeight ?? profile.goalWeight}
-        hero={hero}
-        voiceLine={dayPlan?.moment.line ?? "Your day's already mapped. All you do is eat it and log it."}
-        numbers={{
-          calories: todayTotals.calories,
-          calorieTarget,
-          protein: todayTotals.protein,
-          proteinFloor: profile.proteinFloor,
-          steps: todayTotals.steps,
-          stepGoal: STEP_GOAL,
-        }}
-      />
-
-      {/* Self-hide once installed / dismissed / push already on. */}
-      <PwaInstallBanner />
-      <NotificationOptIn
-        vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
-      />
-
-      <div className="fixed top-[10%] right-[-10%] w-[35%] h-[35%] bg-gold/5 blur-[120px] rounded-full pointer-events-none -z-10" />
-
-      <LogPill />
+      <RivenHome initialFirstName={firstName} />
     </main>
-  );
-}
-
-/* ──────────────────────────────────────────────────────────── */
-
-function UnauthedPlaceholder({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="px-container-mobile md:px-container-desktop max-w-2xl mx-auto pt-12">
-      <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-charcoal">
-        RIVEN
-      </h1>
-      <p className="font-body text-body-md text-on-surface-variant mt-3">{children}</p>
-    </main>
-  );
-}
-
-function LogPill() {
-  return (
-    <Link
-      href="/log"
-      aria-label="Log a meal"
-      className="fixed bottom-[calc(env(safe-area-inset-bottom)_+_84px)] left-3 right-3 z-40 inline-flex items-center justify-center gap-2 rounded-full py-3.5 font-body text-label-md tracking-widest uppercase shadow-elevation-2 active:scale-[0.98] transition-all max-w-2xl mx-auto bg-charcoal text-cream border border-charcoal"
-    >
-      <span className="material-symbols-outlined text-[20px] filled">mic</span>
-      Log a meal
-    </Link>
   );
 }
