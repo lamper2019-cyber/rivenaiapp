@@ -31,8 +31,6 @@ import { DailyWeightCheckinCard, DailyWeighDone } from "@/components/daily-weigh
 import { getDailyWeighSnapshot, getSundayWrap } from "@/lib/daily-weigh-in";
 import { getOrBuildDayPlan } from "@/lib/day-plan";
 import { DayPlanCard } from "@/components/day-plan-card";
-import { getDailyQuestionSnapshot } from "@/lib/daily-question";
-import { DailyQuestionCard } from "@/components/daily-question-card";
 import { ManualStepsCard } from "@/components/manual-steps-card";
 import { SundayWeightWrap } from "@/components/sunday-weight-wrap";
 import { getMonthlyRecap, getYearlyRecap } from "@/lib/weight-recaps";
@@ -113,7 +111,6 @@ export default async function DashboardPage() {
     sundayWrap,
     monthlyRecap,
     yearlyRecap,
-    dailyQuestion,
   ] = await Promise.all([
     getCheerCandidates(clientUserId).catch(() => []),
     getPeerWinCandidates(clientUserId).catch(() => []),
@@ -124,7 +121,6 @@ export default async function DashboardPage() {
     getSundayWrap(clientUserId).catch(() => null),
     getMonthlyRecap(clientUserId).catch(() => null),
     getYearlyRecap(clientUserId).catch(() => null),
-    getDailyQuestionSnapshot(clientUserId).catch(() => null),
   ]);
 
   // Only render the Sunday surface when there IS a prompt AND we're
@@ -253,13 +249,6 @@ export default async function DashboardPage() {
       {/* "RIVEN already picked your day" — the done-with-you surface. One
           decision up top (tonight), the full mapped day one tap below. */}
       {dayPlan && <DayPlanCard plan={dayPlan} />}
-
-      {/* The Circle's daily question — the HOOK. She answers in one tap
-          right here; once answered, "See what the room said" pulls her
-          into the Circle. Home is the door, the Circle is the payoff. */}
-      {dailyQuestion && (
-        <DailyQuestionCard snapshot={dailyQuestion} variant="home" />
-      )}
 
       {/* Self-hides if already installed as PWA or dismissed. */}
       <PwaInstallBanner />

@@ -3,8 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { FeedPost } from "@/lib/community";
-import type { DailyQuestionSnapshot } from "@/lib/daily-question";
-import { DailyQuestionCard } from "@/components/daily-question-card";
 import {
   createCirclePost,
   toggleCircleHeart,
@@ -17,9 +15,9 @@ import {
 
 /**
  * The Circle — a plain conversation room. No category buttons, no canned
- * cheers (they go stale). Just: RIVEN's daily question at the top, a box to
- * say your own thing, and everyone's posts newest-first. Hearts + free-text
- * replies; you can delete your own post or reply; report/block others.
+ * cheers (they go stale). Just a box to say your own thing, and everyone's
+ * posts newest-first. Hearts + free-text replies; you can delete your own
+ * post or reply; report/block others.
  */
 
 function timeAgo(iso: string): string {
@@ -32,10 +30,8 @@ function timeAgo(iso: string): string {
 
 export function CircleFeed({
   initialFeed,
-  dailyQuestion,
 }: {
   initialFeed: FeedPost[];
-  dailyQuestion: DailyQuestionSnapshot | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -58,13 +54,6 @@ export function CircleFeed({
           Everyone, steady together
         </p>
       </header>
-
-      {/* RIVEN's daily question — poses it, leads into the room. */}
-      {dailyQuestion && (
-        <div className="mb-5">
-          <DailyQuestionCard snapshot={dailyQuestion} variant="circle" />
-        </div>
-      )}
 
       {/* Compose — always at the top, since the freshest posts are up here. */}
       <div className="mb-5">
