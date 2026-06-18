@@ -6,6 +6,19 @@ Also read `CLAUDE.md` at the repo root — it captures the design system and Sea
 
 ---
 
+## 🖥️ New-Mac migration (when Sean says "I'm about to switch over")
+
+Full plan: **`../NEW_MAC_SETUP.md`** (one level up, in the `CLaude code` folder). Pre-generated Brewfile + package lists in `../mac-migration-exports/`.
+
+**Env-secrets backup (already done — just carry it over):**
+- File: **`~/Desktop/RIVEN/Web Dev/RIVEN-env-secure.zip`** — encrypted, all 11 `.env` files across his projects.
+- Password: in **Apple Passwords**, search **"rivenenv"** / "rivenenvsecure".
+- New Mac: copy zip → unzip with password → `.env` files restore into `CLaude code/<project>/` (hidden files — ⌘+Shift+. to see them).
+
+Can't auto-restore (do these manually on the new Mac): (1) the `.env` secrets above, (2) GitHub auth — no SSH keys, token in Keychain, (3) Xcode signing certs. Shortcut for #2+#3: Apple Migration Assistant, Keychain only.
+
+---
+
 ## Working style with the coding agent
 
 **When Sean asks for UI/UX ideas, illustrate with ASCII wireframes — NOT JSX, NOT prose.** Any time he asks "what are some ideas for...", "how should X look?", "what are my options for the dashboard...", each option in your response should be a plain-text ASCII wireframe in a fenced code block. Use boxes (`┌─┐ │ └─┘`), pipes for columns, dashes for dividers, `[ Button ]` for buttons, `( ) (•)` for radios, `[✓]` for checkboxes, `▼` for dropdowns. Use real labels, real button text, real-ish data — never `<Component>` tags. He thinks visually; ASCII shows the actual shape on the page, JSX forces him to mentally parse markup, prose forces him to imagine the layout.
