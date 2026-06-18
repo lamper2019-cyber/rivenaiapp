@@ -17,18 +17,58 @@ export function DailyWeightCheckinCard({
 }) {
   const router = useRouter();
   const [weight, setWeight] = useState<number>(roundTo(snapshot.prefillWeight, 1));
+  // The typed value is kept as a STRING so she can type freely ("20" on the way
+  // to "201.5") without it snapping mid-keystroke. `weight` is the source of
+  // truth for submit + the slider; this just mirrors it for the text field.
+  const [weightText, setWeightText] = useState<string>(
+    roundTo(snapshot.prefillWeight, 1).toFixed(1),
+  );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  // Hard bounds (same as the server validates) — typing can go anywhere in
+  // range, not just the slider's ±30 window.
+  const MIN = 70;
+  const MAX = 700;
   // Center the slider on her last weight so a "no change" submit is zero work.
-  const weightMin = Math.max(70, snapshot.prefillWeight - 30);
-  const weightMax = Math.min(700, snapshot.prefillWeight + 30);
+  const weightMin = Math.max(MIN, snapshot.prefillWeight - 30);
+  const weightMax = Math.min(MAX, snapshot.prefillWeight + 30);
+
+  // Slider → keep the typed field in lockstep.
+  function setFromSlider(v: number) {
+    setWeight(v);
+    setWeightText(v.toFixed(1));
+  }
+
+  // Typing → allow only digits + one dot; update the number live when valid.
+  function onTypeWeight(raw: string) {
+    if (!/^\d*\.?\d*$/.test(raw)) return; // ignore stray characters
+    setWeightText(raw);
+    const n = parseFloat(raw);
+    if (Number.isFinite(n)) setWeight(n);
+  }
+
+  // On blur, tidy up: clamp into range and show one decimal.
+  function normalizeWeight() {
+    let n = parseFloat(weightText);
+    if (!Number.isFinite(n)) n = snapshot.prefillWeight;
+    n = Math.min(MAX, Math.max(MIN, roundTo(n, 1)));
+    setWeight(n);
+    setWeightText(n.toFixed(1));
+  }
 
   function handleSubmit() {
     setError(null);
+    // Clamp whatever's typed into range before sending (covers tapping "Lock
+    // it in" while the field still holds a half-typed or out-of-range value).
+    let value = parseFloat(weightText);
+    if (!Number.isFinite(value)) value = weight;
+    value = Math.min(MAX, Math.max(MIN, roundTo(value, 1)));
+    setWeight(value);
+    setWeightText(value.toFixed(1));
     startTransition(async () => {
-      const r = await submitDailyWeightAction({ weight });
+      const r = await submitDailyWeightAction({ weight: value });
       if (!r.ok) {
         setError(r.error);
         return;
@@ -77,11 +117,25 @@ export function DailyWeightCheckinCard({
               : "at goal"}
           </p>
         </div>
-        <p className="font-display text-display-sm text-charcoal">
-          {weight.toFixed(1)}
+        <div className="flex items-baseline">
+          <input
+            id="daily-weight-number"
+            type="text"
+            inputMode="decimal"
+            value={weightText}
+            onChange={(e) => onTypeWeight(e.target.value)}
+            onBlur={normalizeWeight}
+            onFocus={(e) => e.target.select()}
+            disabled={pending || done}
+            aria-label="Type your weight"
+            className="font-display text-display-sm text-charcoal bg-transparent w-32 border-b border-dashed border-gold/50 focus:border-gold focus:outline-none disabled:border-transparent"
+          />
           <span className="font-body text-headline-sm text-on-surface-variant/70 ml-2">
             lb
           </span>
+        </div>
+        <p className="font-body text-label-sm text-on-surface-variant/60">
+          Tap the number to type it, or drag the slider.
         </p>
         <input
           id="daily-weight"
@@ -90,7 +144,7 @@ export function DailyWeightCheckinCard({
           max={weightMax}
           step={0.1}
           value={weight}
-          onChange={(e) => setWeight(parseFloat(e.target.value))}
+          onChange={(e) => setFromSlider(parseFloat(e.target.value))}
           disabled={pending || done}
           className="riven-slider w-full"
         />
