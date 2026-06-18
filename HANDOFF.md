@@ -1,6 +1,6 @@
 # RIVEN — Session Handoff Context
 
-Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated **2026-06-15**, end of the "App Store submission + insights all-time-winners" sprint. The newest section is directly below this line — **read the 2026-06-15 section first**, then the 2026-06-11 section; everything under those is older and may describe behavior that has since changed (notably: the coach voice is now "RIVEN," not "Sean"; weight tracking is daily, not monthly; there's a real community tab; the iOS app is iPhone-only and submitted to the App Store).
+Paste this whole document into a new chat with a coding agent (Claude Code, etc.) to give them complete context. Last updated **2026-06-18** (notifications-scheduler fix + orb revert + billing). The newest section is directly below — **read the 2026-06-18 section first**, then 2026-06-15, then older ones; anything under those may describe behavior since changed (notably: the coach voice is "RIVEN," not "Sean"; weight tracking is daily; the home is the card dashboard — the gold-orb/Jarvis home was reverted; "RIVEN Asked" was removed; the iOS app is iPhone-only and submitted to the App Store).
 
 Also read `CLAUDE.md` at the repo root — it captures the design system and Sean-voice rules in a form that auto-loads into every Claude Code session.
 
@@ -29,7 +29,107 @@ This rule does NOT apply when he asks for a build directly (the visual is implie
 
 ---
 
-## Session updates (2026-06-15) — CURRENT — read this first
+## Session updates (2026-06-18) — CURRENT — read this first
+
+This session: reverted the orb home, removed "RIVEN Asked," added type-in to the
+daily weigh-in, and — the big one — **diagnosed & fixed why push notifications
+were never going out.** Plus billing learnings for comped → paid conversions.
+
+### 🔔 Notifications: fixed the dead scheduler (THE big one)
+
+**Symptom:** clients were subscribed but nobody (including Sean) ever got a
+scheduled push. **Root cause:** the individual notification jobs were never
+being triggered on a schedule — the send pipe + VAPID keys were fine all along
+(verified: VAPID public/private/subject + CRON_SECRET all set; 6 of 9 active
+clients subscribed, mostly on iPhone; a manual send delivered).
+
+**The fix — one dispatcher cron:** new **`/api/cron/tick`** (`src/app/api/cron/tick/route.ts`).
+- Runs hourly, computes **America/Chicago** time (DST-safe), and runs the jobs
+  **due that hour by calling their route handlers IN-PROCESS** (imports
+  `POST` from each job route, calls with a synthetic authed Request).
+- ⚠️ **GOTCHA (cost us a cycle):** the first version relayed to jobs via
+  `fetch()` against the public URL — **a Railway container can't loop back to
+  its own domain**, so every relayed call 500'd and nothing sent (the cron
+  showed green/200 but the DB had 0 nudges). **Never self-HTTP from inside the
+  container — call handlers/functions in-process.**
+- Fires **`riven-coach`** (the CURRENT daily engine), NOT the retired
+  `morning/midday/evening-checkin` routes (firing both double-messages — see the
+  note in `src/lib/riven-coach.ts`). Also deliberately skips `sean-messages`
+  (retired), `process-ai-replies` (off), `monday-checkin`, `sync-instagram`.
+- Schedule (Central): riven-coach `morning`=10a, `midday`=12p, `afternoon`=3p,
+  `evening`=7p; `sunday-recap`=Sun 5p; `weekly-digest`=Mon 7a (coach only);
+  `sunday-reminder` (monthly) poked daily 9a (route self-guards to the 1st).
+- **Test without sending:** `POST /api/cron/tick?dry=1` → `{ok,central,wouldFire[]}`.
+
+**The Railway cron is the `ticker` service** (project `bubbly-perception`): image
+`curlimages/curl:latest`, schedule hourly, curls `/api/cron/tick` with the Bearer
+secret. Confirmed firing every hour. To debug a "no notifications" report: dry-run
+the endpoint, then check the `ticker` service's Cron Runs.
+
+**Notification facts worth knowing:**
+- Web Push (VAPID + `public/sw.js`), opt-in per device (`PushSubscription` rows).
+  `sendPushToUser` fails **silently** by design (a broken push never crashes the
+  app) — which is why nobody noticed it stopped.
+- **iOS only delivers push if the PWA is installed to the home screen** (Apple
+  rule). A client using RIVEN in a Safari tab *cannot* get notifications.
+- **`riven-coach` only targets `role: "CLIENT"`** — the coach account never gets
+  these. Sean tests on a real client account on his phone. Morning/afternoon =
+  weigh nudge (skipped if already weighed); midday/evening = food nudge (skipped
+  if already logged). ≤1 weight + ≤1 food push/day (ledger in riven-coach).
+
+### 🏠 Home reverted to the card dashboard (orb is gone)
+
+The "conversational gold orb" home + the "one focus at a time" rebuild were both
+**reverted** at Sean's request ("take it back to before the orb"). `dashboard/page.tsx`,
+`bottom-nav` (Log tab back), `globals.css`, HANDOFF were restored to commit
+`a463ab5` (the multi-card dashboard). Deleted: `riven-home`, `riven-presence`,
+`riven-orb`, `riven-brief`, `riven-ask`, `ask-riven-actions`, `weigh-in-actions`,
+`api/me/today`, `api/voice/speak`, `home-focus`, `plan/page`. **Kept** (not orb
+work): day-plan engine, restaurant mode, weight editor, manual steps, Circle
+photos/roses, Sunday wrap. The NORTH STAR / Jarvis vision is shelved.
+
+### 🗑️ "RIVEN Asked" (daily question) removed completely
+
+Pulled from home + Circle ("nobody's using it"). Deleted `daily-question.ts`,
+`daily-question-bank.ts`, `daily-question-card.tsx`, `daily-question-actions.ts`,
+`api/cron/daily-question`. The **`DailyAnswer` table is left dormant** in the DB
+(no destructive migration) — drop it later with a migration if wanted.
+
+### ⚖️ Daily weigh-in: tap-to-type
+
+`daily-weight-checkin-card.tsx` — the big number is now an editable field
+(decimal keypad on mobile) kept in sync with the slider; typed values clamp to
+70–700 on blur and submit. (Monthly check-in card is still slider-only.)
+
+### 💳 Billing: Stripe is the source of truth (comped → paid)
+
+- `subscriptionStatus` (`User`) **mirrors Stripe** via webhook; **"comped" is a
+  DB-only flag** that bypasses the paywall. Flipping it does NOT create/stop a
+  real charge — money lives in Stripe. `STRIPE_PRICE_ID_MONTHLY` = the $50/mo
+  price; standard flow = 7-day trial then $50 (`src/lib/quiz.ts`).
+- **You cannot force-charge a member with no card on file.** Comped members who
+  never went through checkout have **no `stripeCustomerId`** → must be sent a
+  checkout/payment link to enter a card.
+- **Ashley** (`a_jade92@…`, active, real Stripe customer): had a double charge —
+  **Sean refunded it himself in Stripe**. Done.
+- **PENDING — Melissa (`williamsmt08@…`) + Denise Batten (`drbatten44@…`):** both
+  comped, no card. Plan when Sean says "build the links": non-expiring Stripe
+  payment links, **first charge July 2**, then the 2nd monthly (`trial_end`/anchor
+  = 2026-07-02, not the 7-day trial), then un-comp them so they're prompted.
+
+### ⚙️ Ops gotchas reinforced this session
+
+- **Production DB reads are classifier-gated** — need explicit user approval
+  naming the prod target. Use `railway run node script.cjs` (local `.env` points
+  at a DEAD Railway PG; prod is Neon via Railway env). Delete temp PII/diag
+  scripts after running.
+- Deploy = push to `main` (Railway auto-deploys); confirm via `railway status` +
+  `https://rivenmethod.com/api/health`. Always `npx tsc --noEmit && npx next lint
+  && npm test` before pushing.
+
+---
+
+## Session updates (2026-06-15) — read this after the 2026-06-18 section
 
 ### 🍎 iOS app SUBMITTED to the App Store (Waiting for Review)
 
