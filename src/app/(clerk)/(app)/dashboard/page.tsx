@@ -28,7 +28,9 @@ import { CheerReceivedCard } from "@/components/cheer-received-card";
 import { CheerCeremony } from "@/components/cheer-ceremony";
 import { SundayRitual } from "@/components/sunday-ritual";
 import { DailyWeightCheckinCard, DailyWeighDone } from "@/components/daily-weight-checkin-card";
-import { getDailyWeighSnapshot, getSundayWrap } from "@/lib/daily-weigh-in";
+import { getDailyWeighSnapshot, getSundayWrap, getRollingWeeklyAverage } from "@/lib/daily-weigh-in";
+import { getCalorieWeek, getWaistSnapshot } from "@/lib/weekly-review";
+import { WeeklyReviewCard } from "@/components/weekly-review-card";
 import { getOrBuildDayPlan } from "@/lib/day-plan";
 import { DayPlanCard } from "@/components/day-plan-card";
 import { ManualStepsCard } from "@/components/manual-steps-card";
@@ -111,6 +113,9 @@ export default async function DashboardPage() {
     sundayWrap,
     monthlyRecap,
     yearlyRecap,
+    weeklyWeightAvg,
+    calorieWeek,
+    waistSnap,
   ] = await Promise.all([
     getCheerCandidates(clientUserId).catch(() => []),
     getPeerWinCandidates(clientUserId).catch(() => []),
@@ -121,6 +126,9 @@ export default async function DashboardPage() {
     getSundayWrap(clientUserId).catch(() => null),
     getMonthlyRecap(clientUserId).catch(() => null),
     getYearlyRecap(clientUserId).catch(() => null),
+    getRollingWeeklyAverage(clientUserId).catch(() => null),
+    getCalorieWeek(clientUserId, profile.cutCalories).catch(() => null),
+    getWaistSnapshot(clientUserId).catch(() => null),
   ]);
 
   // Only render the Sunday surface when there IS a prompt AND we're
@@ -204,7 +212,7 @@ export default async function DashboardPage() {
       ) : monthlyRecap ? (
         <MonthlyRecapOverlay recap={monthlyRecap} />
       ) : sundayWrap ? (
-        <SundayWeightWrap wrap={sundayWrap} />
+        <SundayWeightWrap wrap={sundayWrap} calorie={calorieWeek} waist={waistSnap} />
       ) : null}
 
       {/* Top-right "Message from RIVEN" pill — solid charcoal, serif
@@ -242,6 +250,15 @@ export default async function DashboardPage() {
         ) : (
           <DailyWeightCheckinCard snapshot={dailyWeighSnapshot} />
         ))}
+
+      {/* "This week" at-a-glance — weight avg, calorie avg (vs target), waist,
+          and the one adjustment read. The Sunday ritual is the moment; this
+          keeps the numbers visible any day. */}
+      <WeeklyReviewCard
+        weightAvg={weeklyWeightAvg?.avg ?? null}
+        calorie={calorieWeek}
+        waist={waistSnap}
+      />
 
       {/* Monthly waist/photo check-in removed per RIVEN — the daily weigh-in
           + the weekly/monthly average wraps are the whole weight story now. */}

@@ -101,6 +101,7 @@ model User {
   dailyTotals        DailyTotals[]
   weeklyCheckIns     WeeklyCheckIn[]
   dailyWeighIns      DailyWeighIn[]
+  waistEntries       WaistEntry[]
   dayPicks           DayPick[]
   mealDislikes       MealDislike[]
   coachFlags         CoachFlag[]
@@ -251,6 +252,21 @@ model DailyTotals {
 
   @@unique([userId, date])
   @@index([userId, date])
+}
+
+// Weekly waist measurement — the Sunday ritual asks for it once a week. Kept in
+// its own table (NOT WeeklyCheckIn, which is the heavier monthly check-in) so the
+// two never collide. One row per user per week (keyed to that week's Sunday).
+model WaistEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart DateTime @db.Date
+  waistIn   Float
+  createdAt DateTime @default(now())
+
+  @@unique([userId, weekStart])
+  @@index([userId, weekStart])
 }
 
 model WeeklyCheckIn {
