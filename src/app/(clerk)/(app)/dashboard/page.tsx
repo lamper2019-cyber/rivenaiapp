@@ -241,10 +241,10 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* DAILY weight check-in — the one-number slider, every day. Once she's
-          logged today's number it swaps to the "locked in for today" strip.
-          The 7-day average of these is what we coach. */}
-      {dailyWeighSnapshot &&
+      {/* Weight check-in — Sun/Wed/Fri mornings only. On off days the card
+          doesn't render at all; once she's logged a weigh-day number it swaps
+          to the "locked in" strip. The weekly average is what we coach. */}
+      {dailyWeighSnapshot?.isWeighDay &&
         (dailyWeighSnapshot.weighedToday ? (
           <DailyWeighDone weight={dailyWeighSnapshot.todayWeight ?? 0} />
         ) : (

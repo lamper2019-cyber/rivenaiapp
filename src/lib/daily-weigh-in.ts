@@ -2,13 +2,28 @@ import { prisma } from "@/lib/prisma";
 import { startOfCentralDay } from "@/lib/dates";
 
 /**
- * Daily weight check-in — the one-number slider RIVEN now asks for every day.
- * Separate from the monthly WeeklyCheckIn (waist + photos), which still runs
- * on its own 30-day cadence. We coach the 7-day ROLLING AVERAGE of these daily
- * numbers, never the day-to-day scale wiggle.
+ * Weight check-in — the one-number slider, on a Sun/Wed/Fri cadence
+ * (2026-06-18, Sean: weigh-ins only Sunday, Wednesday, and Friday morning).
+ * Three anchor days beat daily: less scale anxiety, same trend quality. We
+ * coach the WEEKLY AVERAGE of those numbers, never a single reading.
+ * Separate from the monthly WeeklyCheckIn (waist + photos).
  */
 
+/** Central weekdays she weighs in: Sunday, Wednesday, Friday. */
+const WEIGH_DAY_NAMES = new Set(["Sun", "Wed", "Fri"]);
+
+/** Is the given instant a weigh-in day in Central time? */
+export function isWeighDay(d: Date = new Date()): boolean {
+  const wd = d.toLocaleString("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "short",
+  });
+  return WEIGH_DAY_NAMES.has(wd);
+}
+
 export type DailyWeighSnapshot = {
+  /** True when today is a Sun/Wed/Fri weigh day — the card only renders then. */
+  isWeighDay: boolean;
   /** True once she's logged today's number — render the "locked in" strip. */
   weighedToday: boolean;
   /** Today's logged weight, when weighedToday. */
@@ -59,6 +74,7 @@ export async function getDailyWeighSnapshot(
     last != null && last.day.toISOString().slice(0, 10) === centralDateKey();
 
   return {
+    isWeighDay: isWeighDay(),
     weighedToday,
     todayWeight: weighedToday ? last!.weightLb : null,
     prefillWeight: last?.weightLb ?? user.profile.currentWeight ?? user.profile.startWeight,
@@ -176,29 +192,38 @@ export async function deleteWeighForDay(args: {
 }
 
 export type WeeklyAverage = {
-  /** Rounded 7-day average weight. */
+  /** Rounded weekly average weight. */
   avg: number;
-  /** How many daily weigh-ins fed the average (1–7). */
+  /** How many weigh-ins fed the average (1–3 on the Sun/Wed/Fri cadence). */
   count: number;
 };
 
+/** YYYY-MM-DD key for the Central calendar day n days before today. */
+function centralKeyDaysAgo(n: number): string {
+  return centralDateKey(new Date(Date.now() - n * 24 * 60 * 60 * 1000));
+}
+
 /**
- * The 7-day rolling average from her most recent daily weigh-ins — the number
- * we actually coach (Sunday wrap reads this). Returns null with no data yet.
+ * The weekly average from weigh-ins inside the LAST 7 CALENDAR DAYS — the
+ * number we actually coach. Date-windowed (not last-N-rows) because on the
+ * Sun/Wed/Fri cadence "last 7 rows" would span multiple weeks and smear the
+ * trend. Returns null when nothing was logged in the window.
  */
 export async function getRollingWeeklyAverage(
   userId: string,
-  takeDays = 7,
+  windowDays = 7,
 ): Promise<WeeklyAverage | null> {
   const rows = await prisma.dailyWeighIn.findMany({
     where: { userId },
     orderBy: { day: "desc" },
-    take: takeDays,
-    select: { weightLb: true },
+    take: 14, // plenty to cover any 7-day window on a 3-a-week cadence
+    select: { day: true, weightLb: true },
   });
-  if (rows.length === 0) return null;
-  const sum = rows.reduce((a, r) => a + r.weightLb, 0);
-  return { avg: Math.round((sum / rows.length) * 10) / 10, count: rows.length };
+  const cutoff = centralKeyDaysAgo(windowDays - 1);
+  const inWindow = rows.filter((r) => r.day.toISOString().slice(0, 10) >= cutoff);
+  if (inWindow.length === 0) return null;
+  const sum = inWindow.reduce((a, r) => a + r.weightLb, 0);
+  return { avg: Math.round((sum / inWindow.length) * 10) / 10, count: inWindow.length };
 }
 
 export type SundayWrap = {
@@ -233,19 +258,32 @@ export async function getSundayWrap(userId: string): Promise<SundayWrap | null> 
   const rows = await prisma.dailyWeighIn.findMany({
     where: { userId },
     orderBy: { day: "desc" },
-    take: 14,
-    select: { weightLb: true },
+    take: 30,
+    select: { day: true, weightLb: true },
   });
   if (rows.length === 0) return null;
 
-  const weights = rows.map((r) => r.weightLb);
-  const thisAvg = avgOf(weights.slice(0, 7))!; // non-null: rows.length ≥ 1
-  const lastAvg = avgOf(weights.slice(7, 14));
+  // Date-windowed weeks (this week = last 7 calendar days, last week = the 7
+  // before that). On the Sun/Wed/Fri cadence each window holds up to 3 rows —
+  // slicing by row count would smear weeks together.
+  const key = (d: Date) => d.toISOString().slice(0, 10);
+  const thisCut = centralKeyDaysAgo(6);
+  const lastCut = centralKeyDaysAgo(13);
+  const thisWeek = rows.filter((r) => key(r.day) >= thisCut).map((r) => r.weightLb);
+  const lastWeek = rows
+    .filter((r) => key(r.day) >= lastCut && key(r.day) < thisCut)
+    .map((r) => r.weightLb);
+
+  // If she skipped this week entirely, still show her most recent numbers
+  // rather than a blank — but call it "building", not a trend.
+  const thisAvg =
+    avgOf(thisWeek) ?? avgOf(rows.slice(0, 3).map((r) => r.weightLb))!;
+  const lastAvg = avgOf(lastWeek);
 
   let direction: SundayWrap["direction"];
   let deltaLb = 0;
-  if (weights.slice(0, 7).length < 3) {
-    direction = "building"; // not enough data this week to call a trend
+  if (thisWeek.length < 2) {
+    direction = "building"; // fewer than 2 of her 3 weigh days — no trend call
   } else if (lastAvg == null) {
     direction = "first"; // first real week — set the baseline
   } else {
@@ -253,6 +291,7 @@ export async function getSundayWrap(userId: string): Promise<SundayWrap | null> 
     direction = deltaLb <= -0.3 ? "down" : deltaLb >= 0.3 ? "up" : "flat";
   }
 
-  return { thisAvg, lastAvg, deltaLb, direction, series: [...weights].reverse() };
+  const series = rows.slice(0, 14).map((r) => r.weightLb).reverse();
+  return { thisAvg, lastAvg, deltaLb, direction, series };
 }
 

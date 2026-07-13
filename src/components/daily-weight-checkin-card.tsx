@@ -97,7 +97,7 @@ export function DailyWeightCheckinCard({
           Today&apos;s weigh-in
         </p>
         <p className="font-display text-headline-sm text-charcoal mt-1 leading-snug">
-          One number. Same time, every day.
+          One number, first thing this morning. Sunday, Wednesday, Friday.
         </p>
       </div>
 

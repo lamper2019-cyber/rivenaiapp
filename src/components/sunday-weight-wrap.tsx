@@ -309,7 +309,7 @@ function ActionButton({
 function weightCopy(w: SundayWrap): string {
   switch (w.direction) {
     case "building":
-      return "Just getting started. Log a few more days this week — next Sunday we'll have your real trend.";
+      return "Just getting started. Hit your weigh days — Sunday, Wednesday, Friday — and next Sunday we'll have your real trend.";
     case "first":
       return `This is your starting line: ${w.thisAvg.toFixed(1)} lb on the 7-day average. The baseline we build from.`;
     case "down":

@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth, isClerkConfigured } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { submitDailyWeight } from "@/lib/daily-weigh-in";
+import { submitDailyWeight, isWeighDay } from "@/lib/daily-weigh-in";
 
 /**
- * Server action for the DAILY weight slider on /dashboard. Weight-only (the
- * waist + photos live in the monthly check-in). Re-validates the range server-
- * side — a stale tab could send a typo'd value.
+ * Server action for the weight slider on /dashboard — Sun/Wed/Fri cadence.
+ * Re-validates the range AND the weigh day server-side — a stale tab could
+ * send a typo'd value or submit on an off day.
  */
 
 const SubmitSchema = z.object({
@@ -26,6 +26,13 @@ export async function submitDailyWeightAction(
   const parsed = SubmitSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  // Weigh-ins run Sun/Wed/Fri — a tab left open from a weigh day shouldn't
+  // write on an off day. (Backfills still go through the account weight
+  // editor, which is deliberately unrestricted.)
+  if (!isWeighDay()) {
+    return { ok: false, error: "Weigh-in days are Sunday, Wednesday, and Friday." };
   }
 
   const { userId } = auth();

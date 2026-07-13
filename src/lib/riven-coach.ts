@@ -2,16 +2,19 @@ import { prisma } from "@/lib/prisma";
 import { startOfCentralDay } from "@/lib/dates";
 import { sendPushToUser } from "@/lib/push";
 import { getMeal } from "@/lib/meal-bank";
+import { isWeighDay } from "@/lib/daily-weigh-in";
 
 /**
  * The RIVEN coach brain — the running implementation of the decision tree
- * (docs/RIVEN-COACH-DECISION-TREE.md). Reads the DAILY WEIGH-IN + meal logs and
+ * (docs/RIVEN-COACH-DECISION-TREE.md). Reads the weigh-ins + meal logs and
  * sends the explicit, RIVEN-voice nudges.
  *
  * Four slots map to the tree's daily checkpoints:
  *   morning   (~10:30a CT) — weigh nudge if she hasn't weighed today
+ *                            (WEIGH DAYS ONLY: Sun/Wed/Fri — no-op otherwise)
  *   midday    (~12:30p CT) — breakfast/food nudge if nothing logged today
  *   afternoon (~3:00p CT)  — FINAL weigh nudge if still not weighed
+ *                            (weigh days only, same as morning)
  *   evening   (~7:30p CT)  — food nudge if still nothing logged today
  *
  * Frequency ledger — TWO INDEPENDENT TRACKS so weight and food never crowd
@@ -110,6 +113,12 @@ function eveningFoodCopy(
 export async function runRivenCoach(slot: RivenSlot): Promise<RivenCoachResult> {
   const today = startOfCentralDay();
   const weighTrack = isWeighSlot(slot);
+
+  // Weigh nudges only exist on weigh days (Sun/Wed/Fri). Off days the whole
+  // slot is a no-op — nobody gets told to step on a scale on a Tuesday.
+  if (weighTrack && !isWeighDay()) {
+    return { slot, candidates: 0, sent: 0, skippedDone: 0, skippedLedger: 0 };
+  }
 
   const clients = await prisma.user.findMany({
     where: {
