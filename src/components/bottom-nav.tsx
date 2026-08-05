@@ -10,12 +10,13 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  // Four tabs. ALL of RIVEN's AI now lives in the "Message from RIVEN" bubble
-  // at the top of /dashboard (tap it → /chat thread) — so the old "RIVEN AI"
-  // tab is replaced by "Circle", the community room everyone is in.
+  // Four tabs. ALL of RIVEN's AI lives in the "Message from RIVEN" bubble at
+  // the top of /dashboard (tap it → /chat thread), so it needs no tab of its
+  // own. The community tab ("Circle") was retired 2026-08-04 and replaced by
+  // "Train" — the push/pull/legs board.
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/log", label: "Log", icon: "edit_note" },
-  { href: "/circle", label: "Circle", icon: "diversity_3" },
+  { href: "/train", label: "Train", icon: "fitness_center" },
   { href: "/profile", label: "Profile", icon: "person" },
 ];
 

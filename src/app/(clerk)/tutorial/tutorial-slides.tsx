@@ -40,9 +40,9 @@ const SLIDES: Slide[] = [
   },
   {
     eyebrow: "Step 4 of 4",
-    title: "You're not doing this alone.",
-    body: "The Circle is your private community inside RIVEN — real women on the same journey. Share a win, vent a hard day, or just read along. No strangers, no judgment.",
-    icon: "diversity_3",
+    title: "Train three days a week.",
+    body: "The Train tab holds your lifts — push, pull, legs. Each one shows you the movement, and you keep your sets, reps, and weight right there. When a weight sits too long, RIVEN tells you to go up.",
+    icon: "fitness_center",
     ctaLabel: "Let's begin",
   },
 ];

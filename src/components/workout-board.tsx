@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { saveWorkoutSetting } from "@/app/(clerk)/(coach)/coach/train/actions";
+import { saveWorkoutSetting } from "@/lib/workout-actions";
 import {
   WEIGHT_STEP_LB,
   relativeDayLabel,

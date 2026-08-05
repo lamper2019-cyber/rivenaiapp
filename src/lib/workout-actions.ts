@@ -7,13 +7,18 @@ import { prisma } from "@/lib/prisma";
 import { EXERCISES_BY_KEY } from "@/lib/workout";
 
 /**
- * Save one exercise's working numbers from the /coach/train board.
+ * Save one exercise's working numbers from the training board.
  *
- * The client sends absolute values (not deltas) so a double-tap or a stale
- * tab can't silently compound an increment. `weightChangedAt` only moves when
- * the WEIGHT actually changes — that timestamp is the progression signal
- * ("this has sat at 50 for two weeks"), so bumping it on a sets/reps tweak
- * would quietly reset the thing the board exists to show.
+ * Shared by both surfaces — the client tab (/train) and the coach's own board
+ * (/coach/train). Rows are keyed to the signed-in user, so each person only
+ * ever reads and writes their own numbers regardless of which route they came
+ * from; no role gate is needed beyond "is signed in."
+ *
+ * The client sends absolute values (not deltas) so a double-tap or a stale tab
+ * can't silently compound an increment. `weightChangedAt` only moves when the
+ * WEIGHT actually changes — that timestamp is the progression signal ("this has
+ * sat at 50 for two weeks"), so bumping it on a sets/reps tweak would quietly
+ * reset the thing the board exists to show.
  */
 
 const SaveSchema = z.object({
@@ -44,10 +49,9 @@ export async function saveWorkoutSetting(
 
   const user = await prisma.user.findUnique({
     where: { clerkId },
-    select: { id: true, role: true },
+    select: { id: true },
   });
   if (!user) return { ok: false, error: "Not signed in." };
-  if (user.role !== "COACH") return { ok: false, error: "Coach only." };
 
   const existing = await prisma.workoutSetting.findUnique({
     where: { userId_exerciseKey: { userId: user.id, exerciseKey } },
@@ -71,6 +75,7 @@ export async function saveWorkoutSetting(
     });
   }
 
+  revalidatePath("/train");
   revalidatePath("/coach/train");
   return { ok: true };
 }

@@ -282,7 +282,7 @@ export async function askInsights(
   // ── Gather the data context (best-effort on each source) ──────────
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const [cc, funnel7, funnel30, members, weighs7, meals7, circle7, leads] =
+  const [cc, funnel7, funnel30, members, weighs7, meals7, leads] =
     await Promise.all([
       buildCommandCenter().catch(() => null),
       isPosthogQueryConfigured ? fetchFunnelTotals(7).catch(() => null) : null,
@@ -297,7 +297,6 @@ export async function askInsights(
         .catch(() => null),
       prisma.dailyWeighIn.count({ where: { createdAt: { gte: weekAgo } } }).catch(() => null),
       prisma.mealLog.count({ where: { createdAt: { gte: weekAgo } } }).catch(() => null),
-      prisma.communityPost.count({ where: { createdAt: { gte: weekAgo } } }).catch(() => null),
       prisma.lead.count().catch(() => null),
     ]);
 
@@ -326,7 +325,7 @@ ${postLines || "(no posts synced)"}
 
 == APP / MEMBERS ==
 Active members (trialing+active+comped): ${members ?? "?"}
-Weigh-ins logged last 7d: ${weighs7 ?? "?"} · Meals logged last 7d: ${meals7 ?? "?"} · Circle posts last 7d: ${circle7 ?? "?"}
+Weigh-ins logged last 7d: ${weighs7 ?? "?"} · Meals logged last 7d: ${meals7 ?? "?"}
 Quiz leads all-time: ${leads ?? "?"}`.trim();
 
   const turns = history.slice(-8).map((t) => ({

@@ -100,11 +100,8 @@ export async function submitDailyWeight(args: {
     where: { userId: args.userId },
     data: { currentWeight: args.weight },
   });
-  // Auto-share milestone moments (streaks, comebacks, first weigh-in) to
-  // The Circle — behavior only, never her number. Best-effort: a share
-  // failure must never break the weigh-in itself.
-  const { maybeShareWeighMilestone } = await import("@/lib/circle-auto-share");
-  await maybeShareWeighMilestone(args.userId).catch(() => {});
+  // (Milestone moments used to auto-share to The Circle here. The community
+  // tab was retired 2026-08-04 — nothing to broadcast to now.)
 }
 
 export type WeighHistoryRow = {

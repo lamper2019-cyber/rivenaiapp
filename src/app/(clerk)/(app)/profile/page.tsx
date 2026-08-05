@@ -8,7 +8,6 @@ import { Sparkline } from "@/components/sparkline";
 import { startOfCentralMonth } from "@/lib/dates";
 import { DeleteAccountButton } from "./delete-account-button";
 import { CalorieBankingToggle } from "./calorie-banking-toggle";
-import { CircleShareToggle } from "./circle-share-toggle";
 import { getWeighHistory, type WeighHistoryRow } from "@/lib/daily-weigh-in";
 import { WeightLogEditor } from "./weight-log-editor";
 import { getMyMoodHistory, type MoodHistoryEntry } from "@/lib/daily-mood";
@@ -169,17 +168,6 @@ export default async function ProfilePage() {
             Weight log
           </h2>
           <WeightLogEditor history={weighHistory} />
-        </section>
-      )}
-
-      {/* Circle auto-share lever — milestone moments post as behavior,
-          never numbers. Default ON; this is the opt-out. */}
-      {profile && (
-        <section className="space-y-3">
-          <h2 className="font-body text-label-md tracking-widest uppercase text-on-surface-variant">
-            The Circle
-          </h2>
-          <CircleShareToggle initialEnabled={profile.shareToCircle} />
         </section>
       )}
 
