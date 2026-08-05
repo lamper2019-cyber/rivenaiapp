@@ -21,7 +21,14 @@ import {
 type LocalValues = { sets: number; reps: number; weightLb: number; touchedWeight: boolean };
 
 const SAVE_DEBOUNCE_MS = 700;
-const SWIPE_THRESHOLD_PX = 50;
+/** How far the thumb must travel sideways before it counts as a swipe. */
+const SWIPE_THRESHOLD_PX = 60;
+/**
+ * ...and it must be that much MORE sideways than vertical. Scrolling a long
+ * list drifts horizontally by a surprising amount, which was flipping the day
+ * mid-scroll; requiring the gesture to be decisively horizontal fixes it.
+ */
+const SWIPE_AXIS_RATIO = 1.8;
 
 export function WorkoutBoard({ board }: { board: Board }) {
   const [dayIndex, setDayIndex] = useState(0);
@@ -42,7 +49,7 @@ export function WorkoutBoard({ board }: { board: Board }) {
 
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [, startTransition] = useTransition();
-  const touchStartX = useRef<number | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const day = board.days[dayIndex];
 
@@ -87,14 +94,22 @@ export function WorkoutBoard({ board }: { board: Board }) {
   return (
     <div
       onTouchStart={(e) => {
-        touchStartX.current = e.touches[0]?.clientX ?? null;
+        const t = e.touches[0];
+        touchStart.current = t ? { x: t.clientX, y: t.clientY } : null;
       }}
       onTouchEnd={(e) => {
-        const start = touchStartX.current;
-        if (start == null) return;
-        const dx = (e.changedTouches[0]?.clientX ?? start) - start;
-        if (Math.abs(dx) > SWIPE_THRESHOLD_PX) go(dx < 0 ? 1 : -1);
-        touchStartX.current = null;
+        const start = touchStart.current;
+        touchStart.current = null;
+        if (!start) return;
+        const t = e.changedTouches[0];
+        if (!t) return;
+        const dx = t.clientX - start.x;
+        const dy = t.clientY - start.y;
+        // Only a decisively horizontal drag flips the day — otherwise scrolling
+        // the list (which always drifts sideways a little) changes it by accident.
+        if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+        if (Math.abs(dx) < Math.abs(dy) * SWIPE_AXIS_RATIO) return;
+        go(dx < 0 ? 1 : -1);
       }}
     >
       {/* Day switcher — arrows rotate Push → Pull → Legs */}
