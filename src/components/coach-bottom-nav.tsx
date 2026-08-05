@@ -35,16 +35,24 @@ const NAV_ITEMS: NavItem[] = [
     icon: "insights",
     matches: (p) => p.startsWith("/coach/insights"),
   },
+  {
+    href: "/coach/train",
+    label: "Train",
+    icon: "fitness_center",
+    matches: (p) => p.startsWith("/coach/train"),
+  },
   { href: "/coach/profile", label: "Profile", icon: "person" },
 ];
 
+// px-3 (the client nav uses px-6): six tabs need the extra room on a phone,
+// otherwise the labels collide.
 export function CoachBottomNav() {
   const pathname = usePathname();
 
   return (
     <nav
       aria-label="Primary"
-      className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-6 pt-4 pb-safe bg-cream/85 backdrop-blur-xl shadow-nav-top rounded-t-xl border-t border-outline-variant/40"
+      className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-3 pt-4 pb-safe bg-cream/85 backdrop-blur-xl shadow-nav-top rounded-t-xl border-t border-outline-variant/40"
     >
       {NAV_ITEMS.map((item) => {
         const isActive = item.matches

@@ -101,6 +101,7 @@ model User {
   dailyTotals        DailyTotals[]
   weeklyCheckIns     WeeklyCheckIn[]
   dailyWeighIns      DailyWeighIn[]
+  workoutSettings    WorkoutSetting[]
   waistEntries       WaistEntry[]
   dayPicks           DayPick[]
   mealDislikes       MealDislike[]
@@ -857,4 +858,24 @@ model IgAccountSnapshot {
   capturedAt       DateTime @default(now())
 
   @@index([capturedAt])
+}
+
+/// Per-exercise training numbers for the /coach/train tracker (RIVEN's own
+/// push/pull/legs board). One row per (user, exercise). `weightChangedAt` is
+/// tracked separately from `updatedAt` because progression is measured by how
+/// long the WEIGHT has sat still — that's the "time to go up" signal.
+model WorkoutSetting {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseKey     String
+  sets            Int
+  reps            Int
+  weightLb        Int
+  weightChangedAt DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, exerciseKey])
+  @@index([userId])
 }
